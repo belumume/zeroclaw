@@ -348,11 +348,17 @@ def main() -> int:
                             )
                         elif ci_status == "api_error":
                             ci_err = ci_check_proc.stderr.strip() if ci_check_proc else ""
-                            warnings.append(
-                                f"Could not query CI status for commit {tag_commit}: {ci_err}"
-                            )
+                            msg = f"Could not query CI status for commit {tag_commit}: {ci_err}"
+                            if publish_release:
+                                violations.append(f"{msg}. Failing closed because CI gate could not be verified.")
+                            else:
+                                warnings.append(msg)
                         elif ci_status == "gh_not_found":
-                            pass  # already handled as warning in except block
+                            if publish_release:
+                                violations.append(
+                                    "gh CLI not found; cannot enforce CI Required Gate in publish mode."
+                                )
+                            # verify mode: already handled as warning in except block
                         else:
                             violations.append(
                                 f"CI Required Gate conclusion is '{ci_status}' (expected 'success') "
