@@ -309,22 +309,30 @@ def main() -> int:
 
                     # --- CI green gate (blocking) ---
                     if tag_commit:
-                        ci_check_proc = subprocess.run(
-                            [
-                                "gh", "api",
-                                f"repos/{args.repository}/commits/{tag_commit}/check-runs",
-                                "--jq",
-                                '[.check_runs[] | select(.name == "CI Required Gate")] | '
-                                'if length == 0 then "not_found" '
-                                'elif .[0].conclusion == "success" then "success" '
-                                'elif .[0].status != "completed" then "pending" '
-                                'else .[0].conclusion end',
-                            ],
-                            text=True,
-                            capture_output=True,
-                            check=False,
-                        )
-                        ci_status = ci_check_proc.stdout.strip() if ci_check_proc.returncode == 0 else "api_error"
+                        ci_check_proc = None
+                        try:
+                            ci_check_proc = subprocess.run(
+                                [
+                                    "gh", "api",
+                                    f"repos/{args.repository}/commits/{tag_commit}/check-runs",
+                                    "--jq",
+                                    '[.check_runs[] | select(.name == "CI Required Gate")] | '
+                                    'if length == 0 then "not_found" '
+                                    'elif .[0].conclusion == "success" then "success" '
+                                    'elif .[0].status != "completed" then "pending" '
+                                    'else .[0].conclusion end',
+                                ],
+                                text=True,
+                                capture_output=True,
+                                check=False,
+                            )
+                            ci_status = ci_check_proc.stdout.strip() if ci_check_proc.returncode == 0 else "api_error"
+                        except FileNotFoundError:
+                            ci_status = "gh_not_found"
+                            warnings.append(
+                                "gh CLI not found; CI status check skipped. "
+                                "Install gh to enable CI gate enforcement."
+                            )
 
                         if ci_status == "success":
                             pass  # CI passed on the tagged commit
@@ -339,10 +347,12 @@ def main() -> int:
                                 "Wait for CI Required Gate to complete before publishing."
                             )
                         elif ci_status == "api_error":
+                            ci_err = ci_check_proc.stderr.strip() if ci_check_proc else ""
                             warnings.append(
-                                f"Could not query CI status for commit {tag_commit}: "
-                                f"{ci_check_proc.stderr.strip()}"
+                                f"Could not query CI status for commit {tag_commit}: {ci_err}"
                             )
+                        elif ci_status == "gh_not_found":
+                            pass  # already handled as warning in except block
                         else:
                             violations.append(
                                 f"CI Required Gate conclusion is '{ci_status}' (expected 'success') "
@@ -351,18 +361,24 @@ def main() -> int:
 
                     # --- Dry run verification gate (advisory) ---
                     if tag_commit:
-                        dry_run_proc = subprocess.run(
-                            [
-                                "gh", "api",
-                                f"repos/{args.repository}/actions/workflows/pub-release.yml/runs",
-                                "--jq",
-                                f'[.workflow_runs[] | select(.head_sha == "{tag_commit}" and .conclusion == "success")] | length',
-                            ],
-                            text=True,
-                            capture_output=True,
-                            check=False,
-                        )
-                        dry_run_count_str = dry_run_proc.stdout.strip() if dry_run_proc.returncode == 0 else ""
+                        try:
+                            dry_run_proc = subprocess.run(
+                                [
+                                    "gh", "api",
+                                    f"repos/{args.repository}/actions/workflows/pub-release.yml/runs",
+                                    "--jq",
+                                    f'[.workflow_runs[] | select(.head_sha == "{tag_commit}" and .conclusion == "success")] | length',
+                                ],
+                                text=True,
+                                capture_output=True,
+                                check=False,
+                            )
+                            dry_run_count_str = dry_run_proc.stdout.strip() if dry_run_proc.returncode == 0 else ""
+                        except FileNotFoundError:
+                            dry_run_count_str = ""
+                            warnings.append(
+                                "gh CLI not found; dry-run history check skipped."
+                            )
                         try:
                             dry_run_count = int(dry_run_count_str)
                         except ValueError:

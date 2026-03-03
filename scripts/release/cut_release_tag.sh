@@ -99,8 +99,9 @@ fi
 # --- Cargo.lock consistency pre-flight ---
 echo "Checking Cargo.lock consistency..."
 if command -v cargo >/dev/null 2>&1; then
-  if ! cargo check --locked --quiet 2>/dev/null; then
-    echo "error: Cargo.lock is out of date. Run 'cargo check' and commit the updated Cargo.lock." >&2
+  if ! cargo check --locked --quiet; then
+    echo "error: cargo check --locked failed." >&2
+    echo "hint: if this is lockfile drift, run 'cargo check' and commit the updated Cargo.lock." >&2
     exit 1
   fi
   echo "Cargo.lock: consistent"
