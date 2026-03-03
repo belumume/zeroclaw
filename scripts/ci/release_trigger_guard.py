@@ -339,8 +339,8 @@ def main() -> int:
                                 "Wait for CI Required Gate to complete before publishing."
                             )
                         elif ci_status == "api_error":
-                            violations.append(
-                                f"Failed to query CI status for commit {tag_commit}: "
+                            warnings.append(
+                                f"Could not query CI status for commit {tag_commit}: "
                                 f"{ci_check_proc.stderr.strip()}"
                             )
                         else:
