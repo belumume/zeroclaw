@@ -54,6 +54,10 @@ pub async fn run(config: Config, host: String, port: u16) -> Result<()> {
 
     crate::health::mark_component_ok("daemon");
 
+    // Shared broadcast channel so all daemon components (gateway, cron,
+    // heartbeat) can publish real-time events to dashboard clients.
+    let (event_tx, _rx) = tokio::sync::broadcast::channel::<serde_json::Value>(256);
+
     if config.heartbeat.enabled {
         let _ =
             crate::heartbeat::engine::HeartbeatEngine::ensure_heartbeat_file(&config.workspace_dir)
@@ -65,6 +69,7 @@ pub async fn run(config: Config, host: String, port: u16) -> Result<()> {
     {
         let gateway_cfg = config.clone();
         let gateway_host = host.clone();
+        let gateway_event_tx = event_tx.clone();
         handles.push(spawn_component_supervisor(
             "gateway",
             initial_backoff,
@@ -72,7 +77,10 @@ pub async fn run(config: Config, host: String, port: u16) -> Result<()> {
             move || {
                 let cfg = gateway_cfg.clone();
                 let host = gateway_host.clone();
-                async move { Box::pin(crate::gateway::run_gateway(&host, port, cfg)).await }
+                let tx = gateway_event_tx.clone();
+                async move {
+                    Box::pin(crate::gateway::run_gateway(&host, port, cfg, Some(tx))).await
+                }
             },
         ));
     }
@@ -126,13 +134,15 @@ pub async fn run(config: Config, host: String, port: u16) -> Result<()> {
 
     if config.cron.enabled {
         let scheduler_cfg = config.clone();
+        let scheduler_event_tx = event_tx.clone();
         handles.push(spawn_component_supervisor(
             "scheduler",
             initial_backoff,
             max_backoff,
             move || {
                 let cfg = scheduler_cfg.clone();
-                async move { Box::pin(crate::cron::scheduler::run(cfg)).await }
+                let tx = scheduler_event_tx.clone();
+                async move { Box::pin(crate::cron::scheduler::run(cfg, Some(tx))).await }
             },
         ));
     } else {

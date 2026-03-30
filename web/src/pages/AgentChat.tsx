@@ -235,6 +235,23 @@ export default function AgentChat() {
           break;
         }
 
+        case 'cron_result': {
+          const cronOutput = msg.output ?? '';
+          if (cronOutput) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: generateUUID(),
+                role: 'agent' as const,
+                content: cronOutput,
+                markdown: true,
+                timestamp: new Date(msg.timestamp ?? Date.now()),
+              },
+            ]);
+          }
+          break;
+        }
+
         case 'error':
           setMessages((prev) => [
             ...prev,

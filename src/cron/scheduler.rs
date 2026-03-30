@@ -26,7 +26,11 @@ const MIN_POLL_SECONDS: u64 = 5;
 const SHELL_JOB_TIMEOUT_SECS: u64 = 120;
 const SCHEDULER_COMPONENT: &str = "scheduler";
 
-pub async fn run(config: Config) -> Result<()> {
+/// Type alias for the optional broadcast sender used to push cron results
+/// to connected dashboard/SSE clients.
+pub type EventBroadcast = Option<tokio::sync::broadcast::Sender<serde_json::Value>>;
+
+pub async fn run(config: Config, event_tx: EventBroadcast) -> Result<()> {
     let poll_secs = config.reliability.scheduler_poll_secs.max(MIN_POLL_SECONDS);
     let mut interval = time::interval(Duration::from_secs(poll_secs));
     interval.set_missed_tick_behavior(time::MissedTickBehavior::Skip);
@@ -82,7 +86,7 @@ pub async fn run(config: Config) -> Result<()> {
     //    without the `max_tasks` limit so every missed job fires once.
     //    Controlled by `[cron] catch_up_on_startup` (default: true).
     if config.cron.catch_up_on_startup {
-        catch_up_overdue_jobs(&config, &security).await;
+        catch_up_overdue_jobs(&config, &security, &event_tx).await;
     } else {
         tracing::info!("Scheduler startup: catch-up disabled by config");
     }
@@ -101,7 +105,7 @@ pub async fn run(config: Config) -> Result<()> {
             }
         };
 
-        process_due_jobs(&config, &security, jobs, SCHEDULER_COMPONENT).await;
+        process_due_jobs(&config, &security, jobs, SCHEDULER_COMPONENT, &event_tx).await;
     }
 }
 
@@ -109,7 +113,11 @@ pub async fn run(config: Config) -> Result<()> {
 ///
 /// Called once at scheduler startup so that jobs missed during downtime
 /// (e.g. late boot, daemon restart) are caught up immediately.
-async fn catch_up_overdue_jobs(config: &Config, security: &Arc<SecurityPolicy>) {
+async fn catch_up_overdue_jobs(
+    config: &Config,
+    security: &Arc<SecurityPolicy>,
+    event_tx: &EventBroadcast,
+) {
     let now = Utc::now();
     let jobs = match all_overdue_jobs(config, now) {
         Ok(jobs) => jobs,
@@ -129,7 +137,7 @@ async fn catch_up_overdue_jobs(config: &Config, security: &Arc<SecurityPolicy>) 
         "Scheduler startup: catching up overdue jobs"
     );
 
-    process_due_jobs(config, security, jobs, SCHEDULER_COMPONENT).await;
+    process_due_jobs(config, security, jobs, SCHEDULER_COMPONENT, event_tx).await;
 
     tracing::info!("Scheduler startup: catch-up complete");
 }
@@ -179,6 +187,7 @@ async fn process_due_jobs(
     security: &Arc<SecurityPolicy>,
     jobs: Vec<CronJob>,
     component: &str,
+    event_tx: &EventBroadcast,
 ) {
     // Refresh scheduler health on every successful poll cycle, including idle cycles.
     crate::health::mark_component_ok(component);
@@ -203,6 +212,16 @@ async fn process_due_jobs(
     while let Some((job_id, success, output)) = in_flight.next().await {
         if !success {
             tracing::warn!("Scheduler job '{job_id}' failed: {output}");
+        }
+        // Broadcast cron result to dashboard/SSE clients.
+        if let Some(tx) = event_tx {
+            let _ = tx.send(serde_json::json!({
+                "type": "cron_result",
+                "job_id": job_id,
+                "success": success,
+                "output": output,
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+            }));
         }
     }
 }

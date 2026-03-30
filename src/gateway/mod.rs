@@ -377,7 +377,12 @@ pub struct AppState {
 
 /// Run the HTTP gateway using axum with proper HTTP/1.1 compliance.
 #[allow(clippy::too_many_lines)]
-pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
+pub async fn run_gateway(
+    host: &str,
+    port: u16,
+    config: Config,
+    external_event_tx: Option<tokio::sync::broadcast::Sender<serde_json::Value>>,
+) -> Result<()> {
     // ── Security: warn on public bind without tunnel or explicit opt-in ──
     if is_public_bind(host) && config.tunnel.provider == "none" && !config.gateway.allow_public_bind
     {
@@ -536,8 +541,13 @@ pub async fn run_gateway(host: &str, port: u16, config: Config) -> Result<()> {
     // Cost tracker — process-global singleton so channels share the same instance
     let cost_tracker = CostTracker::get_or_init_global(config.cost.clone(), &config.workspace_dir);
 
-    // SSE broadcast channel for real-time events
-    let (event_tx, _event_rx) = tokio::sync::broadcast::channel::<serde_json::Value>(256);
+    // SSE broadcast channel for real-time events.
+    // Use an externally provided sender (e.g. from the daemon) so that other
+    // components (cron, heartbeat) can publish events to the same bus.
+    let event_tx = external_event_tx.unwrap_or_else(|| {
+        let (tx, _rx) = tokio::sync::broadcast::channel::<serde_json::Value>(256);
+        tx
+    });
     // Extract webhook secret for authentication
     let webhook_secret_hash: Option<Arc<str>> =
         config.channels_config.webhook.as_ref().and_then(|webhook| {
