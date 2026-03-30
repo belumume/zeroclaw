@@ -33,7 +33,12 @@ const DRAFT_KEY = 'agent-chat';
 export default function AgentChat() {
   const sessionIdRef = useRef(getOrCreateSessionId());
   const { draft, saveDraft, clearDraft } = useDraft(DRAFT_KEY);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    // Synchronously hydrate from localStorage so messages survive tab switches
+    // without a flash of empty state. Server hydration may override later.
+    const persisted = loadChatHistory(sessionIdRef.current);
+    return persisted.length > 0 ? persistedToUiMessages(persisted) : [];
+  });
   const [historyReady, setHistoryReady] = useState(false);
   const [input, setInput] = useState(draft);
   const [typing, setTyping] = useState(false);
