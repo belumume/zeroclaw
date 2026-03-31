@@ -44,8 +44,27 @@ function eventTypeStyle(type: string): { color: string; bg: string; border: stri
 
 interface LogEntry { id: string; event: SSEEvent; }
 
+const LOG_STORAGE_KEY = 'zeroclaw_live_logs';
+const MAX_PERSISTED_LOGS = 200;
+
+function loadPersistedLogs(): LogEntry[] {
+  try {
+    const raw = sessionStorage.getItem(LOG_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as LogEntry[];
+  } catch {
+    return [];
+  }
+}
+
+function persistLogs(entries: LogEntry[]): void {
+  try {
+    sessionStorage.setItem(LOG_STORAGE_KEY, JSON.stringify(entries.slice(-MAX_PERSISTED_LOGS)));
+  } catch { /* QuotaExceeded */ }
+}
+
 export default function Logs() {
-  const [entries, setEntries] = useState<LogEntry[]>([]);
+  const [entries, setEntries] = useState<LogEntry[]>(() => loadPersistedLogs());
   const [paused, setPaused] = useState(false);
   const [connected, setConnected] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -54,7 +73,10 @@ export default function Logs() {
   const containerRef = useRef<HTMLDivElement>(null);
   const sseRef = useRef<SSEClient | null>(null);
   const pausedRef = useRef(false);
-  const entryIdRef = useRef(0);
+  const entryIdRef = useRef(entries.length);
+
+  // Persist logs to sessionStorage so they survive tab switches
+  useEffect(() => { persistLogs(entries); }, [entries]);
 
   // Keep pausedRef in sync
   useEffect(() => { pausedRef.current = paused; }, [paused]);
