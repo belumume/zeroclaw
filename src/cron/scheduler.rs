@@ -1083,7 +1083,7 @@ mod tests {
         let component = unique_component("scheduler-idle");
 
         crate::health::mark_component_error(&component, "pre-existing error");
-        process_due_jobs(&config, &security, Vec::new(), &component).await;
+        process_due_jobs(&config, &security, Vec::new(), &component, &None).await;
 
         let snapshot = crate::health::snapshot_json();
         let entry = &snapshot["components"][component.as_str()];
@@ -1104,7 +1104,7 @@ mod tests {
         let component = unique_component("scheduler-fail");
 
         crate::health::mark_component_ok(&component);
-        process_due_jobs(&config, &security, vec![job], &component).await;
+        process_due_jobs(&config, &security, vec![job], &component, &None).await;
 
         let snapshot = crate::health::snapshot_json();
         let entry = &snapshot["components"][component.as_str()];
@@ -1467,5 +1467,89 @@ mod tests {
         let redacted = scan_and_redact_output("telegram", "123456", clean_output);
 
         assert_eq!(redacted.as_str(), clean_output);
+    }
+
+    // ── Broadcast / EventBroadcast tests ─────────────────────────────
+
+    #[tokio::test]
+    async fn broadcast_sends_cron_result_on_success() {
+        let tmp = TempDir::new().unwrap();
+        let config = test_config(&tmp).await;
+        let job = test_job("echo broadcast-ok");
+        let security = Arc::new(SecurityPolicy::from_config(
+            &config.autonomy,
+            &config.workspace_dir,
+        ));
+        let component = unique_component("broadcast-ok");
+
+        let (tx, mut rx) = tokio::sync::broadcast::channel::<serde_json::Value>(16);
+        let event_tx: EventBroadcast = Some(tx);
+
+        process_due_jobs(&config, &security, vec![job], &component, &event_tx).await;
+
+        let event = rx.try_recv().expect("should receive a broadcast event");
+        assert_eq!(event["type"], "cron_result");
+        assert_eq!(event["job_id"], "test-job");
+        assert_eq!(event["success"], true);
+        assert!(event["output"].as_str().unwrap().contains("broadcast-ok"));
+        assert!(event["timestamp"].as_str().is_some());
+    }
+
+    #[tokio::test]
+    async fn broadcast_sends_cron_result_on_failure() {
+        let tmp = TempDir::new().unwrap();
+        let config = test_config(&tmp).await;
+        let job = test_job("ls definitely_missing_file_for_broadcast_fail_test");
+        let security = Arc::new(SecurityPolicy::from_config(
+            &config.autonomy,
+            &config.workspace_dir,
+        ));
+        let component = unique_component("broadcast-fail");
+
+        let (tx, mut rx) = tokio::sync::broadcast::channel::<serde_json::Value>(16);
+        let event_tx: EventBroadcast = Some(tx);
+
+        process_due_jobs(&config, &security, vec![job], &component, &event_tx).await;
+
+        let event = rx.try_recv().expect("should receive a broadcast event");
+        assert_eq!(event["type"], "cron_result");
+        assert_eq!(event["job_id"], "test-job");
+        assert_eq!(event["success"], false);
+        assert!(event["timestamp"].as_str().is_some());
+    }
+
+    #[tokio::test]
+    async fn broadcast_none_skips_without_error() {
+        let tmp = TempDir::new().unwrap();
+        let config = test_config(&tmp).await;
+        let job = test_job("echo no-broadcast");
+        let security = Arc::new(SecurityPolicy::from_config(
+            &config.autonomy,
+            &config.workspace_dir,
+        ));
+        let component = unique_component("broadcast-none");
+
+        // event_tx = None — should complete without panic.
+        process_due_jobs(&config, &security, vec![job], &component, &None).await;
+    }
+
+    #[tokio::test]
+    async fn broadcast_handles_no_subscribers() {
+        let tmp = TempDir::new().unwrap();
+        let config = test_config(&tmp).await;
+        let job = test_job("echo no-subscribers");
+        let security = Arc::new(SecurityPolicy::from_config(
+            &config.autonomy,
+            &config.workspace_dir,
+        ));
+        let component = unique_component("broadcast-no-sub");
+
+        let (tx, _) = tokio::sync::broadcast::channel::<serde_json::Value>(16);
+        // Drop the only receiver immediately — `let _ = tx.send(...)` in
+        // process_due_jobs must not panic when there are no subscribers.
+        let event_tx: EventBroadcast = Some(tx);
+
+        process_due_jobs(&config, &security, vec![job], &component, &event_tx).await;
+        // If we got here without panic, the test passes.
     }
 }
