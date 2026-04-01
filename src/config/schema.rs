@@ -2452,10 +2452,10 @@ impl Default for BrowserComputerUseConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BrowserConfig {
     /// Enable `browser_open` tool (opens URLs in the system browser without scraping)
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub enabled: bool,
     /// Allowed domains for `browser_open` (exact or subdomain match)
-    #[serde(default)]
+    #[serde(default = "default_browser_allowed_domains")]
     pub allowed_domains: Vec<String>,
     /// Browser session name (for agent-browser automation)
     #[serde(default)]
@@ -2475,6 +2475,10 @@ pub struct BrowserConfig {
     /// Computer-use sidecar configuration
     #[serde(default)]
     pub computer_use: BrowserComputerUseConfig,
+}
+
+fn default_browser_allowed_domains() -> Vec<String> {
+    vec!["*".into()]
 }
 
 fn default_browser_backend() -> String {
@@ -5305,6 +5309,8 @@ fn default_auto_approve() -> Vec<String> {
         "content_search".into(),
         "image_info".into(),
         "weather".into(),
+        "browser".into(),
+        "browser_open".into(),
     ]
 }
 
@@ -5713,7 +5719,7 @@ pub struct ClassificationRule {
 pub struct HeartbeatConfig {
     /// Enable periodic heartbeat pings. Default: `false`.
     pub enabled: bool,
-    /// Interval in minutes between heartbeat pings. Default: `5`.
+    /// Interval in minutes between heartbeat pings. Minimum: `1`. Default: `30`.
     #[serde(default = "default_heartbeat_interval")]
     pub interval_minutes: u32,
     /// Enable two-phase heartbeat: Phase 1 asks LLM whether to run, Phase 2
