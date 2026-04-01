@@ -5717,7 +5717,7 @@ pub struct ClassificationRule {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct HeartbeatConfig {
-    /// Enable periodic heartbeat pings. Default: `false`.
+    /// Enable periodic heartbeat pings. Default: `true`.
     pub enabled: bool,
     /// Interval in minutes between heartbeat pings. Minimum: `1`. Default: `30`.
     #[serde(default = "default_heartbeat_interval")]
@@ -5804,7 +5804,7 @@ fn default_heartbeat_task_timeout() -> u64 {
 impl Default for HeartbeatConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             interval_minutes: default_heartbeat_interval(),
             two_phase: true,
             message: None,
@@ -11272,7 +11272,7 @@ mod tests {
     #[test]
     async fn heartbeat_config_default() {
         let h = HeartbeatConfig::default();
-        assert!(!h.enabled);
+        assert!(h.enabled);
         assert_eq!(h.interval_minutes, 30);
         assert!(h.message.is_none());
         assert!(h.target.is_none());
@@ -11648,7 +11648,7 @@ default_temperature = 0.7
         assert_eq!(parsed.observability.runtime_trace_mode, "none");
         assert_eq!(parsed.autonomy.level, AutonomyLevel::Supervised);
         assert_eq!(parsed.runtime.kind, "native");
-        assert!(!parsed.heartbeat.enabled);
+        assert!(parsed.heartbeat.enabled);
         assert!(parsed.channels_config.cli);
         assert!(parsed.memory.hygiene_enabled);
         assert_eq!(parsed.memory.archive_after_days, 7);
