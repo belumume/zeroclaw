@@ -308,7 +308,7 @@ async fn run_heartbeat_worker(config: Config) -> Result<()> {
         });
     }
 
-    let base_interval = config.heartbeat.interval_minutes.max(5);
+    let base_interval = config.heartbeat.interval_minutes.max(1);
     let mut sleep_mins = base_interval;
 
     loop {
