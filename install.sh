@@ -1435,11 +1435,16 @@ if [[ "$SKIP_ONBOARD" == false && -n "$ZEROCLAW_BIN" ]]; then
     else
       step_fail "Provider configuration failed — run zeroclaw onboard --tui to retry"
     fi
-  elif [[ -t 0 && -t 1 ]]; then
-    # Interactive terminal: launch TUI onboarding wizard
+  elif [[ -t 1 ]] && [[ -t 0 || -e /dev/tty ]]; then
+    # Interactive terminal: launch TUI onboarding wizard.
+    # When piped (curl | bash), stdin is not a TTY — reopen from /dev/tty.
     echo
     step_dot "Launching TUI onboarding wizard"
-    "$ZEROCLAW_BIN" onboard --tui || warn "TUI setup exited — run zeroclaw onboard --tui to retry"
+    if [[ -t 0 ]]; then
+      "$ZEROCLAW_BIN" onboard --tui || warn "TUI setup exited — run zeroclaw onboard --tui to retry"
+    else
+      "$ZEROCLAW_BIN" onboard --tui </dev/tty || warn "TUI setup exited — run zeroclaw onboard --tui to retry"
+    fi
   else
     step_dot "No API key provided — run zeroclaw onboard --tui to configure"
   fi
