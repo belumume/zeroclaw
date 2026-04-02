@@ -141,7 +141,8 @@ export interface WsMessage {
     | 'done'
     | 'error'
     | 'session_start'
-    | 'connected';
+    | 'connected'
+    | 'cron_result';
   content?: string;
   full_response?: string;
   name?: string;
@@ -152,6 +153,9 @@ export interface WsMessage {
   session_id?: string;
   resumed?: boolean;
   message_count?: number;
+  timestamp?: string;
+  job_id?: string;
+  success?: boolean;
 }
 
 /** Row from GET /api/sessions/{id}/messages */
