@@ -129,6 +129,8 @@ pub async fn run_wizard(force: bool) -> Result<Config> {
     let config = Config {
         workspace_dir: workspace_dir.clone(),
         config_path: config_path.clone(),
+        schema_version: crate::config::migration::CURRENT_SCHEMA_VERSION,
+        providers: crate::config::providers::ProvidersConfig::default(),
         api_key: if api_key.is_empty() {
             None
         } else {
@@ -587,6 +589,8 @@ async fn run_quick_setup_with_home(
     let config = Config {
         workspace_dir: workspace_dir.clone(),
         config_path: config_path.clone(),
+        schema_version: crate::config::migration::CURRENT_SCHEMA_VERSION,
+        providers: crate::config::providers::ProvidersConfig::default(),
         api_key: credential_override.map(|c| {
             let mut s = String::with_capacity(c.len());
             s.push_str(c);
@@ -4349,7 +4353,7 @@ fn setup_channels(existing: Option<ChannelsConfig>) -> Result<ChannelsConfig> {
                 let room_id: String = if let Some(ref mx) = config.matrix {
                     Input::new()
                         .with_prompt("  Room ID (e.g. !abc123:matrix.org)")
-                        .default(mx.room_id.clone())
+                        .default(mx.room_id.clone().unwrap_or_default())
                         .interact_text()?
                 } else {
                     Input::new()
@@ -4400,7 +4404,7 @@ fn setup_channels(existing: Option<ChannelsConfig>) -> Result<ChannelsConfig> {
                     access_token,
                     user_id: detected_user_id,
                     device_id: detected_device_id,
-                    room_id,
+                    room_id: Some(room_id),
                     allowed_users,
                     // Preserve non-prompted fields from existing config (#4655)
                     allowed_rooms: existing_mx

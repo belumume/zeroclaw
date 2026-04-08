@@ -859,7 +859,7 @@ fn apply_tui_selections_to_config(app: &App, config: &mut Config) {
                     access_token: String::from("YOUR_MATRIX_ACCESS_TOKEN"),
                     user_id: None,
                     device_id: None,
-                    room_id: String::from("!YOUR_ROOM_ID:matrix.org"),
+                    room_id: Some(String::from("!YOUR_ROOM_ID:matrix.org")),
                     allowed_users: vec![],
                     allowed_rooms: vec![],
                     interrupt_on_new_message: false,

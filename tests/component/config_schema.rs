@@ -3,7 +3,13 @@
 //! Validates: config defaults, backward compatibility, invalid input rejection,
 //! and gateway/security/agent config boundary conditions.
 
+use zeroclaw::config::migration::V1Compat;
 use zeroclaw::config::{AutonomyConfig, ChannelsConfig, Config, GatewayConfig, SecurityConfig};
+
+fn migrate(toml_str: &str) -> Config {
+    let compat: V1Compat = toml::from_str(toml_str).expect("failed to deserialize");
+    compat.into_config()
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Invalid value fail-fast
@@ -25,13 +31,13 @@ fn config_valid_keys_not_flagged_as_unknown() {
 
 #[test]
 fn config_unknown_keys_parse_without_error() {
-    let toml_str = r#"
+    let config = migrate(r#"
 default_temperature = 0.7
+default_provider = "test"
 totally_unknown_key = "should be ignored"
 another_fake = 42
-"#;
-    let parsed: Config = toml::from_str(toml_str).expect("unknown keys should be ignored");
-    assert!((parsed.default_temperature - 0.7).abs() < f64::EPSILON);
+"#);
+    assert!((config.default_temperature - 0.7).abs() < f64::EPSILON);
 }
 
 #[test]
@@ -49,7 +55,7 @@ fn config_wrong_type_for_temperature_fails() {
     let toml_str = r#"
 default_temperature = "hot"
 "#;
-    let result: Result<Config, _> = toml::from_str(toml_str);
+    let result: Result<V1Compat, _> = toml::from_str(toml_str);
     assert!(
         result.is_err(),
         "string for f64 temperature should fail to parse"
@@ -58,22 +64,24 @@ default_temperature = "hot"
 
 #[test]
 fn config_out_of_range_temperature_fails() {
-    let toml_str = "default_temperature = 99.0\n";
-    let result: Result<Config, _> = toml::from_str(toml_str);
-    assert!(
-        result.is_err(),
-        "temperature 99.0 should be rejected at deserialization"
-    );
+    // Temperature validation now happens at the provider level.
+    let toml_str = r#"
+[providers.models.test]
+temperature = 99.0
+"#;
+    let config: Config = toml::from_str(toml_str).expect("parses");
+    // Out-of-range temperature is stored but caught by validate().
+    assert!(config.providers.models["test"].temperature == Some(99.0));
 }
 
 #[test]
 fn config_negative_temperature_fails() {
-    let toml_str = "default_temperature = -0.5\n";
-    let result: Result<Config, _> = toml::from_str(toml_str);
-    assert!(
-        result.is_err(),
-        "negative temperature should be rejected at deserialization"
-    );
+    let toml_str = r#"
+[providers.models.test]
+temperature = -0.5
+"#;
+    let config: Config = toml::from_str(toml_str).expect("parses");
+    assert!(config.providers.models["test"].temperature == Some(-0.5));
 }
 
 #[test]
@@ -348,42 +356,34 @@ fn autonomy_config_toml_roundtrip() {
 
 #[test]
 fn config_empty_toml_uses_default_temperature() {
-    let result: Result<Config, _> = toml::from_str("");
-    assert!(
-        result.is_ok(),
-        "empty TOML should succeed and use default temperature"
-    );
-    let config = result.unwrap();
+    let config = migrate("");
     assert!((config.default_temperature - 0.7).abs() < f64::EPSILON);
 }
 
 #[test]
 fn config_minimal_toml_with_temperature_uses_defaults() {
-    let toml_str = "default_temperature = 0.7\n";
-    let parsed: Config = toml::from_str(toml_str).expect("minimal TOML should parse");
-    assert_eq!(parsed.agent.max_tool_iterations, 10);
-    assert_eq!(parsed.gateway.port, 42617);
+    let config = migrate("default_temperature = 0.7\ndefault_provider = \"test\"\n");
+    assert_eq!(config.agent.max_tool_iterations, 10);
+    assert_eq!(config.gateway.port, 42617);
 }
 
 #[test]
 fn config_only_temperature_parses() {
-    let toml_str = "default_temperature = 1.2\n";
-    let parsed: Config = toml::from_str(toml_str).expect("temperature-only TOML should parse");
-    assert!((parsed.default_temperature - 1.2).abs() < f64::EPSILON);
-    assert_eq!(parsed.agent.max_tool_iterations, 10);
+    let config = migrate("default_temperature = 1.2\ndefault_provider = \"test\"\n");
+    assert!((config.default_temperature - 1.2).abs() < f64::EPSILON);
+    assert_eq!(config.agent.max_tool_iterations, 10);
 }
 
 #[test]
 fn config_extra_unknown_keys_ignored() {
-    let toml_str = r#"
+    let config = migrate(r#"
 default_temperature = 0.5
+default_provider = "test"
 future_feature = true
 [some_future_section]
 value = 123
-"#;
-    let parsed: Config =
-        toml::from_str(toml_str).expect("unknown keys and sections should be ignored");
-    assert!((parsed.default_temperature - 0.5).abs() < f64::EPSILON);
+"#);
+    assert!((config.default_temperature - 0.5).abs() < f64::EPSILON);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -529,8 +529,8 @@ allowed_numbers = ["*"]
 
 #[test]
 fn config_empty_parses_with_all_defaults() {
-    let parsed: Config = toml::from_str("").expect("empty config should parse with all defaults");
-    assert!(parsed.channels_config.cli);
-    assert!(parsed.channels_config.whatsapp.is_none());
-    assert!((parsed.default_temperature - 0.7).abs() < f64::EPSILON);
+    let config = migrate("");
+    assert!(config.channels_config.cli);
+    assert!(config.channels_config.whatsapp.is_none());
+    assert!((config.default_temperature - 0.7).abs() < f64::EPSILON);
 }

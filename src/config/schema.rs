@@ -72,55 +72,55 @@ pub struct Config {
     /// Path to config.toml - computed from home, not serialized
     #[serde(skip)]
     pub config_path: PathBuf,
-    /// API key for the selected provider. Overridden by `ZEROCLAW_API_KEY` or `API_KEY` env vars.
+    /// Config file schema version.
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+
+    /// Provider configuration (`[providers]`).
+    #[serde(default)]
+    #[nested]
+    pub providers: crate::config::providers::ProvidersConfig,
+
+    // ── Resolved provider cache ────────────────────────────────────
+    //
+    // These fields are NOT serialized or deserialized. They exist solely as a
+    // runtime cache populated by `resolve_provider_cache()` after migration.
+    // The canonical source of truth is `providers.models[providers.fallback]`.
+    //
+    // They preserve backward compatibility with the hundreds of call sites that
+    // read `config.api_key`, `config.default_provider`, etc. directly. Writes
+    // should go through `config.providers` instead.
+
+    /// V1 `api_key` → V2 `providers.models.<fallback>.api_key`
+    #[serde(skip)]
     #[secret]
     pub api_key: Option<String>,
-    /// Base URL override for provider API (e.g. "http://10.0.0.1:11434" for remote Ollama)
+    /// V1 `api_url` → V2 `providers.models.<fallback>.base_url`
+    #[serde(skip)]
     pub api_url: Option<String>,
-    /// Custom API path suffix for OpenAI-compatible / custom providers
-    /// (e.g. "/v2/generate" instead of the default "/v1/chat/completions").
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// V1 `api_path` → V2 `providers.models.<fallback>.api_path`
+    #[serde(skip)]
     pub api_path: Option<String>,
-    /// Default provider ID or alias (e.g. `"openrouter"`, `"ollama"`, `"anthropic"`). Default: `"openrouter"`.
-    #[serde(alias = "model_provider")]
+    /// V1 `default_provider` → V2 `providers.fallback`
+    #[serde(skip)]
     pub default_provider: Option<String>,
-    /// Default model routed through the selected provider (e.g. `"anthropic/claude-sonnet-4-6"`).
-    #[serde(alias = "model")]
+    /// V1 `default_model` → V2 `providers.models.<fallback>.model`
+    #[serde(skip)]
     pub default_model: Option<String>,
-    /// Optional named provider profiles keyed by id (Codex app-server compatible layout).
-    #[serde(default)]
+    /// V1 `model_providers` → V2 `providers.models`
+    #[serde(skip)]
     pub model_providers: HashMap<String, ModelProviderConfig>,
-    /// Default model temperature (0.0–2.0). Default: `0.7`.
-    #[serde(
-        default = "default_temperature",
-        deserialize_with = "deserialize_temperature"
-    )]
+    /// V1 `default_temperature` → V2 `providers.models.<fallback>.temperature`
+    #[serde(skip)]
     pub default_temperature: f64,
-
-    /// HTTP request timeout in seconds for LLM provider API calls. Default: `120`.
-    ///
-    /// Increase for slower backends (e.g., llama.cpp on constrained hardware)
-    /// that need more time processing large contexts.
-    #[serde(default = "default_provider_timeout_secs")]
+    /// V1 `provider_timeout_secs` → V2 `providers.models.<fallback>.timeout_secs`
+    #[serde(skip)]
     pub provider_timeout_secs: u64,
-
-    /// Maximum output tokens to include in LLM provider API requests.
-    ///
-    /// When set, overrides each provider's built-in default. This is especially
-    /// important for OpenRouter where the platform default (65536) can cause 402
-    /// errors for models with lower output limits.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// V1 `provider_max_tokens` → V2 `providers.models.<fallback>.max_tokens`
+    #[serde(skip)]
     pub provider_max_tokens: Option<u32>,
-
-    /// Extra HTTP headers to include in LLM provider API requests.
-    ///
-    /// Some providers require specific headers (e.g., `User-Agent`, `HTTP-Referer`,
-    /// `X-Title`) for request routing or policy enforcement. Headers defined here
-    /// augment (and override) the program's default headers.
-    ///
-    /// Can also be set via `ZEROCLAW_EXTRA_HEADERS` environment variable using
-    /// the format `Key:Value,Key2:Value2`. Env var headers override config file headers.
-    #[serde(default)]
+    /// V1 `extra_headers` → V2 `providers.models.<fallback>.extra_headers`
+    #[serde(skip)]
     pub extra_headers: HashMap<String, String>,
 
     /// Observability backend configuration (`[observability]`).
@@ -551,44 +551,54 @@ impl Default for WorkspaceConfig {
     }
 }
 
-/// Named provider profile definition compatible with Codex app-server style config.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
+/// Named provider profile definition.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Configurable, Default)]
+#[prefix = "providers.models"]
 pub struct ModelProviderConfig {
-    /// Optional provider type/name override (e.g. "openai", "openai-codex", or custom profile id).
+    /// API key for this provider.
+    #[secret]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+    /// Optional provider type/name override.
     #[serde(default)]
     pub name: Option<String>,
-    /// Optional base URL for OpenAI-compatible endpoints.
+    /// Base URL for OpenAI-compatible endpoints.
     #[serde(default)]
     pub base_url: Option<String>,
-    /// Optional custom API path suffix (e.g. "/v2/generate" instead of the
-    /// default "/v1/chat/completions"). Only used by OpenAI-compatible / custom providers.
+    /// Custom API path suffix.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_path: Option<String>,
+    /// Default model for this provider.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// Model temperature (0.0–2.0).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
+    /// HTTP timeout in seconds for API calls.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_secs: Option<u64>,
+    /// Extra HTTP headers for API requests.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub extra_headers: HashMap<String, String>,
     /// Provider protocol variant ("responses" or "chat_completions").
     #[serde(default)]
     pub wire_api: Option<String>,
     /// If true, load OpenAI auth material (OPENAI_API_KEY or ~/.codex/auth.json).
     #[serde(default)]
     pub requires_openai_auth: bool,
-    /// Azure OpenAI resource name (e.g. "my-resource" in https://my-resource.openai.azure.com).
+    /// Azure OpenAI resource name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub azure_openai_resource: Option<String>,
-    /// Azure OpenAI deployment name (e.g. "gpt-4o").
+    /// Azure OpenAI deployment name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub azure_openai_deployment: Option<String>,
-    /// Azure OpenAI API version (defaults to "2024-08-01-preview").
+    /// Azure OpenAI API version.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub azure_openai_api_version: Option<String>,
-    /// Optional maximum output tokens to send in API requests.
-    /// When set, overrides the provider's default `max_tokens` value.
-    /// Useful for providers like OpenRouter where the platform default (65536)
-    /// may exceed a model's actual limit.
+    /// Maximum output tokens for API requests.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
-    /// When true, all system messages are collected and prepended to the first
-    /// user message instead of being sent with `role: system`. Native tool
-    /// calling is preserved. Useful for local model servers (e.g. llama.cpp)
-    /// whose chat template rejects system messages at non-first positions.
+    /// Merge system messages into first user message.
     #[serde(default)]
     pub merge_system_into_user: bool,
 }
@@ -725,6 +735,12 @@ const DEFAULT_TEMPERATURE: f64 = 0.7;
 
 fn default_temperature() -> f64 {
     DEFAULT_TEMPERATURE
+}
+
+/// Defaults to 0 so configs without an explicit `schema_version` are recognized
+/// as pre-versioning and get migrated.
+fn default_schema_version() -> u32 {
+    0
 }
 
 /// Default provider HTTP request timeout: 120 seconds.
@@ -7065,8 +7081,9 @@ pub struct MatrixConfig {
     /// Optional Matrix device ID.
     #[serde(default)]
     pub device_id: Option<String>,
-    /// Matrix room ID to listen in (e.g. `"!abc123:matrix.org"`).
-    pub room_id: String,
+    /// Deprecated: use `allowed_rooms` instead. Migrated by schema V2.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub room_id: Option<String>,
     /// Allowed Matrix user IDs. Empty = deny all.
     pub allowed_users: Vec<String>,
     /// Allowed Matrix room IDs or aliases. Empty = allow all rooms.
@@ -8856,6 +8873,8 @@ impl Default for Config {
         Self {
             workspace_dir: zeroclaw_dir.join("workspace"),
             config_path: zeroclaw_dir.join("config.toml"),
+            schema_version: crate::config::migration::CURRENT_SCHEMA_VERSION,
+            providers: crate::config::providers::ProvidersConfig::default(),
             api_key: None,
             api_url: None,
             api_path: None,
@@ -9373,6 +9392,7 @@ impl Config {
     /// Remaining keys are probed: the key is deserialized in isolation and
     /// the result compared to the default — a changed output means serde
     /// consumed it (covers `Option<T>` fields and `#[serde(alias)]` names).
+    /// V1 legacy keys (consumed by migration) are also accepted.
     pub fn unknown_keys(raw_toml: &str) -> Vec<String> {
         let raw: toml::Table = match raw_toml.parse() {
             Ok(t) => t,
@@ -9388,6 +9408,10 @@ impl Config {
         raw.keys()
             .filter(|key| {
                 if defaults.contains_key(key.as_str()) {
+                    return false;
+                }
+                // V1 legacy keys are handled by migration, not unknown.
+                if crate::config::migration::V1_LEGACY_KEYS.contains(&key.as_str()) {
                     return false;
                 }
                 let mut t = toml::Table::new();
@@ -9454,8 +9478,9 @@ impl Config {
             //
             // We now deserialize with `toml::from_str` (which is correct)
             // and run `serde_ignored` separately just for diagnostics.
-            let mut config: Config =
+            let compat: crate::config::migration::V1Compat =
                 toml::from_str(&contents).context("Failed to deserialize config file")?;
+            let mut config: Config = compat.into_config();
 
             // Ensure the built-in default auto_approve entries are always
             // present.  When a user specifies `auto_approve` in their TOML

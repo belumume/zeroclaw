@@ -1,3 +1,5 @@
+pub mod migration;
+pub mod providers;
 pub mod schema;
 pub mod traits;
 pub mod workspace;
@@ -36,6 +38,8 @@ pub use schema::{
     set_runtime_proxy_config, ws_connect_with_proxy,
 };
 
+pub use providers::ProvidersConfig;
+pub use schema::ModelProviderConfig;
 pub use traits::HasPropKind;
 pub use traits::PropFieldInfo;
 pub use traits::PropKind;
