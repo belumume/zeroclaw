@@ -284,9 +284,14 @@ fn toml_to_edit_value(v: &toml::Value) -> toml_edit::Value {
             .to_string()
             .parse()
             .unwrap_or_else(|_| toml_edit::Value::from(dt.to_string())),
-        toml::Value::Table(_) => {
-            // Tables are handled by sync_table recursion, not leaf conversion.
-            unreachable!("sync_table handles tables before calling toml_to_edit_value")
+        toml::Value::Table(tbl) => {
+            // Tables inside arrays (e.g. `[[providers.model_routes]]`) need to be
+            // converted to inline tables so they can be pushed into a toml_edit Array.
+            let mut inline = toml_edit::InlineTable::new();
+            for (k, v) in tbl {
+                inline.insert(k, toml_to_edit_value(v));
+            }
+            toml_edit::Value::InlineTable(inline)
         }
     }
 }

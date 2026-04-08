@@ -10981,7 +10981,9 @@ mod tests {
             merged.push(']');
         }
         merged.push('\n');
-        let mut config: Config = toml::from_str(&merged).unwrap();
+        // Deserialize through V1Compat to handle legacy top-level fields.
+        let compat: crate::config::migration::V1Compat = toml::from_str(&merged).unwrap();
+        let mut config = compat.into_config();
         config.autonomy.ensure_default_auto_approve();
         config
     }
@@ -11068,12 +11070,16 @@ mod tests {
             .and_then(serde_json::Value::as_object)
             .expect("schema should expose top-level properties");
 
-        assert!(properties.contains_key("default_provider"));
+        assert!(properties.contains_key("providers"));
         assert!(properties.contains_key("skills"));
         assert!(properties.contains_key("gateway"));
         assert!(properties.contains_key("channels_config"));
         assert!(!properties.contains_key("workspace_dir"));
         assert!(!properties.contains_key("config_path"));
+        // These fields are now #[serde(skip)] cache fields, not in schema.
+        assert!(!properties.contains_key("default_provider"));
+        assert!(!properties.contains_key("api_key"));
+        assert!(!properties.contains_key("default_model"));
 
         assert!(
             schema_json
@@ -11315,18 +11321,36 @@ auto_save = true
 
     #[test]
     async fn config_toml_roundtrip() {
-        let config = Config {
+        let mut config = Config {
             schema_version: crate::config::migration::CURRENT_SCHEMA_VERSION,
-            providers: crate::config::providers::ProvidersConfig::default(),
+            providers: crate::config::providers::ProvidersConfig {
+                fallback: Some("openrouter".into()),
+                models: {
+                    let mut m = HashMap::new();
+                    m.insert(
+                        "openrouter".into(),
+                        ModelProviderConfig {
+                            api_key: Some("sk-test-key".into()),
+                            model: Some("gpt-4o".into()),
+                            temperature: Some(0.5),
+                            timeout_secs: Some(120),
+                            ..Default::default()
+                        },
+                    );
+                    m
+                },
+                model_routes: Vec::new(),
+                embedding_routes: Vec::new(),
+            },
             workspace_dir: PathBuf::from("/tmp/test/workspace"),
             config_path: PathBuf::from("/tmp/test/config.toml"),
-            api_key: Some("sk-test-key".into()),
+            api_key: None,
             api_url: None,
             api_path: None,
-            default_provider: Some("openrouter".into()),
-            default_model: Some("gpt-4o".into()),
+            default_provider: None,
+            default_model: None,
             model_providers: HashMap::new(),
-            default_temperature: 0.5,
+            default_temperature: 0.7,
             provider_timeout_secs: 120,
             provider_max_tokens: None,
             extra_headers: HashMap::new(),
@@ -11481,6 +11505,7 @@ auto_save = true
             sop: SopConfig::default(),
             shell_tool: ShellToolConfig::default(),
         };
+        config.resolve_provider_cache();
 
         let toml_str = toml::to_string_pretty(&config).unwrap();
         let parsed = parse_test_config(&toml_str);
@@ -11518,7 +11543,6 @@ default_temperature = 0.7
 "#;
         let parsed = parse_test_config(minimal);
         assert!(parsed.api_key.is_none());
-        assert!(parsed.default_provider.is_none());
         assert_eq!(parsed.observability.backend, "none");
         assert_eq!(parsed.observability.runtime_trace_mode, "none");
         assert_eq!(parsed.autonomy.level, AutonomyLevel::Supervised);
@@ -11529,8 +11553,9 @@ default_temperature = 0.7
         assert_eq!(parsed.memory.archive_after_days, 7);
         assert_eq!(parsed.memory.purge_after_days, 30);
         assert_eq!(parsed.memory.conversation_retention_days, 30);
-        // provider_timeout_secs defaults to 120 when not specified
-        assert_eq!(parsed.provider_timeout_secs, 120);
+        // Temperature migrated to the fallback provider entry, resolved back to cache
+        assert!((parsed.default_temperature - 0.7).abs() < f64::EPSILON);
+        assert_eq!(parsed.provider_timeout_secs, DEFAULT_PROVIDER_TIMEOUT_SECS);
     }
 
     /// Regression test for #4171: the `[autonomy]` section must not be
@@ -11927,19 +11952,31 @@ default_temperature = 0.7
         fs::create_dir_all(&dir).await.unwrap();
 
         let config_path = dir.join("config.toml");
-        let config = Config {
+        let mut providers = crate::config::providers::ProvidersConfig::default();
+        providers.fallback = Some("openrouter".into());
+        providers.models.insert(
+            "openrouter".into(),
+            ModelProviderConfig {
+                api_key: Some("sk-roundtrip".into()),
+                model: Some("test-model".into()),
+                temperature: Some(0.9),
+                timeout_secs: Some(120),
+                ..Default::default()
+            },
+        );
+        let mut config = Config {
             schema_version: crate::config::migration::CURRENT_SCHEMA_VERSION,
-            providers: crate::config::providers::ProvidersConfig::default(),
+            providers,
             workspace_dir: dir.join("workspace"),
             config_path: config_path.clone(),
-            api_key: Some("sk-roundtrip".into()),
+            api_key: None,
             api_url: None,
             api_path: None,
-            default_provider: Some("openrouter".into()),
-            default_model: Some("test-model".into()),
+            default_provider: None,
+            default_model: None,
             model_providers: HashMap::new(),
-            default_temperature: 0.9,
-            provider_timeout_secs: 120,
+            default_temperature: 0.0,
+            provider_timeout_secs: 0,
             provider_max_tokens: None,
             extra_headers: HashMap::new(),
             observability: ObservabilityConfig::default(),
@@ -12014,22 +12051,29 @@ default_temperature = 0.7
             shell_tool: ShellToolConfig::default(),
         };
 
+        config.resolve_provider_cache();
         config.save().await.unwrap();
         assert!(config_path.exists());
 
         let contents = tokio::fs::read_to_string(&config_path).await.unwrap();
-        let loaded: Config = toml::from_str(&contents).unwrap();
+        let compat: crate::config::migration::V1Compat = toml::from_str(&contents).unwrap();
+        let loaded = compat.into_config();
+        let entry = &loaded.providers.models["openrouter"];
         assert!(
-            loaded
+            entry
                 .api_key
                 .as_deref()
                 .is_some_and(crate::security::SecretStore::is_encrypted)
         );
         let store = crate::security::SecretStore::new(&dir, true);
-        let decrypted = store.decrypt(loaded.api_key.as_deref().unwrap()).unwrap();
+        let decrypted = store.decrypt(entry.api_key.as_deref().unwrap()).unwrap();
         assert_eq!(decrypted, "sk-roundtrip");
-        assert_eq!(loaded.default_model.as_deref(), Some("test-model"));
-        assert!((loaded.default_temperature - 0.9).abs() < f64::EPSILON);
+        assert_eq!(entry.model.as_deref(), Some("test-model"));
+        assert!(
+            entry
+                .temperature
+                .is_some_and(|t| (t - 0.9).abs() < f64::EPSILON)
+        );
 
         let _ = fs::remove_dir_all(&dir).await;
     }
@@ -12045,7 +12089,15 @@ default_temperature = 0.7
         let mut config = Config::default();
         config.workspace_dir = dir.join("workspace");
         config.config_path = dir.join("config.toml");
-        config.api_key = Some("root-credential".into());
+        config.providers.fallback = Some("default".into());
+        config.providers.models.insert(
+            "default".into(),
+            ModelProviderConfig {
+                api_key: Some("root-credential".into()),
+                ..Default::default()
+            },
+        );
+        config.resolve_provider_cache();
         config.composio.api_key = Some("composio-credential".into());
         config.browser.computer_use.api_key = Some("browser-credential".into());
         config.web_search.brave_api_key = Some("brave-credential".into());
@@ -12086,10 +12138,17 @@ default_temperature = 0.7
         let contents = tokio::fs::read_to_string(config.config_path.clone())
             .await
             .unwrap();
-        let stored: Config = toml::from_str(&contents).unwrap();
+        let stored: Config = toml::from_str::<crate::config::migration::V1Compat>(&contents)
+            .unwrap()
+            .into_config();
         let store = crate::security::SecretStore::new(&dir, true);
 
-        let root_encrypted = stored.api_key.as_deref().unwrap();
+        let root_encrypted = stored
+            .providers
+            .models
+            .get("default")
+            .and_then(|m| m.api_key.as_deref())
+            .unwrap();
         assert!(crate::security::SecretStore::is_encrypted(root_encrypted));
         assert_eq!(store.decrypt(root_encrypted).unwrap(), "root-credential");
 
@@ -12175,11 +12234,18 @@ default_temperature = 0.7
         let mut config = Config::default();
         config.workspace_dir = dir.join("workspace");
         config.config_path = config_path.clone();
-        config.default_model = Some("model-a".into());
+        config.providers.fallback = Some("test".into());
+        config.providers.models.insert(
+            "test".into(),
+            ModelProviderConfig {
+                model: Some("model-a".into()),
+                ..Default::default()
+            },
+        );
         config.save().await.unwrap();
         assert!(config_path.exists());
 
-        config.default_model = Some("model-b".into());
+        config.providers.models.get_mut("test").unwrap().model = Some("model-b".into());
         config.save().await.unwrap();
 
         let contents = tokio::fs::read_to_string(&config_path).await.unwrap();
@@ -13566,7 +13632,15 @@ requires_openai_auth = true
         let mut config = Config::default();
         config.workspace_dir = workspace_dir;
         config.config_path = PathBuf::from("config.toml");
-        config.default_temperature = 0.5;
+        config.providers.fallback = Some("default".into());
+        config.providers.models.insert(
+            "default".into(),
+            ModelProviderConfig {
+                temperature: Some(0.5),
+                ..Default::default()
+            },
+        );
+        config.resolve_provider_cache();
         config.save().await.unwrap();
 
         assert!(resolved_config_path.exists());

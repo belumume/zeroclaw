@@ -710,25 +710,34 @@ async fn save_tui_config(app: &App) -> Result<()> {
 fn apply_tui_selections_to_config(app: &App, config: &mut Config) {
     // ── Provider ────────────────────────────────────────────────────
     let provider_id = app.selected_provider_id();
-    config.default_provider = Some(provider_id.to_string());
+    config.providers.fallback = Some(provider_id.to_string());
+
+    let entry = config
+        .providers
+        .models
+        .entry(provider_id.to_string())
+        .or_default();
 
     // Clear stale custom provider URL if switching away from custom
     if !provider_id.starts_with("custom") {
-        config.api_url = None;
+        entry.base_url = None;
     }
 
     // API key (if entered)
     if !app.api_key_input.is_empty() {
-        config.api_key = Some(app.api_key_input.clone());
+        entry.api_key = Some(app.api_key_input.clone());
     }
 
     // ── Model ───────────────────────────────────────────────────────
     let model = app.selected_model();
     if model == "Auto (recommended)" {
-        config.default_model = None; // Let provider pick default
+        entry.model = None; // Let provider pick default
     } else {
-        config.default_model = Some(model.to_string());
+        entry.model = Some(model.to_string());
     }
+
+    // Populate runtime cache from providers.
+    config.resolve_provider_cache();
 
     // ── Channel ─────────────────────────────────────────────────────
     // Create a stub config for the selected channel with placeholder
@@ -3231,7 +3240,15 @@ mod tests {
     fn save_no_api_key_when_empty() {
         let app = test_app(); // api_key_input is empty
         let mut config = Config::default();
-        config.api_key = Some("existing-key".to_string());
+        config.providers.fallback = Some("openrouter".into());
+        config.providers.models.insert(
+            "openrouter".into(),
+            crate::config::schema::ModelProviderConfig {
+                api_key: Some("existing-key".to_string()),
+                ..Default::default()
+            },
+        );
+        config.resolve_provider_cache();
         apply_tui_selections_to_config(&app, &mut config);
         // Should preserve existing key, not overwrite with empty
         assert_eq!(config.api_key.as_deref(), Some("existing-key"));
@@ -3791,7 +3808,9 @@ mod tests {
         assert!(toml_str.contains("openrouter"));
 
         // Verify it parses back
-        let _: Config = toml::from_str(&toml_str).expect("serialized TOML should parse back");
+        let _: Config = toml::from_str::<crate::config::migration::V1Compat>(&toml_str)
+            .expect("serialized TOML should parse back")
+            .into_config();
     }
 
     #[test]
@@ -3822,8 +3841,9 @@ mod tests {
 
             let toml_str = toml::to_string(&config)
                 .unwrap_or_else(|e| panic!("failed to serialize config for {channel_name}: {e}"));
-            let _: Config = toml::from_str(&toml_str)
-                .unwrap_or_else(|e| panic!("failed to deserialize config for {channel_name}: {e}"));
+            let _: Config = toml::from_str::<crate::config::migration::V1Compat>(&toml_str)
+                .unwrap_or_else(|e| panic!("failed to deserialize config for {channel_name}: {e}"))
+                .into_config();
         }
     }
 }

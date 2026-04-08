@@ -6531,8 +6531,8 @@ mod tests {
         assert_eq!(config.api_key.as_deref(), Some("sk-force"));
 
         let config_raw = tokio::fs::read_to_string(config.config_path).await.unwrap();
-        assert!(config_raw.contains("default_provider = \"openrouter\""));
-        assert!(config_raw.contains("default_model = \"custom-model-fresh\""));
+        assert!(config_raw.contains("fallback = \"openrouter\""));
+        assert!(config_raw.contains("model = \"custom-model-fresh\""));
     }
 
     #[tokio::test]

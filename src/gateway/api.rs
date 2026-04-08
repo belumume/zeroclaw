@@ -996,6 +996,17 @@ fn mask_sensitive_fields(config: &crate::config::Config) -> crate::config::Confi
         mask_optional_secret(&mut route.api_key);
     }
 
+    // Mask providers (serialized fields)
+    for model in masked.providers.models.values_mut() {
+        mask_optional_secret(&mut model.api_key);
+    }
+    for route in &mut masked.providers.model_routes {
+        mask_optional_secret(&mut route.api_key);
+    }
+    for route in &mut masked.providers.embedding_routes {
+        mask_optional_secret(&mut route.api_key);
+    }
+
     if let Some(telegram) = masked.channels_config.telegram.as_mut() {
         mask_required_secret(&mut telegram.bot_token);
     }
@@ -1672,7 +1683,15 @@ mod tests {
     #[test]
     fn masking_keeps_toml_valid_and_preserves_api_keys_type() {
         let mut cfg = crate::config::Config::default();
-        cfg.api_key = Some("sk-live-123".to_string());
+        cfg.providers.fallback = Some("default".into());
+        cfg.providers.models.insert(
+            "default".into(),
+            crate::config::schema::ModelProviderConfig {
+                api_key: Some("sk-live-123".to_string()),
+                ..Default::default()
+            },
+        );
+        cfg.resolve_provider_cache();
         cfg.reliability.api_keys = vec!["rk-1".to_string(), "rk-2".to_string()];
         cfg.gateway.paired_tokens = vec!["pair-token-1".to_string()];
         cfg.tunnel.cloudflare = Some(crate::config::schema::CloudflareTunnelConfig {
@@ -1713,26 +1732,36 @@ mod tests {
             default_subject: "ZeroClaw Message".to_string(),
             max_attachment_bytes: 25 * 1024 * 1024,
         });
-        cfg.model_routes = vec![crate::config::schema::ModelRouteConfig {
+        cfg.providers.model_routes = vec![crate::config::schema::ModelRouteConfig {
             hint: "reasoning".to_string(),
             provider: "openrouter".to_string(),
             model: "anthropic/claude-sonnet-4.6".to_string(),
             api_key: Some("route-model-key".to_string()),
         }];
-        cfg.embedding_routes = vec![crate::config::schema::EmbeddingRouteConfig {
+        cfg.providers.embedding_routes = vec![crate::config::schema::EmbeddingRouteConfig {
             hint: "semantic".to_string(),
             provider: "openai".to_string(),
             model: "text-embedding-3-small".to_string(),
             dimensions: Some(1536),
             api_key: Some("route-embed-key".to_string()),
         }];
+        cfg.resolve_provider_cache();
 
         let masked = mask_sensitive_fields(&cfg);
         let toml = toml::to_string_pretty(&masked).expect("masked config should serialize");
         let parsed: crate::config::Config =
-            toml::from_str(&toml).expect("masked config should remain valid TOML for Config");
+            toml::from_str::<crate::config::migration::V1Compat>(&toml)
+                .expect("masked config should remain valid TOML for Config")
+                .into_config();
 
-        assert_eq!(parsed.api_key.as_deref(), Some(MASKED_SECRET));
+        assert_eq!(
+            parsed
+                .providers
+                .models
+                .get("default")
+                .and_then(|m| m.api_key.as_deref()),
+            Some(MASKED_SECRET)
+        );
         assert_eq!(
             parsed.reliability.api_keys,
             vec![MASKED_SECRET.to_string(), MASKED_SECRET.to_string()]
@@ -1780,6 +1809,7 @@ mod tests {
         );
         assert_eq!(
             parsed
+                .providers
                 .model_routes
                 .first()
                 .and_then(|v| v.api_key.as_deref()),
@@ -1787,6 +1817,7 @@ mod tests {
         );
         assert_eq!(
             parsed
+                .providers
                 .embedding_routes
                 .first()
                 .and_then(|v| v.api_key.as_deref()),
