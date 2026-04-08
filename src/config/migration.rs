@@ -19,6 +19,25 @@ use super::schema::ModelProviderConfig;
 
 pub const CURRENT_SCHEMA_VERSION: u32 = 2;
 
+/// Top-level keys from V1 that are consumed by V1Compat during migration.
+/// Used by the unknown-key detector to suppress false "unknown key" warnings.
+pub const V1_LEGACY_KEYS: &[&str] = &[
+    "api_key",
+    "api_url",
+    "api_path",
+    "default_provider",
+    "model_provider",
+    "default_model",
+    "model",
+    "default_temperature",
+    "provider_timeout_secs",
+    "provider_max_tokens",
+    "extra_headers",
+    "model_providers",
+    "model_routes",
+    "embedding_routes",
+];
+
 /// Wraps the current Config with extra fields from V1 that no longer exist on Config.
 /// `#[serde(flatten)]` lets Config consume its known fields; the old fields are
 /// captured here.
@@ -48,6 +67,10 @@ pub struct V1Compat {
     provider_max_tokens: Option<u32>,
     #[serde(default)]
     extra_headers: Option<HashMap<String, String>>,
+    #[serde(default)]
+    model_routes: Vec<super::schema::ModelRouteConfig>,
+    #[serde(default)]
+    embedding_routes: Vec<super::schema::EmbeddingRouteConfig>,
 }
 
 impl V1Compat {
@@ -87,6 +110,8 @@ impl V1Compat {
             || self.provider_timeout_secs.is_some()
             || self.provider_max_tokens.is_some()
             || self.extra_headers.as_ref().is_some_and(|h| !h.is_empty())
+            || !self.model_routes.is_empty()
+            || !self.embedding_routes.is_empty()
     }
 
     fn migrate_providers(&mut self) {
@@ -138,6 +163,14 @@ impl V1Compat {
 
         if self.config.providers.fallback.is_none() {
             self.config.providers.fallback = Some(fallback);
+        }
+
+        // Move routing rules into providers.
+        if self.config.providers.model_routes.is_empty() && !self.model_routes.is_empty() {
+            self.config.providers.model_routes = std::mem::take(&mut self.model_routes);
+        }
+        if self.config.providers.embedding_routes.is_empty() && !self.embedding_routes.is_empty() {
+            self.config.providers.embedding_routes = std::mem::take(&mut self.embedding_routes);
         }
     }
 
@@ -227,8 +260,7 @@ fn values_equal(edit: &toml_edit::Value, toml: &toml::Value) -> bool {
         (toml_edit::Value::Float(a), toml::Value::Float(b)) => (a.value() - b).abs() < f64::EPSILON,
         (toml_edit::Value::Boolean(a), toml::Value::Boolean(b)) => a.value() == b,
         (toml_edit::Value::Array(a), toml::Value::Array(b)) => {
-            a.len() == b.len()
-                && a.iter().zip(b.iter()).all(|(ae, be)| values_equal(ae, be))
+            a.len() == b.len() && a.iter().zip(b.iter()).all(|(ae, be)| values_equal(ae, be))
         }
         _ => false,
     }
@@ -248,9 +280,10 @@ fn toml_to_edit_value(v: &toml::Value) -> toml_edit::Value {
             }
             toml_edit::Value::Array(a)
         }
-        toml::Value::Datetime(dt) => {
-            dt.to_string().parse().unwrap_or_else(|_| toml_edit::Value::from(dt.to_string()))
-        }
+        toml::Value::Datetime(dt) => dt
+            .to_string()
+            .parse()
+            .unwrap_or_else(|_| toml_edit::Value::from(dt.to_string())),
         toml::Value::Table(_) => {
             // Tables are handled by sync_table recursion, not leaf conversion.
             unreachable!("sync_table handles tables before calling toml_to_edit_value")

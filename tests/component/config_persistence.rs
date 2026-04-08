@@ -122,11 +122,14 @@ fn config_toml_roundtrip_preserves_provider() {
     use zeroclaw::config::ModelProviderConfig;
     let mut config = Config::default();
     config.providers.fallback = Some("deepseek".into());
-    config.providers.models.insert("deepseek".into(), ModelProviderConfig {
-        model: Some("deepseek-chat".into()),
-        temperature: Some(0.5),
-        ..Default::default()
-    });
+    config.providers.models.insert(
+        "deepseek".into(),
+        ModelProviderConfig {
+            model: Some("deepseek-chat".into()),
+            temperature: Some(0.5),
+            ..Default::default()
+        },
+    );
 
     let toml_str = toml::to_string(&config).expect("config should serialize to TOML");
     let compat: zeroclaw::config::migration::V1Compat =
@@ -182,10 +185,13 @@ fn config_file_write_read_roundtrip() {
 
     let mut config = Config::default();
     config.providers.fallback = Some("mistral".into());
-    config.providers.models.insert("mistral".into(), ModelProviderConfig {
-        model: Some("mistral-large".into()),
-        ..Default::default()
-    });
+    config.providers.models.insert(
+        "mistral".into(),
+        ModelProviderConfig {
+            model: Some("mistral-large".into()),
+            ..Default::default()
+        },
+    );
     config.agent.max_tool_iterations = 15;
 
     let toml_str = toml::to_string(&config).expect("config should serialize");

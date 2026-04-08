@@ -1817,8 +1817,13 @@ async fn main() -> Result<()> {
                     .context("Failed to read config file")?;
                 match crate::config::migration::migrate_file(&raw)? {
                     Some(migrated) => {
+                        let backup_path = config.config_path.with_extension("toml.bak");
+                        tokio::fs::copy(&config.config_path, &backup_path)
+                            .await
+                            .context("Failed to create config backup")?;
                         tokio::fs::write(&config.config_path, &migrated).await?;
                         let to = crate::config::migration::CURRENT_SCHEMA_VERSION;
+                        println!("Backed up to {}", backup_path.display());
                         println!(
                             "Migrated {} to schema version {to}.",
                             config.config_path.display()

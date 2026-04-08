@@ -133,7 +133,11 @@ pub async fn run_wizard(force: bool) -> Result<Config> {
         providers: {
             let mut p = crate::config::providers::ProvidersConfig::default();
             let mut entry = crate::config::ModelProviderConfig::default();
-            entry.api_key = if api_key.is_empty() { None } else { Some(api_key) };
+            entry.api_key = if api_key.is_empty() {
+                None
+            } else {
+                Some(api_key)
+            };
             entry.base_url = provider_api_url;
             entry.model = Some(model);
             entry.temperature = Some(0.7);
@@ -6353,7 +6357,10 @@ mod tests {
         let entry = &config.providers.models["openrouter"];
         assert_eq!(entry.api_key.as_deref(), Some("sk-updated"));
         assert_eq!(entry.model.as_deref(), Some("openai/gpt-5.2"));
-        assert_eq!(entry.base_url.as_deref(), Some("https://openrouter.ai/api/v1"));
+        assert_eq!(
+            entry.base_url.as_deref(),
+            Some("https://openrouter.ai/api/v1")
+        );
 
         // Resolved cache populated.
         assert_eq!(config.default_provider.as_deref(), Some("openrouter"));
@@ -6370,10 +6377,13 @@ mod tests {
         let mut config = Config::default();
         // Set up an existing provider entry.
         config.providers.fallback = Some("anthropic".into());
-        config.providers.models.insert("anthropic".into(), ModelProviderConfig {
-            api_key: Some("sk-old".into()),
-            ..Default::default()
-        });
+        config.providers.models.insert(
+            "anthropic".into(),
+            crate::config::ModelProviderConfig {
+                api_key: Some("sk-old".into()),
+                ..Default::default()
+            },
+        );
         config.resolve_provider_cache();
 
         apply_provider_update(
@@ -6416,8 +6426,14 @@ mod tests {
 
         // V2 canonical locations.
         assert_eq!(config.providers.fallback.as_deref(), Some("openrouter"));
-        assert_eq!(config.providers.models["openrouter"].model.as_deref(), Some("custom-model-946"));
-        assert_eq!(config.providers.models["openrouter"].api_key.as_deref(), Some("sk-issue946"));
+        assert_eq!(
+            config.providers.models["openrouter"].model.as_deref(),
+            Some("custom-model-946")
+        );
+        assert_eq!(
+            config.providers.models["openrouter"].api_key.as_deref(),
+            Some("sk-issue946")
+        );
 
         // Resolved cache.
         assert_eq!(config.default_provider.as_deref(), Some("openrouter"));
@@ -7938,7 +7954,7 @@ mod tests {
             access_token: "old-token".into(),
             user_id: None,
             device_id: None,
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec![],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -7971,7 +7987,7 @@ mod tests {
             access_token: "tok".into(),
             user_id: None,
             device_id: Some("ZEROCLAW".into()),
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec!["@u:m".into()],
             allowed_rooms: vec!["!keep:m.org".into()],
             interrupt_on_new_message: true,

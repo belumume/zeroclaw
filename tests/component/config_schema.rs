@@ -31,12 +31,14 @@ fn config_valid_keys_not_flagged_as_unknown() {
 
 #[test]
 fn config_unknown_keys_parse_without_error() {
-    let config = migrate(r#"
+    let config = migrate(
+        r#"
 default_temperature = 0.7
 default_provider = "test"
 totally_unknown_key = "should be ignored"
 another_fake = 42
-"#);
+"#,
+    );
     assert!((config.default_temperature - 0.7).abs() < f64::EPSILON);
 }
 
@@ -376,13 +378,15 @@ fn config_only_temperature_parses() {
 
 #[test]
 fn config_extra_unknown_keys_ignored() {
-    let config = migrate(r#"
+    let config = migrate(
+        r#"
 default_temperature = 0.5
 default_provider = "test"
 future_feature = true
 [some_future_section]
 value = 123
-"#);
+"#,
+    );
     assert!((config.default_temperature - 0.5).abs() < f64::EPSILON);
 }
 

@@ -4461,7 +4461,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 Ok(Arc::new(MatrixChannel::new(
                     mx.homeserver.clone(),
                     mx.access_token.clone(),
-                    mx.room_id.clone(),
+                    mx.room_id.clone().unwrap_or_default(),
                     mx.allowed_users.clone(),
                 )))
             }
@@ -4903,7 +4903,7 @@ fn collect_configured_channels(
                     MatrixChannel::new_full(
                         mx.homeserver.clone(),
                         mx.access_token.clone(),
-                        mx.room_id.clone(),
+                        mx.room_id.clone().unwrap_or_default(),
                         mx.allowed_users.clone(),
                         mx.allowed_rooms.clone(),
                         mx.user_id.clone(),

@@ -3,10 +3,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use zeroclaw_macros::Configurable;
 
-use super::schema::ModelProviderConfig;
+use super::schema::{EmbeddingRouteConfig, ModelProviderConfig, ModelRouteConfig};
 
-/// Top-level `[providers]` section. Wraps model provider profiles and an optional
-/// fallback reference.
+/// Top-level `[providers]` section. Wraps model provider profiles, routing rules,
+/// and an optional fallback reference.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Configurable, Default)]
 #[prefix = "providers"]
 pub struct ProvidersConfig {
@@ -19,4 +19,12 @@ pub struct ProvidersConfig {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     #[nested]
     pub models: HashMap<String, ModelProviderConfig>,
+
+    /// Model routing rules — route `hint:<name>` to specific provider+model combos.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub model_routes: Vec<ModelRouteConfig>,
+
+    /// Embedding routing rules — route `hint:<name>` to specific provider+model combos.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub embedding_routes: Vec<EmbeddingRouteConfig>,
 }

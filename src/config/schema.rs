@@ -90,7 +90,6 @@ pub struct Config {
     // They preserve backward compatibility with the hundreds of call sites that
     // read `config.api_key`, `config.default_provider`, etc. directly. Writes
     // should go through `config.providers` instead.
-
     /// V1 `api_key` → V2 `providers.models.<fallback>.api_key`
     #[serde(skip)]
     #[secret]
@@ -208,12 +207,11 @@ pub struct Config {
     #[nested]
     pub pipeline: PipelineConfig,
 
-    /// Model routing rules — route `hint:<name>` to specific provider+model combos.
-    #[serde(default)]
+    /// V1 `model_routes` → V2 `providers.model_routes`
+    #[serde(skip)]
     pub model_routes: Vec<ModelRouteConfig>,
-
-    /// Embedding routing rules — route `hint:<name>` to specific provider+model combos.
-    #[serde(default)]
+    /// V1 `embedding_routes` → V2 `providers.embedding_routes`
+    #[serde(skip)]
     pub embedding_routes: Vec<EmbeddingRouteConfig>,
 
     /// Automatic query classification — maps user messages to model hints.
@@ -9809,9 +9807,21 @@ impl Config {
                 .map(str::trim)
                 .is_some_and(|value| !value.is_empty());
 
-            if !has_name && !has_base_url {
+            // Entries created by migration from top-level fields use the provider
+            // name as the map key and may not have explicit `name` or `base_url`
+            // (the provider factory resolves known names). Only reject entries that
+            // have no identifying information at all.
+            let has_api_key = profile
+                .api_key
+                .as_deref()
+                .is_some_and(|v| !v.trim().is_empty());
+            let has_model = profile
+                .model
+                .as_deref()
+                .is_some_and(|v| !v.trim().is_empty());
+            if !has_name && !has_base_url && !has_api_key && !has_model {
                 anyhow::bail!(
-                    "model_providers.{profile_name} must define at least one of `name` or `base_url`"
+                    "providers.models.{profile_name} must define at least one of `name`, `base_url`, `api_key`, or `model`"
                 );
             }
 
@@ -10662,9 +10672,10 @@ impl Config {
             if existing.is_empty() {
                 new_toml
             } else {
-                let new_table: toml::Table = toml::from_str(&new_toml)
-                    .context("Failed to round-trip serialized config")?;
-                let mut doc: toml_edit::DocumentMut = existing.parse()
+                let new_table: toml::Table =
+                    toml::from_str(&new_toml).context("Failed to round-trip serialized config")?;
+                let mut doc: toml_edit::DocumentMut = existing
+                    .parse()
                     .context("Failed to parse existing config for comment preservation")?;
                 crate::config::migration::sync_table(doc.as_table_mut(), &new_table);
                 doc.to_string()
@@ -11305,6 +11316,8 @@ auto_save = true
     #[test]
     async fn config_toml_roundtrip() {
         let config = Config {
+            schema_version: crate::config::migration::CURRENT_SCHEMA_VERSION,
+            providers: crate::config::providers::ProvidersConfig::default(),
             workspace_dir: PathBuf::from("/tmp/test/workspace"),
             config_path: PathBuf::from("/tmp/test/config.toml"),
             api_key: Some("sk-test-key".into()),
@@ -11915,6 +11928,8 @@ default_temperature = 0.7
 
         let config_path = dir.join("config.toml");
         let config = Config {
+            schema_version: crate::config::migration::CURRENT_SCHEMA_VERSION,
+            providers: crate::config::providers::ProvidersConfig::default(),
             workspace_dir: dir.join("workspace"),
             config_path: config_path.clone(),
             api_key: Some("sk-roundtrip".into()),
@@ -12300,7 +12315,7 @@ default_temperature = 0.7
             access_token: "syt_token_abc".into(),
             user_id: Some("@bot:matrix.org".into()),
             device_id: Some("DEVICE123".into()),
-            room_id: "!room123:matrix.org".into(),
+            room_id: Some("!room123:matrix.org".into()),
             allowed_users: vec!["@user:matrix.org".into()],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -12315,7 +12330,7 @@ default_temperature = 0.7
         assert_eq!(parsed.access_token, "syt_token_abc");
         assert_eq!(parsed.user_id.as_deref(), Some("@bot:matrix.org"));
         assert_eq!(parsed.device_id.as_deref(), Some("DEVICE123"));
-        assert_eq!(parsed.room_id, "!room123:matrix.org");
+        assert_eq!(parsed.room_id.as_deref(), Some("!room123:matrix.org"));
         assert_eq!(parsed.allowed_users.len(), 1);
     }
 
@@ -12327,7 +12342,7 @@ default_temperature = 0.7
             access_token: "tok".into(),
             user_id: None,
             device_id: None,
-            room_id: "!abc:synapse.local".into(),
+            room_id: Some("!abc:synapse.local".into()),
             allowed_users: vec!["@admin:synapse.local".into(), "*".into()],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -12429,7 +12444,7 @@ allowed_users = ["@ops:matrix.org"]
                 access_token: "tok".into(),
                 user_id: None,
                 device_id: None,
-                room_id: "!r:m".into(),
+                room_id: Some("!r:m".into()),
                 allowed_users: vec!["@u:m".into()],
                 allowed_rooms: vec![],
                 interrupt_on_new_message: false,
@@ -15987,7 +16002,7 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             access_token: "tok".into(),
             user_id: None,
             device_id: None,
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec![],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -16013,7 +16028,7 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             access_token: String::new(),
             user_id: None,
             device_id: None,
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec![],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -16034,7 +16049,7 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             access_token: "old".into(),
             user_id: None,
             device_id: None,
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec![],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -16056,7 +16071,7 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             access_token: "tok".into(),
             user_id: None,
             device_id: None,
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec![],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -16081,7 +16096,7 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             access_token: "mx-tok".into(),
             user_id: None,
             device_id: None,
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec![],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -16107,7 +16122,7 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             access_token: "old".into(),
             user_id: None,
             device_id: None,
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec![],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -16154,7 +16169,7 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             access_token: "plaintext-token".into(),
             user_id: None,
             device_id: None,
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec![],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -16185,7 +16200,7 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             access_token: "plaintext-token".into(),
             user_id: None,
             device_id: None,
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec![],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -16214,7 +16229,7 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             access_token: "plaintext-token".into(),
             user_id: None,
             device_id: None,
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec![],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
@@ -16238,7 +16253,7 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             access_token: "tok".into(),
             user_id: Some("@bot:m.org".into()),
             device_id: None,
-            room_id: "!r:m".into(),
+            room_id: Some("!r:m".into()),
             allowed_users: vec![],
             allowed_rooms: vec![],
             interrupt_on_new_message: false,
