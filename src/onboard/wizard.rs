@@ -6336,7 +6336,6 @@ mod tests {
     #[test]
     fn apply_provider_update_preserves_non_provider_settings() {
         let mut config = Config::default();
-        config.default_temperature = 1.23;
         config.memory.backend = "markdown".to_string();
         config.skills.open_skills_enabled = true;
         config.channels_config.cli = false;
@@ -6349,14 +6348,18 @@ mod tests {
             Some("https://openrouter.ai/api/v1".to_string()),
         );
 
+        // V2 canonical location.
+        assert_eq!(config.providers.fallback.as_deref(), Some("openrouter"));
+        let entry = &config.providers.models["openrouter"];
+        assert_eq!(entry.api_key.as_deref(), Some("sk-updated"));
+        assert_eq!(entry.model.as_deref(), Some("openai/gpt-5.2"));
+        assert_eq!(entry.base_url.as_deref(), Some("https://openrouter.ai/api/v1"));
+
+        // Resolved cache populated.
         assert_eq!(config.default_provider.as_deref(), Some("openrouter"));
-        assert_eq!(config.default_model.as_deref(), Some("openai/gpt-5.2"));
         assert_eq!(config.api_key.as_deref(), Some("sk-updated"));
-        assert_eq!(
-            config.api_url.as_deref(),
-            Some("https://openrouter.ai/api/v1")
-        );
-        assert_eq!(config.default_temperature, 1.23);
+
+        // Non-provider settings untouched.
         assert_eq!(config.memory.backend, "markdown");
         assert!(config.skills.open_skills_enabled);
         assert!(!config.channels_config.cli);
@@ -6365,7 +6368,13 @@ mod tests {
     #[test]
     fn apply_provider_update_clears_api_key_when_empty() {
         let mut config = Config::default();
-        config.api_key = Some("sk-old".to_string());
+        // Set up an existing provider entry.
+        config.providers.fallback = Some("anthropic".into());
+        config.providers.models.insert("anthropic".into(), ModelProviderConfig {
+            api_key: Some("sk-old".into()),
+            ..Default::default()
+        });
+        config.resolve_provider_cache();
 
         apply_provider_update(
             &mut config,
@@ -6375,11 +6384,14 @@ mod tests {
             None,
         );
 
-        assert_eq!(config.default_provider.as_deref(), Some("anthropic"));
-        assert_eq!(
-            config.default_model.as_deref(),
-            Some("claude-sonnet-4-5-20250929")
-        );
+        // V2 canonical location.
+        assert_eq!(config.providers.fallback.as_deref(), Some("anthropic"));
+        let entry = &config.providers.models["anthropic"];
+        assert_eq!(entry.model.as_deref(), Some("claude-sonnet-4-5-20250929"));
+        assert!(entry.api_key.is_none());
+        assert!(entry.base_url.is_none());
+
+        // Resolved cache.
         assert!(config.api_key.is_none());
         assert!(config.api_url.is_none());
     }
@@ -6402,13 +6414,19 @@ mod tests {
         .await
         .unwrap();
 
+        // V2 canonical locations.
+        assert_eq!(config.providers.fallback.as_deref(), Some("openrouter"));
+        assert_eq!(config.providers.models["openrouter"].model.as_deref(), Some("custom-model-946"));
+        assert_eq!(config.providers.models["openrouter"].api_key.as_deref(), Some("sk-issue946"));
+
+        // Resolved cache.
         assert_eq!(config.default_provider.as_deref(), Some("openrouter"));
         assert_eq!(config.default_model.as_deref(), Some("custom-model-946"));
-        assert_eq!(config.api_key.as_deref(), Some("sk-issue946"));
 
+        // Serialized TOML uses V2 layout.
         let config_raw = tokio::fs::read_to_string(config.config_path).await.unwrap();
-        assert!(config_raw.contains("default_provider = \"openrouter\""));
-        assert!(config_raw.contains("default_model = \"custom-model-946\""));
+        assert!(config_raw.contains("[providers.models.openrouter]"));
+        assert!(config_raw.contains("model = \"custom-model-946\""));
     }
 
     #[tokio::test]

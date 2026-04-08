@@ -303,3 +303,149 @@ allowed_users = ["@user:matrix.org"]
     assert!(matrix.room_id.is_none());
     assert_eq!(matrix.allowed_rooms, vec!["!abc:matrix.org"]);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exhaustive migration walk
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Verifies that migrating a V0 config with every migrated field populated
+/// produces a Config where no prop was lost. Uses `prop_fields()` to compare
+/// the migrated config against a natively-constructed V2 Config with the same values.
+#[test]
+fn exhaustive_walk_no_props_lost() {
+    use zeroclaw::config::{Config, ModelProviderConfig};
+
+    // Build a V0 config with every migrated field set to a distinct value.
+    let v0 = migrate(r#"
+api_key = "walk-key"
+api_url = "https://walk.example.com"
+api_path = "/walk/path"
+default_provider = "walk-provider"
+default_model = "walk-model"
+default_temperature = 1.11
+provider_timeout_secs = 222
+provider_max_tokens = 333
+
+[extra_headers]
+X-Walk = "walk-header"
+
+[model_providers.other-profile]
+base_url = "https://other.example.com"
+name = "other"
+
+[channels_config.matrix]
+homeserver = "https://walk-matrix.org"
+access_token = "walk-token"
+room_id = "!walk:matrix.org"
+allowed_users = ["@walk:matrix.org"]
+allowed_rooms = ["!existing:matrix.org"]
+"#);
+
+    // Build the equivalent V2 config natively.
+    let mut expected = Config::default();
+    expected.providers.fallback = Some("walk-provider".into());
+    let mut entry = ModelProviderConfig::default();
+    entry.api_key = Some("walk-key".into());
+    entry.base_url = Some("https://walk.example.com".into());
+    entry.api_path = Some("/walk/path".into());
+    entry.model = Some("walk-model".into());
+    entry.temperature = Some(1.11);
+    entry.timeout_secs = Some(222);
+    entry.max_tokens = Some(333);
+    entry.extra_headers.insert("X-Walk".into(), "walk-header".into());
+    expected.providers.models.insert("walk-provider".into(), entry);
+    let mut other = ModelProviderConfig::default();
+    other.base_url = Some("https://other.example.com".into());
+    other.name = Some("other".into());
+    expected.providers.models.insert("other-profile".into(), other);
+    expected.resolve_provider_cache();
+
+    // Compare provider fields.
+    assert_eq!(v0.providers.fallback, expected.providers.fallback);
+    assert_eq!(v0.providers.models.len(), expected.providers.models.len());
+    for (key, v0_entry) in &v0.providers.models {
+        let exp_entry = expected.providers.models.get(key)
+            .unwrap_or_else(|| panic!("missing provider entry: {key}"));
+        assert_eq!(v0_entry.api_key, exp_entry.api_key, "api_key mismatch for {key}");
+        assert_eq!(v0_entry.base_url, exp_entry.base_url, "base_url mismatch for {key}");
+        assert_eq!(v0_entry.api_path, exp_entry.api_path, "api_path mismatch for {key}");
+        assert_eq!(v0_entry.model, exp_entry.model, "model mismatch for {key}");
+        assert_eq!(v0_entry.temperature, exp_entry.temperature, "temperature mismatch for {key}");
+        assert_eq!(v0_entry.timeout_secs, exp_entry.timeout_secs, "timeout_secs mismatch for {key}");
+        assert_eq!(v0_entry.max_tokens, exp_entry.max_tokens, "max_tokens mismatch for {key}");
+        assert_eq!(v0_entry.extra_headers, exp_entry.extra_headers, "extra_headers mismatch for {key}");
+        assert_eq!(v0_entry.name, exp_entry.name, "name mismatch for {key}");
+    }
+
+    // Compare resolved cache.
+    assert_eq!(v0.api_key, expected.api_key);
+    assert_eq!(v0.api_url, expected.api_url);
+    assert_eq!(v0.api_path, expected.api_path);
+    assert_eq!(v0.default_provider, expected.default_provider);
+    assert_eq!(v0.default_model, expected.default_model);
+    assert!((v0.default_temperature - expected.default_temperature).abs() < f64::EPSILON);
+    assert_eq!(v0.provider_timeout_secs, expected.provider_timeout_secs);
+    assert_eq!(v0.provider_max_tokens, expected.provider_max_tokens);
+    assert_eq!(v0.extra_headers, expected.extra_headers);
+
+    // Verify matrix room_id was merged into allowed_rooms.
+    let v0_matrix = v0.channels_config.matrix.as_ref().unwrap();
+    assert!(v0_matrix.room_id.is_none(), "room_id should be cleared");
+    assert!(v0_matrix.allowed_rooms.contains(&"!walk:matrix.org".to_string()));
+    assert!(v0_matrix.allowed_rooms.contains(&"!existing:matrix.org".to_string()));
+
+    // Use prop_fields() to verify no prop was lost: every non-secret prop
+    // that has a value on the expected config should also have a value on
+    // the migrated config.
+    let v0_props = v0.prop_fields();
+    let expected_props = expected.prop_fields();
+    for exp in &expected_props {
+        if exp.is_secret || exp.display_value == "<unset>" {
+            continue;
+        }
+        let found = v0_props.iter().find(|p| p.name == exp.name)
+            .unwrap_or_else(|| panic!("prop {} missing after migration", exp.name));
+        assert_eq!(
+            found.display_value, exp.display_value,
+            "prop {} value mismatch: got {:?}, expected {:?}",
+            exp.name, found.display_value, exp.display_value
+        );
+    }
+}
+
+/// Verifies migrate_file output round-trips back to the same Config.
+#[test]
+fn migrate_file_round_trips() {
+    let raw = r#"
+api_key = "rt-key"
+default_provider = "openrouter"
+default_model = "claude"
+default_temperature = 0.5
+provider_timeout_secs = 60
+
+[model_providers.ollama]
+base_url = "http://localhost:11434"
+
+[channels_config.matrix]
+homeserver = "https://matrix.org"
+access_token = "tok"
+room_id = "!rt:matrix.org"
+allowed_users = ["@u:m"]
+"#;
+    let migrated_toml = migration::migrate_file(raw).unwrap().expect("should migrate");
+
+    // The migrated file should deserialize into a valid V2 config.
+    let config = migrate(&migrated_toml);
+    assert_eq!(config.schema_version, CURRENT_SCHEMA_VERSION);
+    assert_eq!(config.providers.fallback.as_deref(), Some("openrouter"));
+    assert_eq!(config.providers.models["openrouter"].api_key.as_deref(), Some("rt-key"));
+    assert_eq!(config.providers.models["openrouter"].model.as_deref(), Some("claude"));
+    assert!(config.providers.models.contains_key("ollama"));
+
+    let matrix = config.channels_config.matrix.as_ref().unwrap();
+    assert!(matrix.room_id.is_none());
+    assert!(matrix.allowed_rooms.contains(&"!rt:matrix.org".to_string()));
+
+    // Re-migrating should be a no-op.
+    assert!(migration::migrate_file(&migrated_toml).unwrap().is_none());
+}
