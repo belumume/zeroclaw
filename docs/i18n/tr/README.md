@@ -651,7 +651,7 @@ Onboarding akışını geçtikten sonra daha derin referans istediğinizde bunla
 - Proxy ajan el kitabı: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Donanım rehberleri: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw, smooth crab 🦀 için inşa edildi — hızlı ve verimli bir AI asistanı. Argenis De La Rosa ve topluluk tarafından geliştirildi.
 

@@ -651,7 +651,7 @@ curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/master/insta
 - Εγχειρίδιο proxy agent: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Οδηγοί υλικού: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 Το ZeroClaw δημιουργήθηκε για τον smooth crab 🦀, έναν γρήγορο και αποδοτικό βοηθό AI. Δημιουργήθηκε από τον Argenis De La Rosa και την κοινότητα.
 

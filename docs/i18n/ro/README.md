@@ -651,7 +651,7 @@ Folosește-le când ai trecut de fluxul de onboarding și vrei referința mai de
 - Playbook proxy agent: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Ghiduri hardware: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw a fost construit pentru smooth crab 🦀, un asistent AI rapid și eficient. Construit de Argenis De La Rosa și comunitate.
 

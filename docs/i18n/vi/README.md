@@ -651,7 +651,7 @@ Dùng khi bạn đã hoàn thành onboarding và muốn tham khảo sâu hơn.
 - Sổ tay proxy agent: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Hướng dẫn phần cứng: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw được xây dựng cho smooth crab 🦀, một trợ lý AI nhanh và hiệu quả. Được xây dựng bởi Argenis De La Rosa và cộng đồng.
 

@@ -651,7 +651,7 @@ Používejte tyto, když jste prošli onboardingem a chcete hlubší referenci.
 - Příručka proxy agenta: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Hardwarové průvodce: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw byl vytvořen pro smooth crab 🦀, rychlého a efektivního AI asistenta. Vytvořil Argenis De La Rosa a komunita.
 

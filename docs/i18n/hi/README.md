@@ -651,7 +651,7 @@ curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/master/insta
 - प्रॉक्सी एजेंट प्लेबुक: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - हार्डवेयर गाइड: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw को smooth crab 🦀 के लिए बनाया गया था, एक तेज़ और कुशल AI सहायक। Argenis De La Rosa और समुदाय द्वारा निर्मित।
 

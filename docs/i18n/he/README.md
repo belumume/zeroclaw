@@ -651,7 +651,7 @@ curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/master/insta
 - מדריך סוכן פרוקסי: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - מדריכי חומרה: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw נבנה עבור ה-smooth crab 🦀, עוזר AI מהיר ויעיל. נבנה על ידי Argenis De La Rosa והקהילה.
 

@@ -648,7 +648,7 @@ Use these when you're past the onboarding flow and want the deeper reference.
 - Proxy agent playbook: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Hardware guides: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw was built for the smooth crab 🦀, a fast and efficient AI assistant. Built by Argenis De La Rosa and the community.
 

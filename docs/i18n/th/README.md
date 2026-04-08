@@ -651,7 +651,7 @@ Release assets เผยแพร่สำหรับ:
 - Playbook proxy agent: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - คู่มือฮาร์ดแวร์: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw ถูกสร้างสำหรับ smooth crab 🦀 ผู้ช่วย AI ที่เร็วและมีประสิทธิภาพ สร้างโดย Argenis De La Rosa และชุมชน
 

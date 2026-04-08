@@ -651,7 +651,7 @@ Kayta naita, kun olet ohittanut onboarding-kulun ja haluat syvemman viitteen.
 - Proxy-agentin kasikirja: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Laitteisto-oppaat: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw rakennettiin smooth crab 🦀 -kaveria varten, nopea ja tehokas tekoalyavustaja. Rakennettu Argenis De La Rosan ja yhteison toimesta.
 

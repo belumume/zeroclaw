@@ -651,7 +651,7 @@ Verwende diese Ressourcen, wenn du den Onboarding-Prozess abgeschlossen hast und
 - Proxy-Agent-Handbuch: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Hardware-Leitfäden: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw wurde für den glatten Krebs 🦀 gebaut, einen schnellen und effizienten KI-Assistenten. Entwickelt von Argenis De La Rosa und der Community.
 

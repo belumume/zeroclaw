@@ -651,7 +651,7 @@ Hasznald ezeket, ha tuljutottal az onboarding folyamaton es melyebb referenciara
 - Proxy agens kezikonyv: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Hardver utmutatok: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 A ZeroClaw a smooth crab 🦀 szamara keszult, egy gyors es hatekony MI asszisztens. Epitette Argenis De La Rosa es a kozosseg.
 

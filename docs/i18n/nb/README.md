@@ -651,7 +651,7 @@ Bruk disse nar du er forbi onboarding-flyten og onsker dypere referanse.
 - Proxy-agenthandbok: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Maskinvareguider: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw ble bygget for den smidige krabben 🦀, en rask og effektiv AI-assistent. Bygget av Argenis De La Rosa og fellesskapet.
 

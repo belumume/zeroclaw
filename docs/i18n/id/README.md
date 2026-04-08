@@ -651,7 +651,7 @@ Gunakan ini ketika Anda sudah melewati alur onboarding dan menginginkan referens
 - Playbook proxy agent: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Panduan perangkat keras: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw dibangun untuk smooth crab 🦀, asisten AI yang cepat dan efisien. Dibangun oleh Argenis De La Rosa dan komunitas.
 

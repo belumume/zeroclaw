@@ -651,7 +651,7 @@ curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/master/insta
 - 代理代理手册：[docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - 硬件指南：[docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw 为 smooth crab 🦀 而构建，一个快速高效的 AI 助手。由 Argenis De La Rosa 和社区共同构建。
 

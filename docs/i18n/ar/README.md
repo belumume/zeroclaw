@@ -651,7 +651,7 @@ curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/master/insta
 - دليل وكيل البروكسي: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - أدلة الأجهزة: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 تم بناء ZeroClaw للسلطعون الناعم 🦀، مساعد ذكاء اصطناعي سريع وفعال. بناه Argenis De La Rosa والمجتمع.
 

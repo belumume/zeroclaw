@@ -651,7 +651,7 @@ Utilisez ces ressources lorsque vous avez dépassé le flux d'onboarding et voul
 - Manuel de l'agent proxy : [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Guides matériels : [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw a été construit pour le crabe lisse 🦀, un assistant IA rapide et efficace. Construit par Argenis De La Rosa et la communauté.
 

@@ -651,7 +651,7 @@ Używaj tych, gdy przeszedłeś już przez onboarding i chcesz głębszej dokume
 - Podręcznik agenta proxy: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Przewodniki sprzętowe: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 ZeroClaw został zbudowany dla smooth crab 🦀, szybkiego i wydajnego asystenta AI. Stworzony przez Argenisa De La Rosę i społeczność.
 

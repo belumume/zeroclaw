@@ -651,7 +651,7 @@ Gamitin ang mga ito kapag tapos ka na sa onboarding flow at gusto mo ng mas mala
 - Proxy agent playbook: [docs/ops/proxy-agent-playbook.md](docs/ops/proxy-agent-playbook.md)
 - Hardware guides: [docs/hardware/README.md](docs/hardware/README.md)
 
-## Smooth Crab 🦀
+## Icy Crab 🦀
 
 Ang ZeroClaw ay binuo para sa smooth crab 🦀, isang mabilis at mahusay na AI assistant. Binuo ni Argenis De La Rosa at ng komunidad.
 
