@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use serde_json::json;
 use tracing::warn;
 
-use super::traits::{Tool, ToolResult};
+use zeroclaw_api::tool::{Tool, ToolResult};
 use crate::sop::types::SopRunAction;
 use crate::sop::{SopAuditLogger, SopEngine, SopMetricsCollector};
 

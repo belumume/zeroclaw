@@ -15,96 +15,57 @@
 //! [`start_channels`]. See `AGENTS.md` §7.2 for the full change playbook.
 
 pub mod acp_server;
-pub mod bluesky;
-pub mod clawdtalk;
 pub mod cli;
-pub mod debounce;
-pub mod dingtalk;
-pub mod discord;
-pub mod discord_history;
-pub mod email_channel;
-pub mod gmail_push;
-pub mod imessage;
-pub mod irc;
-#[cfg(feature = "channel-lark")]
-pub mod lark;
-pub mod link_enricher;
-pub mod linq;
 #[cfg(feature = "channel-matrix")]
 pub mod matrix;
-pub mod mattermost;
 pub mod media_pipeline;
-pub mod mochat;
 pub mod mqtt;
-pub mod nextcloud_talk;
-#[cfg(feature = "channel-nostr")]
-pub mod nostr;
-pub mod notion;
-pub mod qq;
-pub mod reddit;
-pub mod session_backend;
-pub mod session_sqlite;
-pub mod session_store;
-pub mod signal;
-pub mod slack;
-pub mod stall_watchdog;
 pub mod telegram;
-pub mod traits;
-pub mod transcription;
-pub mod tts;
-pub mod twitter;
-pub mod voice_call;
-#[cfg(feature = "voice-wake")]
-pub mod voice_wake;
-pub mod wati;
-pub mod webhook;
-pub mod wecom;
-pub mod whatsapp;
-#[cfg(feature = "whatsapp-web")]
-pub mod whatsapp_storage;
-#[cfg(feature = "whatsapp-web")]
-pub mod whatsapp_web;
 
-pub use bluesky::BlueskyChannel;
-pub use clawdtalk::{ClawdTalkChannel, ClawdTalkConfig};
-pub use cli::CliChannel;
-pub use dingtalk::DingTalkChannel;
-pub use discord::DiscordChannel;
-pub use discord_history::DiscordHistoryChannel;
-pub use email_channel::EmailChannel;
-pub use gmail_push::GmailPushChannel;
-pub use imessage::IMessageChannel;
-pub use irc::IrcChannel;
+// Channel types imported directly from source crates (no shim files)
+pub use zeroclaw_api::channel::{Channel, ChannelMessage, SendMessage};
+pub use zeroclaw_channels::bluesky::BlueskyChannel;
+pub use zeroclaw_channels::clawdtalk::{ClawdTalkChannel};
+pub use zeroclaw_channels::dingtalk::DingTalkChannel;
+pub use zeroclaw_channels::discord::DiscordChannel;
+pub use zeroclaw_channels::discord_history::DiscordHistoryChannel;
+pub use zeroclaw_channels::email_channel::EmailChannel;
+pub use zeroclaw_channels::gmail_push::GmailPushChannel;
+pub use zeroclaw_channels::imessage::IMessageChannel;
+pub use zeroclaw_channels::irc::IrcChannel;
 #[cfg(feature = "channel-lark")]
-pub use lark::LarkChannel;
-pub use linq::LinqChannel;
-#[cfg(feature = "channel-matrix")]
-pub use matrix::MatrixChannel;
-pub use mattermost::MattermostChannel;
-pub use mochat::MochatChannel;
-pub use nextcloud_talk::NextcloudTalkChannel;
+pub use zeroclaw_channels::lark::LarkChannel;
+pub use zeroclaw_channels::linq::LinqChannel;
+pub use zeroclaw_channels::mattermost::MattermostChannel;
+pub use zeroclaw_channels::mochat::MochatChannel;
+pub use zeroclaw_channels::nextcloud_talk::NextcloudTalkChannel;
 #[cfg(feature = "channel-nostr")]
-pub use nostr::NostrChannel;
-pub use notion::NotionChannel;
-pub use qq::QQChannel;
-pub use reddit::RedditChannel;
-pub use signal::SignalChannel;
-pub use slack::SlackChannel;
-pub use telegram::TelegramChannel;
-pub use traits::{Channel, SendMessage};
-#[allow(unused_imports)]
-pub use tts::{TtsManager, TtsProvider};
-pub use twitter::TwitterChannel;
-#[allow(unused_imports)]
-pub use voice_call::{VoiceCallChannel, VoiceCallConfig};
+pub use zeroclaw_channels::nostr::NostrChannel;
+pub use zeroclaw_channels::notion::NotionChannel;
+pub use zeroclaw_channels::qq::QQChannel;
+pub use zeroclaw_channels::reddit::RedditChannel;
+pub use zeroclaw_channels::signal::SignalChannel;
+pub use zeroclaw_channels::slack::SlackChannel;
+pub use zeroclaw_channels::transcription;
+pub use zeroclaw_channels::tts::{TtsManager, TtsProvider};
+pub use zeroclaw_channels::twitter::TwitterChannel;
+pub use zeroclaw_channels::voice_call::{VoiceCallChannel};
 #[cfg(feature = "voice-wake")]
-pub use voice_wake::VoiceWakeChannel;
-pub use wati::WatiChannel;
-pub use webhook::WebhookChannel;
-pub use wecom::WeComChannel;
-pub use whatsapp::WhatsAppChannel;
+pub use zeroclaw_channels::voice_wake::VoiceWakeChannel;
+pub use zeroclaw_channels::wati::WatiChannel;
+pub use zeroclaw_channels::webhook::WebhookChannel;
+pub use zeroclaw_channels::wecom::WeComChannel;
+pub use zeroclaw_channels::whatsapp::WhatsAppChannel;
+// Local channel types (in misc, not zeroclaw-channels)
+pub use telegram::TelegramChannel;
+pub use cli::CliChannel;
 #[cfg(feature = "whatsapp-web")]
-pub use whatsapp_web::WhatsAppWebChannel;
+pub use zeroclaw_channels::whatsapp_web::WhatsAppWebChannel;
+pub use zeroclaw_channels::link_enricher;
+pub use zeroclaw_infra::debounce::MessageDebouncer;
+pub use zeroclaw_infra::stall_watchdog::StallWatchdog;
+pub use zeroclaw_infra::session_backend::SessionBackend;
+pub use zeroclaw_infra::session_sqlite::SqliteSessionBackend;
 
 use crate::agent::loop_::{
     build_tool_instructions, clear_model_switch_request, get_model_switch_state,
@@ -390,7 +351,7 @@ struct ChannelRuntimeContext {
     query_classification: zeroclaw_config::schema::QueryClassificationConfig,
     ack_reactions: bool,
     show_tool_calls: bool,
-    session_store: Option<Arc<session_store::SessionStore>>,
+    session_store: Option<Arc<zeroclaw_infra::session_store::SessionStore>>,
     /// Non-interactive approval manager for channel-driven runs.
     /// Enforces `auto_approve` / `always_ask` / supervised policy from
     /// `[autonomy]` config; auto-denies tools that would need interactive
@@ -401,7 +362,7 @@ struct ChannelRuntimeContext {
     pacing: zeroclaw_config::schema::PacingConfig,
     max_tool_result_chars: usize,
     context_token_budget: usize,
-    debouncer: Arc<debounce::MessageDebouncer>,
+    debouncer: Arc<zeroclaw_infra::debounce::MessageDebouncer>,
 }
 
 #[derive(Clone)]
@@ -437,7 +398,7 @@ impl InFlightTaskCompletion {
     }
 }
 
-fn conversation_memory_key(msg: &traits::ChannelMessage) -> String {
+fn conversation_memory_key(msg: &zeroclaw_api::channel::ChannelMessage) -> String {
     // Include thread_ts for per-topic memory isolation in forum groups
     match &msg.thread_ts {
         Some(tid) => format!("{}_{}_{}_{}", msg.channel, tid, msg.sender, msg.id),
@@ -445,7 +406,7 @@ fn conversation_memory_key(msg: &traits::ChannelMessage) -> String {
     }
 }
 
-fn conversation_history_key(msg: &traits::ChannelMessage) -> String {
+fn conversation_history_key(msg: &zeroclaw_api::channel::ChannelMessage) -> String {
     // Include reply_target for per-channel isolation (e.g. distinct Discord/Slack
     // channels) and thread_ts for per-topic isolation in forum groups.
     match &msg.thread_ts {
@@ -457,11 +418,11 @@ fn conversation_history_key(msg: &traits::ChannelMessage) -> String {
     }
 }
 
-fn followup_thread_id(msg: &traits::ChannelMessage) -> Option<String> {
+fn followup_thread_id(msg: &zeroclaw_api::channel::ChannelMessage) -> Option<String> {
     msg.thread_ts.clone().or_else(|| Some(msg.id.clone()))
 }
 
-fn interruption_scope_key(msg: &traits::ChannelMessage) -> String {
+fn interruption_scope_key(msg: &zeroclaw_api::channel::ChannelMessage) -> String {
     match &msg.interruption_scope_id {
         Some(scope) => format!(
             "{}_{}_{}_{}",
@@ -1757,7 +1718,7 @@ fn build_config_block_kit(
 
 async fn handle_runtime_command_if_needed(
     ctx: &ChannelRuntimeContext,
-    msg: &traits::ChannelMessage,
+    msg: &zeroclaw_api::channel::ChannelMessage,
     target_channel: Option<&Arc<dyn Channel>>,
 ) -> bool {
     let Some(command) = parse_runtime_command(&msg.channel, &msg.content) else {
@@ -2344,7 +2305,7 @@ fn strip_isolated_tool_json_artifacts(message: &str, known_tool_names: &HashSet<
 
 fn spawn_supervised_listener(
     ch: Arc<dyn Channel>,
-    tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
+    tx: tokio::sync::mpsc::Sender<zeroclaw_api::channel::ChannelMessage>,
     initial_backoff_secs: u64,
     max_backoff_secs: u64,
 ) -> tokio::task::JoinHandle<()> {
@@ -2359,7 +2320,7 @@ fn spawn_supervised_listener(
 
 fn spawn_supervised_listener_with_health_interval(
     ch: Arc<dyn Channel>,
-    tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
+    tx: tokio::sync::mpsc::Sender<zeroclaw_api::channel::ChannelMessage>,
     initial_backoff_secs: u64,
     max_backoff_secs: u64,
     health_interval: Duration,
@@ -2463,7 +2424,7 @@ fn spawn_scoped_typing_task(
 
 async fn process_channel_message(
     ctx: Arc<ChannelRuntimeContext>,
-    msg: traits::ChannelMessage,
+    msg: zeroclaw_api::channel::ChannelMessage,
     cancellation_token: CancellationToken,
 ) {
     if cancellation_token.is_cancelled() {
@@ -3569,7 +3530,7 @@ async fn process_channel_message(
 /// can reuse the same in-flight tracking / cancellation / process logic.
 async fn dispatch_worker(
     ctx: Arc<ChannelRuntimeContext>,
-    msg: traits::ChannelMessage,
+    msg: zeroclaw_api::channel::ChannelMessage,
     in_flight: Arc<tokio::sync::Mutex<HashMap<String, InFlightSenderTaskState>>>,
     task_sequence: Arc<AtomicU64>,
     permit: tokio::sync::OwnedSemaphorePermit,
@@ -3627,7 +3588,7 @@ async fn dispatch_worker(
 }
 
 async fn run_message_dispatch_loop(
-    mut rx: tokio::sync::mpsc::Receiver<traits::ChannelMessage>,
+    mut rx: tokio::sync::mpsc::Receiver<zeroclaw_api::channel::ChannelMessage>,
     ctx: Arc<ChannelRuntimeContext>,
     max_in_flight_messages: usize,
 ) {
@@ -3688,7 +3649,7 @@ async fn run_message_dispatch_loop(
         let msg = if msg.channel != "cli" && ctx.debouncer.enabled() {
             let debounce_key = conversation_history_key(&msg);
             match ctx.debouncer.debounce(&debounce_key, &msg.content).await {
-                debounce::DebounceResult::Pending(rx) => {
+                zeroclaw_infra::debounce::DebounceResult::Pending(rx) => {
                     // Spawn a lightweight task that waits for the debounce window
                     // to expire, then feeds the combined message through the normal
                     // worker path below.
@@ -3728,7 +3689,7 @@ async fn run_message_dispatch_loop(
                     });
                     continue;
                 }
-                debounce::DebounceResult::Passthrough(content) => {
+                zeroclaw_infra::debounce::DebounceResult::Passthrough(content) => {
                     let mut m = msg;
                     m.content = content;
                     m
@@ -4574,7 +4535,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 .irc
                 .as_ref()
                 .context("IRC channel is not configured")?;
-            Ok(Arc::new(IrcChannel::new(irc::IrcChannelConfig {
+            Ok(Arc::new(IrcChannel::new(zeroclaw_channels::irc::IrcChannelConfig {
                 server: irc_cfg.server.clone(),
                 port: irc_cfg.port,
                 nickname: irc_cfg.nickname.clone(),
@@ -5046,7 +5007,7 @@ fn collect_configured_channels(
         if irc.enabled {
             channels.push(ConfiguredChannel {
                 display_name: "IRC",
-                channel: Arc::new(IrcChannel::new(irc::IrcChannelConfig {
+                channel: Arc::new(IrcChannel::new(zeroclaw_channels::irc::IrcChannelConfig {
                     server: irc.server.clone(),
                     port: irc.port,
                     nickname: irc.nickname.clone(),
@@ -5460,7 +5421,7 @@ pub async fn start_channels(config: Config) -> Result<()> {
                         registry.server_count()
                     );
                     deferred_section =
-                        crate::tools::mcp_deferred::build_deferred_tools_section(&deferred_set);
+                        crate::tools::build_deferred_tools_section(&deferred_set);
                     let activated = std::sync::Arc::new(std::sync::Mutex::new(
                         crate::tools::ActivatedToolSet::new(),
                     ));
@@ -5686,7 +5647,7 @@ pub async fn start_channels(config: Config) -> Result<()> {
         .max(DEFAULT_CHANNEL_MAX_BACKOFF_SECS);
 
     // Single message bus — all channels send messages here
-    let (tx, rx) = tokio::sync::mpsc::channel::<traits::ChannelMessage>(100);
+    let (tx, rx) = tokio::sync::mpsc::channel::<zeroclaw_api::channel::ChannelMessage>(100);
 
     // Spawn a listener for each channel
     let mut handles = Vec::new();
@@ -5823,7 +5784,7 @@ pub async fn start_channels(config: Config) -> Result<()> {
         ack_reactions: config.channels_config.ack_reactions,
         show_tool_calls: config.channels_config.show_tool_calls,
         session_store: if config.channels_config.session_persistence {
-            match session_store::SessionStore::new(&config.workspace_dir) {
+            match zeroclaw_infra::session_store::SessionStore::new(&config.workspace_dir) {
                 Ok(store) => {
                     tracing::info!("📂 Session persistence enabled");
                     Some(Arc::new(store))
@@ -5849,7 +5810,7 @@ pub async fn start_channels(config: Config) -> Result<()> {
         pacing: config.pacing.clone(),
         max_tool_result_chars: config.agent.max_tool_result_chars,
         context_token_budget: config.agent.max_context_tokens,
-        debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::from_millis(
+        debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::from_millis(
             config.channels_config.debounce_ms,
         ))),
     });
@@ -6285,7 +6246,7 @@ mod tests {
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         };
 
         assert!(compact_sender_history(&ctx, &sender));
@@ -6409,7 +6370,7 @@ mod tests {
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         };
 
         append_sender_turn(&ctx, &sender, ChatMessage::user("hello"));
@@ -6490,7 +6451,7 @@ mod tests {
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         };
 
         assert!(rollback_orphan_user_turn(&ctx, &sender, "pending"));
@@ -6510,7 +6471,7 @@ mod tests {
     #[test]
     fn rollback_orphan_user_turn_also_removes_from_session_store() {
         let tmp = tempfile::TempDir::new().unwrap();
-        let store = Arc::new(session_store::SessionStore::new(tmp.path()).unwrap());
+        let store = Arc::new(zeroclaw_infra::session_store::SessionStore::new(tmp.path()).unwrap());
 
         let sender = "telegram_u4".to_string();
 
@@ -6588,7 +6549,7 @@ mod tests {
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         };
 
         assert!(rollback_orphan_user_turn(
@@ -6716,7 +6677,7 @@ mod tests {
 
         async fn listen(
             &self,
-            _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
+            _tx: tokio::sync::mpsc::Sender<zeroclaw_api::channel::ChannelMessage>,
         ) -> anyhow::Result<()> {
             Ok(())
         }
@@ -6746,7 +6707,7 @@ mod tests {
 
         async fn listen(
             &self,
-            _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
+            _tx: tokio::sync::mpsc::Sender<zeroclaw_api::channel::ChannelMessage>,
         ) -> anyhow::Result<()> {
             Ok(())
         }
@@ -6776,7 +6737,7 @@ mod tests {
 
         async fn listen(
             &self,
-            _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
+            _tx: tokio::sync::mpsc::Sender<zeroclaw_api::channel::ChannelMessage>,
         ) -> anyhow::Result<()> {
             Ok(())
         }
@@ -7187,12 +7148,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-1".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-42".to_string(),
@@ -7277,12 +7238,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx.clone(),
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-telegram-tool-1".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-telegram".to_string(),
@@ -7381,12 +7342,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-raw-json".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-raw".to_string(),
@@ -7470,12 +7431,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-2".to_string(),
                 sender: "bob".to_string(),
                 reply_target: "chat-84".to_string(),
@@ -7569,12 +7530,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx.clone(),
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-cmd-1".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -7689,12 +7650,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-routed-1".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -7790,12 +7751,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-default-provider-cache".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -7906,12 +7867,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-runtime-store-model".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -8010,12 +7971,12 @@ BTC is currently around $65,000 based on latest tool output."#
             },
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-iter-success".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-iter-success".to_string(),
@@ -8104,12 +8065,12 @@ BTC is currently around $65,000 based on latest tool output."#
             },
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-iter-fail".to_string(),
                 sender: "bob".to_string(),
                 reply_target: "chat-iter-fail".to_string(),
@@ -8321,11 +8282,11 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
-        let (tx, rx) = tokio::sync::mpsc::channel::<traits::ChannelMessage>(4);
-        tx.send(traits::ChannelMessage {
+        let (tx, rx) = tokio::sync::mpsc::channel::<zeroclaw_api::channel::ChannelMessage>(4);
+        tx.send(zeroclaw_api::channel::ChannelMessage {
             id: "1".to_string(),
             sender: "alice".to_string(),
             reply_target: "alice".to_string(),
@@ -8338,7 +8299,7 @@ BTC is currently around $65,000 based on latest tool output."#
         })
         .await
         .unwrap();
-        tx.send(traits::ChannelMessage {
+        tx.send(zeroclaw_api::channel::ChannelMessage {
             id: "2".to_string(),
             sender: "bob".to_string(),
             reply_target: "bob".to_string(),
@@ -8433,12 +8394,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
-        let (tx, rx) = tokio::sync::mpsc::channel::<traits::ChannelMessage>(8);
+        let (tx, rx) = tokio::sync::mpsc::channel::<zeroclaw_api::channel::ChannelMessage>(8);
         let send_task = tokio::spawn(async move {
-            tx.send(traits::ChannelMessage {
+            tx.send(zeroclaw_api::channel::ChannelMessage {
                 id: "msg-1".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -8452,7 +8413,7 @@ BTC is currently around $65,000 based on latest tool output."#
             .await
             .unwrap();
             tokio::time::sleep(Duration::from_millis(40)).await;
-            tx.send(traits::ChannelMessage {
+            tx.send(zeroclaw_api::channel::ChannelMessage {
                 id: "msg-2".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -8564,12 +8525,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
-        let (tx, rx) = tokio::sync::mpsc::channel::<traits::ChannelMessage>(8);
+        let (tx, rx) = tokio::sync::mpsc::channel::<zeroclaw_api::channel::ChannelMessage>(8);
         let send_task = tokio::spawn(async move {
-            tx.send(traits::ChannelMessage {
+            tx.send(zeroclaw_api::channel::ChannelMessage {
                 id: "msg-1".to_string(),
                 sender: "U123".to_string(),
                 reply_target: "C123".to_string(),
@@ -8583,7 +8544,7 @@ BTC is currently around $65,000 based on latest tool output."#
             .await
             .unwrap();
             tokio::time::sleep(Duration::from_millis(40)).await;
-            tx.send(traits::ChannelMessage {
+            tx.send(zeroclaw_api::channel::ChannelMessage {
                 id: "msg-2".to_string(),
                 sender: "U123".to_string(),
                 reply_target: "C123".to_string(),
@@ -8692,12 +8653,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
-        let (tx, rx) = tokio::sync::mpsc::channel::<traits::ChannelMessage>(8);
+        let (tx, rx) = tokio::sync::mpsc::channel::<zeroclaw_api::channel::ChannelMessage>(8);
         let send_task = tokio::spawn(async move {
-            tx.send(traits::ChannelMessage {
+            tx.send(zeroclaw_api::channel::ChannelMessage {
                 id: "msg-a".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -8711,7 +8672,7 @@ BTC is currently around $65,000 based on latest tool output."#
             .await
             .unwrap();
             tokio::time::sleep(Duration::from_millis(30)).await;
-            tx.send(traits::ChannelMessage {
+            tx.send(zeroclaw_api::channel::ChannelMessage {
                 id: "msg-b".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-2".to_string(),
@@ -8798,12 +8759,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "typing-msg".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-typing".to_string(),
@@ -8885,12 +8846,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "typing-fast-msg".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-typing".to_string(),
@@ -8972,12 +8933,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "react-msg".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-react".to_string(),
@@ -9513,7 +9474,7 @@ BTC is currently around $65,000 based on latest tool output."#
 
     #[test]
     fn conversation_memory_key_uses_message_id() {
-        let msg = traits::ChannelMessage {
+        let msg = zeroclaw_api::channel::ChannelMessage {
             id: "msg_abc123".into(),
             sender: "U123".into(),
             reply_target: "C456".into(),
@@ -9530,7 +9491,7 @@ BTC is currently around $65,000 based on latest tool output."#
 
     #[test]
     fn followup_thread_id_prefers_thread_ts() {
-        let msg = traits::ChannelMessage {
+        let msg = zeroclaw_api::channel::ChannelMessage {
             id: "slack_C123_1741234567.123456".into(),
             sender: "U123".into(),
             reply_target: "C123".into(),
@@ -9550,7 +9511,7 @@ BTC is currently around $65,000 based on latest tool output."#
 
     #[test]
     fn followup_thread_id_falls_back_to_message_id() {
-        let msg = traits::ChannelMessage {
+        let msg = zeroclaw_api::channel::ChannelMessage {
             id: "msg_abc123".into(),
             sender: "U123".into(),
             reply_target: "C456".into(),
@@ -9567,7 +9528,7 @@ BTC is currently around $65,000 based on latest tool output."#
 
     #[test]
     fn conversation_memory_key_is_unique_per_message() {
-        let msg1 = traits::ChannelMessage {
+        let msg1 = zeroclaw_api::channel::ChannelMessage {
             id: "msg_1".into(),
             sender: "U123".into(),
             reply_target: "C456".into(),
@@ -9578,7 +9539,7 @@ BTC is currently around $65,000 based on latest tool output."#
             interruption_scope_id: None,
             attachments: vec![],
         };
-        let msg2 = traits::ChannelMessage {
+        let msg2 = zeroclaw_api::channel::ChannelMessage {
             id: "msg_2".into(),
             sender: "U123".into(),
             reply_target: "C456".into(),
@@ -9601,7 +9562,7 @@ BTC is currently around $65,000 based on latest tool output."#
         let tmp = TempDir::new().unwrap();
         let mem = SqliteMemory::new(tmp.path()).unwrap();
 
-        let msg1 = traits::ChannelMessage {
+        let msg1 = zeroclaw_api::channel::ChannelMessage {
             id: "msg_1".into(),
             sender: "U123".into(),
             reply_target: "C456".into(),
@@ -9612,7 +9573,7 @@ BTC is currently around $65,000 based on latest tool output."#
             interruption_scope_id: None,
             attachments: vec![],
         };
-        let msg2 = traits::ChannelMessage {
+        let msg2 = zeroclaw_api::channel::ChannelMessage {
             id: "msg_2".into(),
             sender: "U123".into(),
             reply_target: "C456".into(),
@@ -9764,12 +9725,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx.clone(),
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-a".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -9786,7 +9747,7 @@ BTC is currently around $65,000 based on latest tool output."#
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-b".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -9905,12 +9866,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx.clone(),
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-before-new".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-refresh".to_string(),
@@ -9943,7 +9904,7 @@ BTC is currently around $65,000 based on latest tool output."#
 
         process_channel_message(
             runtime_ctx.clone(),
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-new-session".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-refresh".to_string(),
@@ -9982,7 +9943,7 @@ BTC is currently around $65,000 based on latest tool output."#
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-after-new".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-refresh".to_string(),
@@ -10089,12 +10050,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx.clone(),
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-ctx-1".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-ctx".to_string(),
@@ -10205,12 +10166,12 @@ BTC is currently around $65,000 based on latest tool output."#
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx.clone(),
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "tg-msg-1".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-telegram".to_string(),
@@ -10564,7 +10525,7 @@ This is an example JSON object for profile settings."#;
 
         async fn listen(
             &self,
-            _tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
+            _tx: tokio::sync::mpsc::Sender<zeroclaw_api::channel::ChannelMessage>,
         ) -> anyhow::Result<()> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             anyhow::bail!("listen boom")
@@ -10583,7 +10544,7 @@ This is an example JSON object for profile settings."#;
 
         async fn listen(
             &self,
-            tx: tokio::sync::mpsc::Sender<traits::ChannelMessage>,
+            tx: tokio::sync::mpsc::Sender<zeroclaw_api::channel::ChannelMessage>,
         ) -> anyhow::Result<()> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             tx.closed().await;
@@ -10599,7 +10560,7 @@ This is an example JSON object for profile settings."#;
             calls: Arc::clone(&calls),
         });
 
-        let (tx, rx) = tokio::sync::mpsc::channel::<traits::ChannelMessage>(1);
+        let (tx, rx) = tokio::sync::mpsc::channel::<zeroclaw_api::channel::ChannelMessage>(1);
         let handle = spawn_supervised_listener(channel, tx, 1, 1);
 
         tokio::time::sleep(Duration::from_millis(80)).await;
@@ -10630,7 +10591,7 @@ This is an example JSON object for profile settings."#;
             calls: Arc::clone(&calls),
         });
 
-        let (tx, rx) = tokio::sync::mpsc::channel::<traits::ChannelMessage>(1);
+        let (tx, rx) = tokio::sync::mpsc::channel::<zeroclaw_api::channel::ChannelMessage>(1);
         let handle = spawn_supervised_listener_with_health_interval(
             channel,
             tx,
@@ -10793,13 +10754,13 @@ This is an example JSON object for profile settings."#;
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         // Simulate a photo attachment message with [IMAGE:] marker.
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-photo-1".to_string(),
                 sender: "zeroclaw_user".to_string(),
                 reply_target: "chat-photo".to_string(),
@@ -10889,12 +10850,12 @@ This is an example JSON object for profile settings."#;
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             Arc::clone(&runtime_ctx),
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-photo-1".to_string(),
                 sender: "zeroclaw_user".to_string(),
                 reply_target: "chat-photo".to_string(),
@@ -10911,7 +10872,7 @@ This is an example JSON object for profile settings."#;
 
         process_channel_message(
             Arc::clone(&runtime_ctx),
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-text-2".to_string(),
                 sender: "zeroclaw_user".to_string(),
                 reply_target: "chat-photo".to_string(),
@@ -11017,14 +10978,14 @@ This is an example JSON object for profile settings."#;
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 50000,
             context_token_budget: 128_000,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(std::time::Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(std::time::Duration::ZERO)),
             media_pipeline: zeroclaw_config::schema::MediaPipelineConfig::default(),
             transcription_config: zeroclaw_config::schema::TranscriptionConfig::default(),
         });
 
         process_channel_message(
             Arc::clone(&runtime_ctx),
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-bad-1".to_string(),
                 sender: "zeroclaw_user".to_string(),
                 reply_target: "chat-format".to_string(),
@@ -11041,7 +11002,7 @@ This is an example JSON object for profile settings."#;
 
         process_channel_message(
             Arc::clone(&runtime_ctx),
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-text-2".to_string(),
                 sender: "zeroclaw_user".to_string(),
                 reply_target: "chat-format".to_string(),
@@ -11193,12 +11154,12 @@ This is an example JSON object for profile settings."#;
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-qc-1".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -11313,12 +11274,12 @@ This is an example JSON object for profile settings."#;
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-qc-disabled".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -11425,12 +11386,12 @@ This is an example JSON object for profile settings."#;
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-qc-nomatch".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -11557,12 +11518,12 @@ This is an example JSON object for profile settings."#;
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
         process_channel_message(
             runtime_ctx,
-            traits::ChannelMessage {
+            zeroclaw_api::channel::ChannelMessage {
                 id: "msg-qc-prio".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "chat-1".to_string(),
@@ -11721,7 +11682,7 @@ This is an example JSON object for profile settings."#;
 
     #[test]
     fn interruption_scope_key_without_scope_id_is_three_component() {
-        let msg = traits::ChannelMessage {
+        let msg = zeroclaw_api::channel::ChannelMessage {
             id: "1".into(),
             sender: "alice".into(),
             reply_target: "room".into(),
@@ -11737,7 +11698,7 @@ This is an example JSON object for profile settings."#;
 
     #[test]
     fn interruption_scope_key_with_scope_id_is_four_component() {
-        let msg = traits::ChannelMessage {
+        let msg = zeroclaw_api::channel::ChannelMessage {
             id: "1".into(),
             sender: "alice".into(),
             reply_target: "room".into(),
@@ -11754,7 +11715,7 @@ This is an example JSON object for profile settings."#;
     #[test]
     fn interruption_scope_key_thread_ts_alone_does_not_affect_key() {
         // thread_ts used for reply anchoring should not bleed into scope key
-        let msg = traits::ChannelMessage {
+        let msg = zeroclaw_api::channel::ChannelMessage {
             id: "1".into(),
             sender: "alice".into(),
             reply_target: "C123".into(),
@@ -11831,14 +11792,14 @@ This is an example JSON object for profile settings."#;
             pacing: zeroclaw_config::schema::PacingConfig::default(),
             max_tool_result_chars: 0,
             context_token_budget: 0,
-            debouncer: Arc::new(debounce::MessageDebouncer::new(Duration::ZERO)),
+            debouncer: Arc::new(zeroclaw_infra::debounce::MessageDebouncer::new(Duration::ZERO)),
         });
 
-        let (tx, rx) = tokio::sync::mpsc::channel::<traits::ChannelMessage>(8);
+        let (tx, rx) = tokio::sync::mpsc::channel::<zeroclaw_api::channel::ChannelMessage>(8);
         let send_task = tokio::spawn(async move {
             // Two messages from same sender but in different Slack threads —
             // they must NOT cancel each other.
-            tx.send(traits::ChannelMessage {
+            tx.send(zeroclaw_api::channel::ChannelMessage {
                 id: "1741234567.100001".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "C123".to_string(),
@@ -11852,7 +11813,7 @@ This is an example JSON object for profile settings."#;
             .await
             .unwrap();
             tokio::time::sleep(Duration::from_millis(30)).await;
-            tx.send(traits::ChannelMessage {
+            tx.send(zeroclaw_api::channel::ChannelMessage {
                 id: "1741234567.200002".to_string(),
                 sender: "alice".to_string(),
                 reply_target: "C123".to_string(),

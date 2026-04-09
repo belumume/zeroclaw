@@ -1270,7 +1270,7 @@ impl Agent {
         println!("Type /quit to exit.\n");
 
         let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-        let cli = crate::channels::CliChannel::new();
+        let cli = crate::channels::cli::CliChannel::new();
 
         let listen_handle = tokio::spawn(async move {
             let _ = crate::channels::Channel::listen(&cli, tx).await;

@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 use serde_json::json;
 
-use super::traits::{Tool, ToolResult};
+use zeroclaw_api::tool::{Tool, ToolResult};
 use crate::sop::SopEngine;
 
 /// Lists all loaded SOPs with their triggers, priority, step count, and active runs.

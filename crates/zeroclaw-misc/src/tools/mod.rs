@@ -15,84 +15,19 @@
 //! To add a new tool, implement [`Tool`] in a new submodule and register it in
 //! [`all_tools_with_runtime`]. See `AGENTS.md` §7.3 for the full change playbook.
 
-pub mod ask_user;
-pub mod backup_tool;
-pub mod browser;
-pub mod browser_delegate;
-pub mod browser_open;
-pub mod calculator;
-pub mod canvas;
-pub mod claude_code;
-pub mod claude_code_runner;
-pub mod cli_discovery;
-pub mod cloud_ops;
-pub mod cloud_patterns;
-pub mod codex_cli;
-pub mod composio;
-pub mod content_search;
 pub mod cron_add;
 pub mod cron_list;
 pub mod cron_remove;
 pub mod cron_run;
 pub mod cron_runs;
 pub mod cron_update;
-pub mod data_management;
 pub mod delegate;
-pub mod discord_search;
-pub mod escalate;
-pub mod file_edit;
 pub mod file_read;
-pub mod file_write;
-pub mod gemini_cli;
-pub mod git_operations;
-pub mod glob_search;
-pub mod google_workspace;
-#[cfg(feature = "hardware")]
-pub mod hardware_board_info;
-#[cfg(feature = "hardware")]
-pub mod hardware_memory_map;
-#[cfg(feature = "hardware")]
-pub mod hardware_memory_read;
-pub mod http_request;
-pub mod image_gen;
-pub mod image_info;
-pub mod jira_tool;
-pub mod knowledge_tool;
-pub mod linkedin;
-pub mod linkedin_client;
-pub mod llm_task;
-pub mod mcp_client;
-pub mod mcp_deferred;
-pub mod mcp_protocol;
-pub mod mcp_tool;
-pub mod mcp_transport;
-pub mod memory_export;
-pub mod memory_forget;
-pub mod memory_purge;
-pub mod memory_recall;
-pub mod memory_store;
-pub mod microsoft365;
-pub mod model_routing_config;
 pub mod model_switch;
-pub mod node_capabilities;
 pub mod node_tool;
-pub mod notion_tool;
-pub mod opencode_cli;
-pub mod pdf_read;
-pub mod pipeline;
-pub mod poll;
-pub mod project_intel;
-pub mod proxy_config;
-pub mod pushover;
-pub mod reaction;
 pub mod read_skill;
-pub mod report_template_tool;
-pub mod report_templates;
 pub mod schedule;
-pub mod schema;
-pub mod screenshot;
 pub mod security_ops;
-pub mod sessions;
 pub mod shell;
 pub mod skill_http;
 pub mod skill_tool;
@@ -101,117 +36,105 @@ pub mod sop_approve;
 pub mod sop_execute;
 pub mod sop_list;
 pub mod sop_status;
-pub mod swarm;
-pub mod text_browser;
-pub mod tool_search;
-pub mod traits;
 pub mod verifiable_intent;
-pub mod weather_tool;
-pub mod web_fetch;
-mod web_search_provider_routing;
-pub mod web_search_tool;
-pub mod workspace_tool;
-pub mod wrappers;
 
-pub use ask_user::AskUserTool;
-pub use backup_tool::BackupTool;
-pub use browser::{BrowserTool, ComputerUseConfig};
-#[allow(unused_imports)]
-pub use browser_delegate::{BrowserDelegateConfig, BrowserDelegateTool};
-pub use browser_open::BrowserOpenTool;
-pub use calculator::CalculatorTool;
-pub use canvas::{CanvasStore, CanvasTool};
-pub use claude_code::ClaudeCodeTool;
-pub use claude_code_runner::ClaudeCodeRunnerTool;
-pub use cloud_ops::CloudOpsTool;
-pub use cloud_patterns::CloudPatternsTool;
-pub use codex_cli::CodexCliTool;
-pub use composio::ComposioTool;
-pub use content_search::ContentSearchTool;
+// Tool types from zeroclaw-tools (direct imports, no shims)
+pub use zeroclaw_tools::ask_user::AskUserTool;
+pub use zeroclaw_tools::ask_user::ChannelMapHandle;
+pub use zeroclaw_tools::backup_tool::BackupTool;
+pub use zeroclaw_tools::browser::{BrowserTool, ComputerUseConfig};
+pub use zeroclaw_tools::browser_delegate::{BrowserDelegateTool};
+pub use zeroclaw_tools::browser_open::BrowserOpenTool;
+pub use zeroclaw_tools::calculator::CalculatorTool;
+pub use zeroclaw_tools::canvas::{CanvasStore, CanvasTool};
+pub use zeroclaw_tools::claude_code::ClaudeCodeTool;
+pub use zeroclaw_tools::claude_code_runner::ClaudeCodeRunnerTool;
+pub use zeroclaw_tools::cloud_ops::CloudOpsTool;
+pub use zeroclaw_tools::cloud_patterns::CloudPatternsTool;
+pub use zeroclaw_tools::codex_cli::CodexCliTool;
+pub use zeroclaw_tools::composio::ComposioTool;
+pub use zeroclaw_tools::cli_discovery::{discover_cli_tools, DiscoveredCli};
+pub use zeroclaw_tools::content_search::ContentSearchTool;
+pub use zeroclaw_tools::data_management::DataManagementTool;
+pub use zeroclaw_tools::discord_search::DiscordSearchTool;
+pub use zeroclaw_tools::escalate::EscalateToHumanTool;
+pub use zeroclaw_tools::file_edit::FileEditTool;
+pub use zeroclaw_tools::file_write::FileWriteTool;
+pub use zeroclaw_tools::gemini_cli::GeminiCliTool;
+pub use zeroclaw_tools::git_operations::GitOperationsTool;
+pub use zeroclaw_tools::glob_search::GlobSearchTool;
+pub use zeroclaw_tools::google_workspace::GoogleWorkspaceTool;
+pub use zeroclaw_tools::hardware_board_info::HardwareBoardInfoTool;
+pub use zeroclaw_tools::hardware_memory_map::HardwareMemoryMapTool;
+pub use zeroclaw_tools::hardware_memory_read::HardwareMemoryReadTool;
+pub use zeroclaw_tools::http_request::HttpRequestTool;
+pub use zeroclaw_tools::image_gen::ImageGenTool;
+pub use zeroclaw_tools::image_info::ImageInfoTool;
+pub use zeroclaw_tools::jira_tool::JiraTool;
+pub use zeroclaw_tools::knowledge_tool::KnowledgeTool;
+pub use zeroclaw_tools::linkedin::LinkedInTool;
+pub use zeroclaw_tools::llm_task::LlmTaskTool;
+pub use zeroclaw_tools::mcp_tool::McpToolWrapper;
+pub use zeroclaw_tools::mcp_deferred::{ActivatedToolSet, DeferredMcpToolSet, build_deferred_tools_section};
+pub use zeroclaw_tools::mcp_client::McpRegistry;
+pub use zeroclaw_tools::memory_export::MemoryExportTool;
+pub use zeroclaw_tools::memory_forget::MemoryForgetTool;
+pub use zeroclaw_tools::memory_purge::MemoryPurgeTool;
+pub use zeroclaw_tools::memory_recall::MemoryRecallTool;
+pub use zeroclaw_tools::memory_store::MemoryStoreTool;
+pub use zeroclaw_tools::model_routing_config::ModelRoutingConfigTool;
+pub use zeroclaw_tools::notion_tool::NotionTool;
+pub use zeroclaw_tools::opencode_cli::OpenCodeCliTool;
+pub use zeroclaw_tools::pipeline::PipelineTool;
+pub use zeroclaw_tools::poll::PollTool;
+pub use zeroclaw_tools::project_intel::ProjectIntelTool;
+pub use zeroclaw_tools::proxy_config::ProxyConfigTool;
+pub use zeroclaw_tools::pushover::PushoverTool;
+pub use zeroclaw_tools::reaction::ReactionTool;
+pub use zeroclaw_tools::report_template_tool::ReportTemplateTool;
+pub use zeroclaw_tools::screenshot::ScreenshotTool;
+pub use zeroclaw_tools::sessions::{SessionsHistoryTool, SessionsListTool, SessionsSendTool};
+pub use zeroclaw_tools::swarm::SwarmTool;
+pub use zeroclaw_tools::text_browser::TextBrowserTool;
+pub use zeroclaw_tools::tool_search::ToolSearchTool;
+pub use zeroclaw_tools::weather_tool::WeatherTool;
+pub use zeroclaw_tools::web_fetch::WebFetchTool;
+pub use zeroclaw_tools::web_search_tool::WebSearchTool;
+pub use zeroclaw_tools::workspace_tool::WorkspaceTool;
+pub use zeroclaw_tools::canvas::{MAX_CONTENT_SIZE, ALLOWED_CONTENT_TYPES};
+pub use zeroclaw_tools::microsoft365::Microsoft365Tool;
+#[cfg(feature = "rag-pdf")]
+pub use zeroclaw_tools::pdf_read::PdfReadTool;
+pub use zeroclaw_tools::wrappers::{PathGuardedTool, RateLimitedTool};
+
+// Traits from zeroclaw-api
+pub use zeroclaw_api::tool::{Tool, ToolResult, ToolSpec};
+pub use zeroclaw_api::schema::{CleaningStrategy, SchemaCleanr};
+
+// Local tool re-exports (tools with root deps, kept in misc)
 pub use cron_add::CronAddTool;
 pub use cron_list::CronListTool;
 pub use cron_remove::CronRemoveTool;
 pub use cron_run::CronRunTool;
 pub use cron_runs::CronRunsTool;
 pub use cron_update::CronUpdateTool;
-pub use data_management::DataManagementTool;
 pub use delegate::DelegateTool;
-// Re-exported for downstream consumers of background delegation results.
-#[allow(unused_imports)]
-pub use delegate::{BackgroundDelegateResult, BackgroundTaskStatus};
-pub use discord_search::DiscordSearchTool;
-pub use escalate::EscalateToHumanTool;
-pub use file_edit::FileEditTool;
 pub use file_read::FileReadTool;
-pub use file_write::FileWriteTool;
-pub use gemini_cli::GeminiCliTool;
-pub use git_operations::GitOperationsTool;
-pub use glob_search::GlobSearchTool;
-pub use google_workspace::GoogleWorkspaceTool;
-#[cfg(feature = "hardware")]
-pub use hardware_board_info::HardwareBoardInfoTool;
-#[cfg(feature = "hardware")]
-pub use hardware_memory_map::HardwareMemoryMapTool;
-#[cfg(feature = "hardware")]
-pub use hardware_memory_read::HardwareMemoryReadTool;
-pub use http_request::HttpRequestTool;
-pub use image_gen::ImageGenTool;
-pub use image_info::ImageInfoTool;
-pub use jira_tool::JiraTool;
-pub use knowledge_tool::KnowledgeTool;
-pub use linkedin::LinkedInTool;
-pub use llm_task::LlmTaskTool;
-pub use mcp_client::McpRegistry;
-pub use mcp_deferred::{ActivatedToolSet, DeferredMcpToolSet};
-pub use mcp_tool::McpToolWrapper;
-pub use memory_export::MemoryExportTool;
-pub use memory_forget::MemoryForgetTool;
-pub use memory_purge::MemoryPurgeTool;
-pub use memory_recall::MemoryRecallTool;
-pub use memory_store::MemoryStoreTool;
-pub use microsoft365::Microsoft365Tool;
-pub use model_routing_config::ModelRoutingConfigTool;
 pub use model_switch::ModelSwitchTool;
-#[allow(unused_imports)]
 pub use node_tool::NodeTool;
-pub use notion_tool::NotionTool;
-pub use opencode_cli::OpenCodeCliTool;
-pub use pdf_read::PdfReadTool;
-pub use poll::{ChannelMapHandle, PollTool};
-pub use project_intel::ProjectIntelTool;
-pub use proxy_config::ProxyConfigTool;
-pub use pushover::PushoverTool;
-pub use reaction::ReactionTool;
 pub use read_skill::ReadSkillTool;
-pub use report_template_tool::ReportTemplateTool;
 pub use schedule::ScheduleTool;
-#[allow(unused_imports)]
-pub use schema::{CleaningStrategy, SchemaCleanr};
-pub use screenshot::ScreenshotTool;
 pub use security_ops::SecurityOpsTool;
-pub use sessions::{SessionsHistoryTool, SessionsListTool, SessionsSendTool};
 pub use shell::ShellTool;
-#[allow(unused_imports)]
 pub use skill_http::SkillHttpTool;
-#[allow(unused_imports)]
 pub use skill_tool::SkillShellTool;
 pub use sop_advance::SopAdvanceTool;
 pub use sop_approve::SopApproveTool;
 pub use sop_execute::SopExecuteTool;
 pub use sop_list::SopListTool;
 pub use sop_status::SopStatusTool;
-pub use swarm::SwarmTool;
-pub use text_browser::TextBrowserTool;
-pub use tool_search::ToolSearchTool;
-pub use traits::Tool;
-#[allow(unused_imports)]
-pub use traits::{ToolResult, ToolSpec};
 pub use verifiable_intent::VerifiableIntentTool;
-pub use weather_tool::WeatherTool;
-pub use web_fetch::WebFetchTool;
-pub use web_search_tool::WebSearchTool;
-pub use workspace_tool::WorkspaceTool;
-pub use wrappers::{PathGuardedTool, RateLimitedTool};
+
 
 use zeroclaw_config::schema::{Config, DelegateAgentConfig};
 use zeroclaw_memory::Memory;
@@ -228,6 +151,7 @@ pub type DelegateParentToolsHandle = Arc<RwLock<Vec<Arc<dyn Tool>>>>;
 
 /// Thin wrapper that makes an `Arc<dyn Tool>` usable as `Box<dyn Tool>`.
 pub struct ArcToolRef(pub Arc<dyn Tool>);
+// ArcToolRef is the public constructor name for ArcToolWrapper
 
 #[async_trait]
 impl Tool for ArcToolRef {
@@ -731,6 +655,7 @@ pub fn all_tools_with_runtime(
     }
 
     // PDF extraction (feature-gated at compile time via rag-pdf)
+    #[cfg(feature = "rag-pdf")]
     tool_arcs.push(Arc::new(PdfReadTool::new(security.clone())));
 
     // Vision tools are always available
@@ -738,8 +663,8 @@ pub fn all_tools_with_runtime(
     tool_arcs.push(Arc::new(ImageInfoTool::new(security.clone())));
 
     // Session-to-session messaging tools (always available when sessions dir exists)
-    if let Ok(session_store) = crate::channels::session_store::SessionStore::new(workspace_dir) {
-        let backend: Arc<dyn crate::channels::session_backend::SessionBackend> =
+    if let Ok(session_store) = zeroclaw_infra::session_store::SessionStore::new(workspace_dir) {
+        let backend: Arc<dyn zeroclaw_infra::session_backend::SessionBackend> =
             Arc::new(session_store);
         tool_arcs.push(Arc::new(SessionsListTool::new(backend.clone())));
         tool_arcs.push(Arc::new(SessionsHistoryTool::new(
@@ -850,7 +775,7 @@ pub fn all_tools_with_runtime(
                 );
             }
 
-            let resolved = microsoft365::types::Microsoft365ResolvedConfig {
+            let resolved = zeroclaw_tools::microsoft365::types::Microsoft365ResolvedConfig {
                 tenant_id,
                 client_id,
                 client_secret: ms_cfg.client_secret.clone(),
@@ -1023,7 +948,7 @@ pub fn all_tools_with_runtime(
     // Pipeline tool (execute_pipeline) — multi-step tool chaining.
     if root_config.pipeline.enabled {
         let pipeline_tools: Vec<Arc<dyn Tool>> = tool_arcs.clone();
-        tool_arcs.push(Arc::new(pipeline::PipelineTool::new(
+        tool_arcs.push(Arc::new(PipelineTool::new(
             root_config.pipeline.clone(),
             pipeline_tools,
         )));

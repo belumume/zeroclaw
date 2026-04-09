@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use tokio::time::Duration;
 
 use crate::gateway::nodes::{NodeInvocation, NodeRegistry};
-use crate::tools::node_capabilities::requires_approval;
-use crate::tools::traits::{Tool, ToolResult};
+use zeroclaw_tools::node_capabilities::requires_approval;
+use zeroclaw_api::tool::{Tool, ToolResult};
 
 /// Default timeout for node invocations (30 seconds).
 const NODE_INVOKE_TIMEOUT_SECS: u64 = 30;

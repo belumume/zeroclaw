@@ -517,7 +517,7 @@ pub async fn deliver_announcement(
                 .telegram
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("telegram channel not configured"))?;
-            let channel = TelegramChannel::new(
+            let channel = crate::channels::telegram::TelegramChannel::new(
                 tg.bot_token.clone(),
                 tg.allowed_users.clone(),
                 tg.mention_only,

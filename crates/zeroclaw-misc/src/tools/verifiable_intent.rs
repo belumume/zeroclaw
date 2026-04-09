@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::security::SecurityPolicy;
 use crate::security::policy::ToolOperation;
-use crate::tools::traits::{Tool, ToolResult};
+use zeroclaw_api::tool::{Tool, ToolResult};
 use crate::verifiable_intent::error::ViError;
 use crate::verifiable_intent::types::{Constraint, Fulfillment};
 use crate::verifiable_intent::verification::{

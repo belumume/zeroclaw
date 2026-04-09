@@ -2093,7 +2093,7 @@ pub async fn run(
                         registry.server_count()
                     );
                     deferred_section =
-                        crate::tools::mcp_deferred::build_deferred_tools_section(&deferred_set);
+                        crate::tools::build_deferred_tools_section(&deferred_set);
                     let activated = std::sync::Arc::new(std::sync::Mutex::new(
                         crate::tools::ActivatedToolSet::new(),
                     ));
@@ -2567,7 +2567,7 @@ pub async fn run(
     } else {
         println!("🦀 ZeroClaw Interactive Mode");
         println!("Type /help for commands.\n");
-        let cli = crate::channels::CliChannel::new();
+        let cli = crate::channels::cli::CliChannel::new();
 
         // Persistent conversation history across turns
         let mut history = if let Some(path) = session_state_file.as_deref() {
@@ -2902,7 +2902,7 @@ pub async fn run(
                 println!();
             } else if let Err(e) = crate::channels::Channel::send(
                 &cli,
-                &crate::channels::traits::SendMessage::new(format!("\n{response}\n"), "user"),
+                &zeroclaw_api::channel::SendMessage::new(format!("\n{response}\n"), "user"),
             )
             .await
             {
@@ -3056,7 +3056,7 @@ pub async fn process_message(
                         registry.server_count()
                     );
                     deferred_section =
-                        crate::tools::mcp_deferred::build_deferred_tools_section(&deferred_set);
+                        crate::tools::build_deferred_tools_section(&deferred_set);
                     let activated = std::sync::Arc::new(std::sync::Mutex::new(
                         crate::tools::ActivatedToolSet::new(),
                     ));

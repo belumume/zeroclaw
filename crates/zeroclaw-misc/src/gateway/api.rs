@@ -776,7 +776,7 @@ pub async fn handle_api_cli_tools(
         return e.into_response();
     }
 
-    let tools = crate::tools::cli_discovery::discover_cli_tools(&[], &[]);
+    let tools = zeroclaw_tools::cli_discovery::discover_cli_tools(&[], &[]);
 
     Json(serde_json::json!({"cli_tools": tools})).into_response()
 }
@@ -1516,7 +1516,7 @@ pub async fn handle_api_session_state(
 /// configured) could be wired to update a Slack message in-place.
 pub async fn handle_claude_code_hook(
     State(state): State<AppState>,
-    Json(payload): Json<crate::tools::claude_code_runner::ClaudeCodeHookEvent>,
+    Json(payload): Json<zeroclaw_tools::claude_code_runner::ClaudeCodeHookEvent>,
 ) -> impl IntoResponse {
     // Do not require bearer-token auth: Claude Code subprocesses cannot easily
     // obtain a pairing token, and the hook carries a session_id that ties it
@@ -1653,7 +1653,7 @@ mod tests {
             device_registry: None,
             pending_pairings: None,
             path_prefix: String::new(),
-            canvas_store: crate::tools::canvas::CanvasStore::new(),
+            canvas_store: crate::tools::CanvasStore::new(),
             #[cfg(feature = "webauthn")]
             webauthn: None,
         }

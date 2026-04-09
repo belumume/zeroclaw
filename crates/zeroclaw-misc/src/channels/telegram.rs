@@ -1,4 +1,4 @@
-use super::traits::{Channel, ChannelMessage, SendMessage};
+use zeroclaw_api::channel::{Channel, ChannelMessage, SendMessage};
 use zeroclaw_config::schema::{Config, StreamMode};
 use crate::security::pairing::PairingGuard;
 use anyhow::Context;
@@ -601,7 +601,7 @@ impl TelegramChannel {
         text: &str,
         tts_config: &zeroclaw_config::schema::TtsConfig,
     ) -> anyhow::Result<()> {
-        let tts_manager = super::tts::TtsManager::new(tts_config)?;
+        let tts_manager = zeroclaw_channels::tts::TtsManager::new(tts_config)?;
         let audio_bytes = tts_manager.synthesize(text).await?;
         let audio_len = audio_bytes.len();
         tracing::info!("Telegram TTS: synthesized {audio_len} bytes of audio");

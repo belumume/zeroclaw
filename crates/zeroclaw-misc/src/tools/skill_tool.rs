@@ -5,7 +5,7 @@
 //! prefixed with the skill name (e.g. `my_skill.run_lint`) to avoid collisions
 //! with built-in tools.
 
-use super::traits::{Tool, ToolResult};
+use zeroclaw_api::tool::{Tool, ToolResult};
 use crate::security::SecurityPolicy;
 use async_trait::async_trait;
 use std::collections::HashMap;

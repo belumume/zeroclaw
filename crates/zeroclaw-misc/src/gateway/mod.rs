@@ -34,7 +34,7 @@ use crate::runtime;
 use zeroclaw_config::policy::SecurityPolicy;
 use crate::security::pairing::{PairingGuard, constant_time_eq, is_public_bind};
 use crate::tools;
-use zeroclaw_tools::canvas::CanvasStore;
+use crate::tools::CanvasStore;
 use zeroclaw_api::tool::ToolSpec;
 use crate::util::truncate_with_ellipsis;
 use anyhow::{Context, Result};
@@ -1726,7 +1726,7 @@ async fn handle_linq_webhook(
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
 
-        if !crate::channels::linq::verify_linq_signature(
+        if !zeroclaw_channels::linq::verify_linq_signature(
             signing_secret,
             &body_str,
             timestamp,
@@ -1961,7 +1961,7 @@ async fn handle_nextcloud_talk_webhook(
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
 
-        if !crate::channels::nextcloud_talk::verify_nextcloud_talk_signature(
+        if !zeroclaw_channels::nextcloud_talk::verify_nextcloud_talk_signature(
             webhook_secret,
             random,
             &body_str,
@@ -2092,7 +2092,7 @@ async fn handle_gmail_push_webhook(
     }
 
     let body_str = String::from_utf8_lossy(&body);
-    let envelope: crate::channels::gmail_push::PubSubEnvelope =
+    let envelope: zeroclaw_channels::gmail_push::PubSubEnvelope =
         match serde_json::from_str(&body_str) {
             Ok(e) => e,
             Err(e) => {

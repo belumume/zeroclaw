@@ -1,4 +1,4 @@
-use super::traits::{Tool, ToolResult};
+use zeroclaw_api::tool::{Tool, ToolResult};
 use crate::agent::loop_::run_tool_call_loop;
 use crate::agent::prompt::{PromptContext, SystemPromptBuilder};
 use zeroclaw_config::schema::{DelegateAgentConfig, DelegateToolConfig};

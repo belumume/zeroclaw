@@ -1,4 +1,4 @@
-use super::traits::{Tool, ToolResult};
+use zeroclaw_api::tool::{Tool, ToolResult};
 use crate::agent::loop_::get_model_switch_state;
 use zeroclaw_providers as providers;
 use crate::security::SecurityPolicy;

@@ -1,4 +1,4 @@
-use super::traits::{Tool, ToolResult};
+use zeroclaw_api::tool::{Tool, ToolResult};
 use zeroclaw_config::schema::Config;
 use crate::cron::{
     self, DeliveryConfig, JobType, Schedule, SessionTarget, deserialize_maybe_stringified,

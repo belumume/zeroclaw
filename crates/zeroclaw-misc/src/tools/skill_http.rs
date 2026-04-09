@@ -4,7 +4,7 @@
 //! that implements the `Tool` trait. The command field is used as the URL
 //! template and args are substituted as query parameters or path segments.
 
-use super::traits::{Tool, ToolResult};
+use zeroclaw_api::tool::{Tool, ToolResult};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::time::Duration;
