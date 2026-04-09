@@ -40,6 +40,9 @@ use super::traits::{Channel, ChannelMessage, SendMessage};
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, zeroclaw_macros::Configurable)]
 #[prefix = "channels.email"]
 pub struct EmailConfig {
+    /// Whether this channel is active. Default: false.
+    #[serde(default)]
+    pub enabled: bool,
     /// IMAP server hostname
     pub imap_host: String,
     /// IMAP server port (default: 993 for TLS)
@@ -113,6 +116,7 @@ fn default_max_attachment_bytes() -> usize {
 impl Default for EmailConfig {
     fn default() -> Self {
         Self {
+            enabled: false,
             imap_host: String::new(),
             imap_port: default_imap_port(),
             imap_folder: default_imap_folder(),

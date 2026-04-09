@@ -4531,7 +4531,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
             #[cfg(feature = "channel-lark")]
             {
                 let lk = config
-                    .channels_config
+                    .channels
                     .lark
                     .as_ref()
                     .context("Lark channel is not configured")?;
@@ -4545,12 +4545,12 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         "feishu" => {
             #[cfg(feature = "channel-lark")]
             {
-                if let Some(ref fs) = config.channels_config.feishu {
+                if let Some(ref fs) = config.channels.feishu {
                     return Ok(Arc::new(LarkChannel::from_feishu_config(fs)));
                 }
                 // Legacy: [channels_config.lark] with use_feishu = true
                 let lk = config
-                    .channels_config
+                    .channels
                     .lark
                     .as_ref()
                     .context("Feishu channel is not configured")?;
@@ -4563,7 +4563,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "dingtalk" => {
             let dt = config
-                .channels_config
+                .channels
                 .dingtalk
                 .as_ref()
                 .context("DingTalk channel is not configured")?;
@@ -4578,7 +4578,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "wecom" => {
             let wc = config
-                .channels_config
+                .channels
                 .wecom
                 .as_ref()
                 .context("WeCom channel is not configured")?;
@@ -4589,7 +4589,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "nextcloud_talk" | "nextcloud-talk" => {
             let nc = config
-                .channels_config
+                .channels
                 .nextcloud_talk
                 .as_ref()
                 .context("Nextcloud Talk channel is not configured")?;
@@ -4603,7 +4603,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "wati" => {
             let wati_cfg = config
-                .channels_config
+                .channels
                 .wati
                 .as_ref()
                 .context("WATI channel is not configured")?;
@@ -4617,7 +4617,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "linq" => {
             let lq = config
-                .channels_config
+                .channels
                 .linq
                 .as_ref()
                 .context("Linq channel is not configured")?;
@@ -4629,7 +4629,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "email" => {
             let em = config
-                .channels_config
+                .channels
                 .email
                 .as_ref()
                 .context("Email channel is not configured")?;
@@ -4637,7 +4637,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "gmail_push" | "gmail-push" => {
             let gp = config
-                .channels_config
+                .channels
                 .gmail_push
                 .as_ref()
                 .context("Gmail Push channel is not configured")?;
@@ -4645,7 +4645,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "irc" => {
             let irc_cfg = config
-                .channels_config
+                .channels
                 .irc
                 .as_ref()
                 .context("IRC channel is not configured")?;
@@ -4664,7 +4664,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "twitter" => {
             let tw = config
-                .channels_config
+                .channels
                 .twitter
                 .as_ref()
                 .context("X/Twitter channel is not configured")?;
@@ -4675,7 +4675,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "mochat" => {
             let mc = config
-                .channels_config
+                .channels
                 .mochat
                 .as_ref()
                 .context("Mochat channel is not configured")?;
@@ -4688,7 +4688,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "discord_history" | "discord-history" => {
             let dh = config
-                .channels_config
+                .channels
                 .discord_history
                 .as_ref()
                 .context("Discord History channel is not configured")?;
@@ -4707,7 +4707,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
         }
         "imessage" => {
             let im = config
-                .channels_config
+                .channels
                 .imessage
                 .as_ref()
                 .context("iMessage channel is not configured")?;

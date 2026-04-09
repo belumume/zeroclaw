@@ -8408,6 +8408,9 @@ impl ChannelConfig for VoiceWakeConfig {
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema, Configurable)]
 #[prefix = "channels.nostr"]
 pub struct NostrConfig {
+    /// Whether this channel is active. Default: false.
+    #[serde(default)]
+    pub enabled: bool,
     /// Private key in hex or nsec bech32 format
     #[secret]
     pub private_key: String,
@@ -9362,7 +9365,6 @@ impl Config {
             .cloned()
             .collect()
     }
-
 
     pub async fn load_or_init() -> Result<Self> {
         let (default_zeroclaw_dir, default_workspace_dir) = default_config_and_workspace_dirs()?;

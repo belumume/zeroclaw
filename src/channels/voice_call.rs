@@ -48,6 +48,9 @@ impl fmt::Display for VoiceProvider {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Configurable)]
 #[prefix = "channels.voice-call"]
 pub struct VoiceCallConfig {
+    /// Whether this channel is active. Default: false.
+    #[serde(default)]
+    pub enabled: bool,
     /// Telephony provider: `twilio`, `telnyx`, or `plivo`.
     #[serde(default)]
     pub provider: VoiceProvider,
@@ -93,6 +96,7 @@ fn default_max_call_duration() -> u64 {
 impl Default for VoiceCallConfig {
     fn default() -> Self {
         Self {
+            enabled: false,
             provider: VoiceProvider::default(),
             account_id: String::new(),
             auth_token: String::new(),

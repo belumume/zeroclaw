@@ -5577,6 +5577,7 @@ fn setup_channels(existing: Option<ChannelsConfig>) -> Result<ChannelsConfig> {
                 }
 
                 config.nostr = Some(NostrConfig {
+                    enabled: true,
                     private_key: private_key.trim().to_string(),
                     relays: relays.clone(),
                     allowed_pubkeys,
