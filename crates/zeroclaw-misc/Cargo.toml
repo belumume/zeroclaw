@@ -17,14 +17,14 @@ zeroclaw-tools = { path = "../zeroclaw-tools" }
 zeroclaw-tool-call-parser = { path = "../zeroclaw-tool-call-parser" }
 anyhow = "1.0"
 async-trait = "0.1"
-axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query", "ws", "macros"] }
+axum = { optional = true, version = "0.8", default-features = false, features = ["http1", "json", "tokio", "query", "ws", "macros"] }
 base64 = "0.22"
 chacha20poly1305 = "0.10"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
 chrono-tz = "0.10"
 console = "0.16"
 cron = "0.15"
-crossterm = { version = "0.29", features = ["event-stream"] }
+crossterm = { optional = true, version = "0.29", features = ["event-stream"] }
 dialoguer = { version = "0.12", features = ["fuzzy-select"] }
 directories = "6.0"
 flate2 = "1"
@@ -33,23 +33,23 @@ glob = "0.3"
 hex = "0.4"
 hmac = "0.12"
 hostname = "0.4.2"
-http-body-util = "0.1"
-hyper = { version = "1", features = ["http1", "server"] }
-hyper-util = { version = "0.1", features = ["tokio", "server-auto", "server-graceful"] }
+http-body-util = { version = "0.1", optional = true }
+hyper = { optional = true, version = "1", features = ["http1", "server"] }
+hyper-util = { optional = true, version = "0.1", features = ["tokio", "server-auto", "server-graceful"] }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 indicatif = "0.18"
 lru = "0.16"
-mime_guess = "2"
+mime_guess = { version = "2", optional = true }
 nanohtml2text = "0.2"
 parking_lot = "0.12"
 portable-atomic = "1"
 rand = "0.10"
-ratatui = { version = "0.30", default-features = true }
+ratatui = { optional = true, version = "0.30", default-features = true }
 regex = "1.10"
 rumqttc = "0.24"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking", "multipart", "stream", "socks"] }
 ring = "0.17"
-rust-embed = "8"
+rust-embed = { version = "8", optional = true }
 rusqlite = { version = "0.37", features = ["bundled"] }
 rustls = "0.23"
 rustls-pemfile = "2"
@@ -68,8 +68,8 @@ tokio-stream = { version = "0.1.18", default-features = false, features = ["fs",
 tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots"] }
 tokio-util = { version = "0.7", default-features = false }
 toml = "1.0"
-tower = { version = "0.5", default-features = false, features = ["util"] }
-tower-http = { version = "0.6", default-features = false, features = ["limit", "timeout"] }
+tower = { optional = true, version = "0.5", default-features = false, features = ["util"] }
+tower-http = { optional = true, version = "0.6", default-features = false, features = ["limit", "timeout"] }
 tracing = { version = "0.1", default-features = false }
 urlencoding = "2.1"
 uuid = { version = "1.22", default-features = false, features = ["v4", "std"] }
@@ -93,7 +93,9 @@ landlock = { version = "0.4", optional = true }
 libc = "0.2"
 
 [features]
-default = ["observability-prometheus", "skill-creation"]
+default = ["observability-prometheus", "skill-creation", "gateway", "tui-onboarding"]
+gateway = ["dep:axum", "dep:hyper", "dep:hyper-util", "dep:tower", "dep:tower-http", "dep:http-body-util", "dep:rust-embed", "dep:mime_guess"]
+tui-onboarding = ["dep:ratatui", "dep:crossterm"]
 observability-prometheus = ["dep:prometheus"]
 observability-otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
 peripheral-rpi = ["rppal"]

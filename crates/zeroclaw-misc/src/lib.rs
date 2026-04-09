@@ -14,6 +14,7 @@ pub mod channels;
 pub mod cron;
 pub mod daemon;
 pub mod doctor;
+#[cfg(feature = "gateway")]
 pub mod gateway;
 pub mod hardware;
 pub mod health;
@@ -35,6 +36,7 @@ pub mod skills;
 pub mod sop;
 pub mod tools;
 pub mod trust;
+#[cfg(feature = "tui-onboarding")]
 pub mod tui;
 pub mod tunnel;
 pub mod verifiable_intent;

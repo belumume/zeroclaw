@@ -48,6 +48,7 @@ pub(crate) mod cost;
 pub mod cron;
 pub(crate) mod daemon;
 pub(crate) mod doctor;
+#[cfg(feature = "gateway")]
 pub mod gateway;
 pub mod hands;
 pub(crate) mod hardware;
@@ -71,6 +72,7 @@ pub(crate) mod skills;
 pub mod sop;
 pub mod tools;
 pub(crate) mod trust;
+#[cfg(feature = "tui-onboarding")]
 pub mod tui;
 pub(crate) mod tunnel;
 pub mod verifiable_intent;
