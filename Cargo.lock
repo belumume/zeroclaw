@@ -13028,6 +13028,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeroclaw-memory"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "parking_lot",
+ "regex",
+ "reqwest 0.12.28",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "uuid",
+ "zeroclaw-api",
+ "zeroclaw-config",
+]
+
+[[package]]
 name = "zeroclaw-providers"
 version = "0.1.0"
 dependencies = [
@@ -13199,6 +13221,7 @@ dependencies = [
  "zeroclaw-config",
  "zeroclaw-infra",
  "zeroclaw-macros",
+ "zeroclaw-memory",
  "zeroclaw-providers",
  "zeroclaw-tool-call-parser",
  "zip",
