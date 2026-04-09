@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
+members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
 resolver = "2"
 
 [package]
@@ -40,6 +40,7 @@ zeroclaw-infra = { path = "crates/zeroclaw-infra" }
 zeroclaw-config = { path = "crates/zeroclaw-config" }
 zeroclaw-providers = { path = "crates/zeroclaw-providers" }
 zeroclaw-memory = { path = "crates/zeroclaw-memory" }
+zeroclaw-channels = { path = "crates/zeroclaw-channels" }
 zeroclaw-tool-call-parser = { path = "crates/zeroclaw-tool-call-parser" }
 # Internal proc macros
 zeroclaw-macros = { path = "crates/zeroclaw-macros", version = "0.1.0" }

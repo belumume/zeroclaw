@@ -12950,6 +12950,58 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeroclaw-channels"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-imap",
+ "async-trait",
+ "axum",
+ "base64 0.22.1",
+ "chrono",
+ "directories",
+ "futures-util",
+ "hex",
+ "hmac",
+ "image",
+ "lettre",
+ "mail-parser",
+ "nanohtml2text",
+ "nostr-sdk",
+ "parking_lot",
+ "portable-atomic",
+ "prost 0.14.3",
+ "rand 0.10.0",
+ "regex",
+ "reqwest 0.12.28",
+ "rusqlite",
+ "rustls 0.23.37",
+ "rustls-pki-types",
+ "serde",
+ "serde-big-array",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "tokio",
+ "tokio-rustls 0.26.4",
+ "tokio-socks",
+ "tokio-tungstenite 0.29.0",
+ "tracing",
+ "urlencoding",
+ "uuid",
+ "wa-rs",
+ "wa-rs-binary",
+ "wa-rs-core",
+ "wa-rs-proto",
+ "webpki-roots 1.0.6",
+ "zeroclaw-api",
+ "zeroclaw-config",
+ "zeroclaw-infra",
+ "zeroclaw-memory",
+ "zeroclaw-providers",
+]
+
+[[package]]
 name = "zeroclaw-config"
 version = "0.1.0"
 dependencies = [
@@ -13218,6 +13270,7 @@ dependencies = [
  "which",
  "wiremock",
  "zeroclaw-api",
+ "zeroclaw-channels",
  "zeroclaw-config",
  "zeroclaw-infra",
  "zeroclaw-macros",
