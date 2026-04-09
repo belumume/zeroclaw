@@ -4927,7 +4927,7 @@ mod tests {
     fn session_key_stable_without_thread_replies() {
         // When thread_replies=false, top-level messages from the same user should
         // produce the same conversation_history_key (thread_ts=None).
-        use crate::traits::ChannelMessage;
+        use zeroclaw_api::channel::ChannelMessage;
 
         let make_msg = |ts: &str| ChannelMessage {
             id: format!("slack_C123_{ts}"),
@@ -4944,8 +4944,8 @@ mod tests {
         let msg1 = make_msg("100.000");
         let msg2 = make_msg("200.000");
 
-        let key1 = super::super::conversation_history_key(&msg1);
-        let key2 = super::super::conversation_history_key(&msg2);
+        let key1 = crate::util::conversation_history_key(&msg1);
+        let key2 = crate::util::conversation_history_key(&msg2);
         assert_eq!(key1, key2, "session key should be stable across messages");
     }
 
@@ -4953,7 +4953,7 @@ mod tests {
     fn session_key_varies_with_thread_replies() {
         // When thread_replies=true, top-level messages get thread_ts=Some(ts),
         // giving each its own session key (thread isolation).
-        use crate::traits::ChannelMessage;
+        use zeroclaw_api::channel::ChannelMessage;
 
         let make_msg = |ts: &str| ChannelMessage {
             id: format!("slack_C123_{ts}"),
@@ -4970,8 +4970,8 @@ mod tests {
         let msg1 = make_msg("100.000");
         let msg2 = make_msg("200.000");
 
-        let key1 = super::super::conversation_history_key(&msg1);
-        let key2 = super::super::conversation_history_key(&msg2);
+        let key1 = crate::util::conversation_history_key(&msg1);
+        let key2 = crate::util::conversation_history_key(&msg2);
         assert_ne!(key1, key2, "session key should differ per thread");
     }
 

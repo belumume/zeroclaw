@@ -411,7 +411,7 @@ fn conversation_memory_key(msg: &zeroclaw_api::channel::ChannelMessage) -> Strin
     }
 }
 
-fn conversation_history_key(msg: &zeroclaw_api::channel::ChannelMessage) -> String {
+pub fn conversation_history_key(msg: &zeroclaw_api::channel::ChannelMessage) -> String {
     // Include reply_target for per-channel isolation (e.g. distinct Discord/Slack
     // channels) and thread_ts for per-topic isolation in forum groups.
     match &msg.thread_ts {

@@ -120,3 +120,14 @@ pub fn strip_tool_call_tags(message: &str) -> String {
 
     result.trim().to_string()
 }
+
+/// Generate a conversation history key from a channel message.
+pub fn conversation_history_key(msg: &zeroclaw_api::channel::ChannelMessage) -> String {
+    match &msg.thread_ts {
+        Some(tid) => format!(
+            "{}_{}_{}_{}",
+            msg.channel, msg.reply_target, tid, msg.sender
+        ),
+        None => format!("{}_{}_{}", msg.channel, msg.reply_target, msg.sender),
+    }
+}

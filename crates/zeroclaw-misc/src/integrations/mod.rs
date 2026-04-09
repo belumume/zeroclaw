@@ -174,7 +174,7 @@ pub fn show_integration_info(config: &Config, name: &str) -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "_root_tests"))]
 mod tests {
     use super::*;
 

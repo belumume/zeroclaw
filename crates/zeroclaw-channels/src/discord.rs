@@ -2335,7 +2335,7 @@ mod tests {
 
     #[tokio::test]
     async fn send_draft_returns_none_when_not_partial() {
-        use crate::traits::SendMessage;
+        use zeroclaw_api::channel::SendMessage;
         use zeroclaw_config::schema::StreamMode;
 
         let off = DiscordChannel::new("t".into(), None, vec![], false, false);

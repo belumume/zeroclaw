@@ -101,7 +101,11 @@ channel-voice-call = []
 voice-wake = ["dep:cpal"]
 
 [dev-dependencies]
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "env-filter"] }
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }
 tempfile = "3.26"
 
 
+toml = "1.0"
+wiremock = "0.6"
+tokio = { version = "1.50", features = ["rt-multi-thread", "macros"] }

@@ -299,7 +299,7 @@ impl PromptSection for ChannelMediaSection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tools::traits::Tool;
+    use zeroclaw_api::tool::Tool;
     use async_trait::async_trait;
 
     struct TestTool;

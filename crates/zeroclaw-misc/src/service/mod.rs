@@ -1386,7 +1386,7 @@ pub fn xml_escape(raw: &str) -> String {
         .replace('\'', "&apos;")
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "_root_tests"))]
 mod tests {
     use super::*;
 

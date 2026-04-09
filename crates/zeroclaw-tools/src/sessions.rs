@@ -299,7 +299,7 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
     use zeroclaw_api::provider::ChatMessage;
-    use zeroclaw_channels::session_store::SessionStore;
+    use zeroclaw_infra::session_store::SessionStore;
 
     fn test_security() -> Arc<SecurityPolicy> {
         Arc::new(SecurityPolicy::default())
