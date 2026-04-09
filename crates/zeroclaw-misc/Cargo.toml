@@ -12,7 +12,7 @@ zeroclaw-infra = { path = "../zeroclaw-infra" }
 zeroclaw-config = { path = "../zeroclaw-config" }
 zeroclaw-providers = { path = "../zeroclaw-providers" }
 zeroclaw-memory = { path = "../zeroclaw-memory" }
-zeroclaw-channels = { path = "../zeroclaw-channels", features = ["channel-email", "channel-lark"] }
+zeroclaw-channels = { path = "../zeroclaw-channels", default-features = false }
 zeroclaw-tools = { path = "../zeroclaw-tools" }
 zeroclaw-tool-call-parser = { path = "../zeroclaw-tool-call-parser" }
 anyhow = "1.0"
@@ -93,7 +93,7 @@ landlock = { version = "0.4", optional = true }
 libc = "0.2"
 
 [features]
-default = ["observability-prometheus", "skill-creation", "gateway", "tui-onboarding"]
+default = ["observability-prometheus", "skill-creation", "gateway", "tui-onboarding", "channel-email", "channel-lark", "channel-discord", "channel-slack", "channel-signal", "channel-mattermost", "channel-irc", "channel-imessage", "channel-dingtalk", "channel-qq", "channel-bluesky", "channel-twitter", "channel-reddit", "channel-notion", "channel-linq", "channel-wati", "channel-nextcloud", "channel-mochat", "channel-wecom", "channel-clawdtalk", "channel-webhook", "channel-acp-server", "channel-whatsapp-cloud", "channel-voice-call"]
 gateway = ["dep:axum", "dep:hyper", "dep:hyper-util", "dep:tower", "dep:tower-http", "dep:http-body-util", "dep:rust-embed", "dep:mime_guess"]
 tui-onboarding = ["dep:ratatui", "dep:crossterm"]
 observability-prometheus = ["dep:prometheus"]
@@ -103,7 +103,40 @@ sandbox-landlock = ["dep:landlock"]
 hardware = []
 skill-creation = []
 
+# Channel features (forwarded to zeroclaw-channels)
+channel-email = ["zeroclaw-channels/channel-email"]
+channel-telegram = ["zeroclaw-channels/channel-telegram"]
+channel-lark = ["zeroclaw-channels/channel-lark"]
+channel-nostr = ["zeroclaw-channels/channel-nostr"]
+channel-matrix = []
+channel-discord = ["zeroclaw-channels/channel-discord"]
+channel-slack = ["zeroclaw-channels/channel-slack"]
+channel-signal = ["zeroclaw-channels/channel-signal"]
+channel-mattermost = ["zeroclaw-channels/channel-mattermost"]
+channel-irc = ["zeroclaw-channels/channel-irc"]
+channel-imessage = ["zeroclaw-channels/channel-imessage"]
+channel-dingtalk = ["zeroclaw-channels/channel-dingtalk"]
+channel-qq = ["zeroclaw-channels/channel-qq"]
+channel-bluesky = ["zeroclaw-channels/channel-bluesky"]
+channel-twitter = ["zeroclaw-channels/channel-twitter"]
+channel-reddit = ["zeroclaw-channels/channel-reddit"]
+channel-notion = ["zeroclaw-channels/channel-notion"]
+channel-linq = ["zeroclaw-channels/channel-linq"]
+channel-wati = ["zeroclaw-channels/channel-wati"]
+channel-nextcloud = ["zeroclaw-channels/channel-nextcloud"]
+channel-mochat = ["zeroclaw-channels/channel-mochat"]
+channel-wecom = ["zeroclaw-channels/channel-wecom"]
+channel-clawdtalk = ["zeroclaw-channels/channel-clawdtalk"]
+channel-webhook = ["zeroclaw-channels/channel-webhook"]
+channel-acp-server = []
+channel-whatsapp-cloud = ["zeroclaw-channels/channel-whatsapp-cloud"]
+channel-voice-call = ["zeroclaw-channels/channel-voice-call"]
+whatsapp-web = ["zeroclaw-channels/whatsapp-web"]
+voice-wake = ["zeroclaw-channels/voice-wake"]
+
 [dev-dependencies]
 tempfile = "3.26"
 tokio = { version = "1.50", features = ["rt-multi-thread", "macros"] }
 scopeguard = "1.2"
+
+# Channel features (forwarded to zeroclaw-channels)

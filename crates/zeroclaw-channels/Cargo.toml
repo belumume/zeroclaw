@@ -56,12 +56,42 @@ wa-rs-proto = { version = "0.2", optional = true, default-features = false }
 serde-big-array = { version = "0.5", optional = true }
 
 [features]
-default = []
+default = [
+    "channel-discord", "channel-slack", "channel-signal", "channel-mattermost",
+    "channel-irc", "channel-imessage", "channel-dingtalk", "channel-qq",
+    "channel-bluesky", "channel-twitter", "channel-reddit", "channel-notion",
+    "channel-linq", "channel-wati", "channel-nextcloud", "channel-mochat",
+    "channel-wecom", "channel-clawdtalk", "channel-webhook",
+    "channel-whatsapp-cloud", "channel-voice-call",
+]
+# Channels with optional deps
 channel-email = ["dep:lettre", "dep:mail-parser", "dep:async-imap"]
 channel-telegram = ["dep:image"]
 channel-lark = ["dep:prost"]
 channel-nostr = ["dep:nostr-sdk"]
 whatsapp-web = ["dep:wa-rs", "dep:wa-rs-core", "dep:wa-rs-binary", "dep:wa-rs-proto", "dep:serde-big-array"]
+# Channels with no optional deps (cfg gate only)
+channel-discord = []
+channel-slack = []
+channel-signal = []
+channel-mattermost = []
+channel-irc = []
+channel-imessage = []
+channel-dingtalk = []
+channel-qq = []
+channel-bluesky = []
+channel-twitter = []
+channel-reddit = []
+channel-notion = []
+channel-linq = []
+channel-wati = []
+channel-nextcloud = []
+channel-mochat = []
+channel-wecom = []
+channel-clawdtalk = []
+channel-webhook = []
+channel-whatsapp-cloud = []
+channel-voice-call = []
 voice-wake = []
 
 [dev-dependencies]

@@ -40,9 +40,9 @@ zeroclaw-infra = { path = "crates/zeroclaw-infra" }
 zeroclaw-config = { path = "crates/zeroclaw-config" }
 zeroclaw-providers = { path = "crates/zeroclaw-providers" }
 zeroclaw-memory = { path = "crates/zeroclaw-memory" }
-zeroclaw-channels = { path = "crates/zeroclaw-channels", features = ["channel-email", "channel-lark"] }
+zeroclaw-channels = { path = "crates/zeroclaw-channels", default-features = false }
 zeroclaw-tools = { path = "crates/zeroclaw-tools" }
-zeroclaw-misc = { path = "crates/zeroclaw-misc" }
+zeroclaw-misc = { path = "crates/zeroclaw-misc", default-features = false }
 zeroclaw-tool-call-parser = { path = "crates/zeroclaw-tool-call-parser" }
 # Internal proc macros
 zeroclaw-macros = { path = "crates/zeroclaw-macros", version = "0.1.0" }
@@ -252,17 +252,59 @@ landlock = { version = "0.4", optional = true }
 libc = "0.2"
 
 [features]
-default = ["observability-prometheus", "skill-creation", "channel-lark", "gateway", "tui-onboarding"]
+default = [
+    "gateway", "tui-onboarding",
+    "observability-prometheus", "skill-creation",
+    "channel-email", "channel-telegram", "channel-lark",
+    "channel-discord", "channel-slack", "channel-signal",
+    "channel-mattermost", "channel-irc", "channel-imessage",
+    "channel-dingtalk", "channel-qq", "channel-bluesky",
+    "channel-twitter", "channel-reddit", "channel-notion",
+    "channel-linq", "channel-wati", "channel-nextcloud",
+    "channel-mochat", "channel-wecom", "channel-clawdtalk",
+    "channel-webhook", "channel-acp-server", "channel-whatsapp-cloud",
+    "channel-voice-call",
+]
+
+# Tier 1 — major subsystems
 gateway = ["zeroclaw-misc/gateway"]
 tui-onboarding = ["zeroclaw-misc/tui-onboarding"]
-channel-nostr = ["dep:nostr-sdk"]
-hardware = ["nusb", "tokio-serial"]
-channel-matrix = ["dep:matrix-sdk"]
-channel-lark = ["dep:prost"]
-channel-feishu = ["channel-lark"]  # Alias for Feishu users (Lark and Feishu are the same platform)
-observability-prometheus = ["dep:prometheus"]
-observability-otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
-peripheral-rpi = ["rppal"]
+
+# Tier 2 — channels (root → misc → channels forwarding chain)
+channel-email = ["zeroclaw-misc/channel-email"]
+channel-telegram = ["zeroclaw-misc/channel-telegram"]
+channel-lark = ["zeroclaw-misc/channel-lark"]
+channel-nostr = ["zeroclaw-misc/channel-nostr", "dep:nostr-sdk"]
+channel-matrix = ["zeroclaw-misc/channel-matrix", "dep:matrix-sdk"]
+channel-discord = ["zeroclaw-misc/channel-discord"]
+channel-slack = ["zeroclaw-misc/channel-slack"]
+channel-signal = ["zeroclaw-misc/channel-signal"]
+channel-mattermost = ["zeroclaw-misc/channel-mattermost"]
+channel-irc = ["zeroclaw-misc/channel-irc"]
+channel-imessage = ["zeroclaw-misc/channel-imessage"]
+channel-dingtalk = ["zeroclaw-misc/channel-dingtalk"]
+channel-qq = ["zeroclaw-misc/channel-qq"]
+channel-bluesky = ["zeroclaw-misc/channel-bluesky"]
+channel-twitter = ["zeroclaw-misc/channel-twitter"]
+channel-reddit = ["zeroclaw-misc/channel-reddit"]
+channel-notion = ["zeroclaw-misc/channel-notion"]
+channel-linq = ["zeroclaw-misc/channel-linq"]
+channel-wati = ["zeroclaw-misc/channel-wati"]
+channel-nextcloud = ["zeroclaw-misc/channel-nextcloud"]
+channel-mochat = ["zeroclaw-misc/channel-mochat"]
+channel-wecom = ["zeroclaw-misc/channel-wecom"]
+channel-clawdtalk = ["zeroclaw-misc/channel-clawdtalk"]
+channel-webhook = ["zeroclaw-misc/channel-webhook"]
+channel-acp-server = ["zeroclaw-misc/channel-acp-server"]
+channel-whatsapp-cloud = ["zeroclaw-misc/channel-whatsapp-cloud"]
+channel-voice-call = ["zeroclaw-misc/channel-voice-call"]
+channel-feishu = ["channel-lark"]  # Alias
+
+# Tier 3 — backends and integrations
+observability-prometheus = ["zeroclaw-misc/observability-prometheus"]
+observability-otel = ["zeroclaw-misc/observability-otel"]
+hardware = ["zeroclaw-misc/hardware"]
+peripheral-rpi = ["zeroclaw-misc/peripheral-rpi"]
 # Browser backend feature alias used by cfg(feature = "browser-native")
 browser-native = ["dep:fantoccini"]
 # Backward-compatible alias for older invocations
@@ -279,33 +321,30 @@ probe = ["dep:probe-rs"]
 # rag-pdf = PDF ingestion for datasheet RAG
 rag-pdf = ["dep:pdf-extract"]
 # skill-creation = Autonomous skill creation from successful multi-step tasks
-skill-creation = []
-# whatsapp-web = Native WhatsApp Web client with custom rusqlite storage backend
-whatsapp-web = ["dep:wa-rs", "dep:wa-rs-core", "dep:wa-rs-binary", "dep:wa-rs-proto", "dep:wa-rs-ureq-http", "dep:wa-rs-tokio-transport", "dep:serde-big-array", "dep:prost", "dep:qrcode"]
-# voice-wake = Voice wake word detection via microphone (cpal)
-voice-wake = ["dep:cpal"]
-# WASM plugin system (extism-based)
+skill-creation = ["zeroclaw-misc/skill-creation"]
+whatsapp-web = ["zeroclaw-misc/whatsapp-web"]
+voice-wake = ["zeroclaw-misc/voice-wake"]
 plugins-wasm = ["dep:extism"]
-# WebAuthn / FIDO2 hardware key authentication
 webauthn = []
 # Meta-feature for CI: all features except those requiring system C libraries
 # not available on standard CI runners (e.g., voice-wake needs libasound2-dev).
 ci-all = [
-    "channel-nostr",
-    "hardware",
-    "channel-matrix",
-    "channel-lark",
-    "observability-prometheus",
-    "observability-otel",
-    "peripheral-rpi",
-    "browser-native",
-    "sandbox-landlock",
-    "sandbox-bubblewrap",
-    "probe",
-    "rag-pdf",
-    "skill-creation",
-    "whatsapp-web",
-    "plugins-wasm",
+    "gateway", "tui-onboarding",
+    # All 28 channels
+    "channel-email", "channel-telegram", "channel-lark", "channel-nostr",
+    "channel-matrix", "channel-discord", "channel-slack", "channel-signal",
+    "channel-mattermost", "channel-irc", "channel-imessage",
+    "channel-dingtalk", "channel-qq", "channel-bluesky",
+    "channel-twitter", "channel-reddit", "channel-notion",
+    "channel-linq", "channel-wati", "channel-nextcloud",
+    "channel-mochat", "channel-wecom", "channel-clawdtalk",
+    "channel-webhook", "channel-acp-server", "channel-whatsapp-cloud",
+    "channel-voice-call", "whatsapp-web",
+    # Backends
+    "observability-prometheus", "observability-otel",
+    "hardware", "peripheral-rpi",
+    "browser-native", "sandbox-landlock", "sandbox-bubblewrap",
+    "probe", "rag-pdf", "skill-creation", "plugins-wasm",
 ]
 
 [profile.dev]
