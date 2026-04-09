@@ -1,7 +1,11 @@
 pub use zeroclaw_misc::service::*;
 
 use crate::config::Config;
-use anyhow::Result;
+use anyhow::{Context, Result, bail};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::str::FromStr;
 
 pub fn handle_command(
     command: &crate::ServiceCommands,

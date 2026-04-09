@@ -1,3 +1,4 @@
+pub use zeroclaw_misc::tunnel::*;
 
 #[cfg(test)]
 mod tests {

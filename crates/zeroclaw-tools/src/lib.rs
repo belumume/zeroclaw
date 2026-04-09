@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports)]
 //! Tool implementations for agent-callable capabilities.
 
 pub mod microsoft365;

@@ -32,7 +32,8 @@
     clippy::unused_self,
     clippy::cast_precision_loss,
     clippy::unnecessary_wraps,
-    dead_code
+    dead_code,
+    unused_imports
 )]
 
 use clap::Subcommand;

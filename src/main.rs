@@ -30,7 +30,8 @@
     clippy::unnecessary_literal_bound,
     clippy::unnecessary_map_or,
     clippy::unnecessary_wraps,
-    dead_code
+    dead_code, unused_variables,
+    unused_imports
 )]
 
 use anyhow::{Context, Result, bail};

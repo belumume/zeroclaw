@@ -470,6 +470,7 @@ pub fn config_from_wizard_choice(choice: usize, devices: &[DiscoveredDevice]) ->
         _ => HardwareConfig::default(), // software only
     }
 }
+#[cfg(feature = "hardware")]
 pub fn run_discover() -> Result<()> {
     let devices = discover::list_usb_devices()?;
 
@@ -501,6 +502,7 @@ pub fn run_discover() -> Result<()> {
     feature = "hardware",
     any(target_os = "linux", target_os = "macos", target_os = "windows")
 ))]
+#[cfg(feature = "hardware")]
 pub fn run_introspect(path: &str) -> Result<()> {
     let result = introspect::introspect_device(path)?;
 
@@ -526,6 +528,7 @@ pub fn run_introspect(path: &str) -> Result<()> {
     feature = "hardware",
     any(target_os = "linux", target_os = "macos", target_os = "windows")
 ))]
+#[cfg(feature = "hardware")]
 pub fn run_info(chip: &str) -> Result<()> {
     #[cfg(feature = "probe")]
     {

@@ -1,3 +1,4 @@
+pub use zeroclaw_misc::heartbeat::*;
 
 #[cfg(test)]
 mod tests {

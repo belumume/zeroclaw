@@ -1,3 +1,4 @@
+#![allow(dead_code, unused_imports)]
 //! Provider subsystem for model inference backends.
 //!
 //! This module implements the factory pattern for AI model providers. Each provider

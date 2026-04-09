@@ -1,7 +1,9 @@
 pub use zeroclaw_misc::peripherals::*;
 
-use crate::config::{Config, PeripheralBoardConfig};
+use crate::config::{Config, PeripheralBoardConfig, PeripheralsConfig};
+use crate::tools::Tool;
 use anyhow::Result;
+use zeroclaw_tools::hardware_memory_map::HardwareMemoryMapTool;
 
 pub async fn handle_command(cmd: crate::PeripheralCommands, config: &Config) -> Result<()> {
     match cmd {
