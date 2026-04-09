@@ -85,6 +85,7 @@ mod cost;
 mod cron;
 mod daemon;
 mod doctor;
+#[cfg(feature = "gateway")]
 mod gateway;
 mod hardware;
 mod health;
@@ -110,6 +111,7 @@ mod skills;
 mod sop;
 mod tools;
 mod trust;
+#[cfg(feature = "tui-onboarding")]
 mod tui;
 mod tunnel;
 mod util;
@@ -1019,7 +1021,7 @@ async fn main() -> Result<()> {
 
         // TUI onboarding mode (ratatui-based)
         if use_tui {
-            Box::pin(tui::run_tui_onboarding()).await?;
+            Box::pin(run_tui_if_enabled()).await?;
             return Ok(());
         }
 
@@ -1159,7 +1161,7 @@ async fn main() -> Result<()> {
                     }
 
                     log_gateway_start(&host, port);
-                    Box::pin(gateway::run_gateway(&host, port, config, None)).await
+                    Box::pin(run_gateway_if_enabled(&host, port, config, None)).await
                 }
                 Some(zeroclaw::GatewayCommands::GetPaircode { new }) => {
                     let port = config.gateway.port;
@@ -1212,13 +1214,13 @@ async fn main() -> Result<()> {
                 Some(zeroclaw::GatewayCommands::Start { port, host }) => {
                     let (port, host) = resolve_gateway_addr(&config, port, host);
                     log_gateway_start(&host, port);
-                    Box::pin(gateway::run_gateway(&host, port, config, None)).await
+                    Box::pin(run_gateway_if_enabled(&host, port, config, None)).await
                 }
                 None => {
                     let port = config.gateway.port;
                     let host = config.gateway.host.clone();
                     log_gateway_start(&host, port);
-                    Box::pin(gateway::run_gateway(&host, port, config, None)).await
+                    Box::pin(run_gateway_if_enabled(&host, port, config, None)).await
                 }
             }
         }
@@ -3107,4 +3109,24 @@ mod tests {
 
         assert!((final_temperature - 0.7).abs() < f64::EPSILON);
     }
+}
+
+#[cfg(feature = "gateway")]
+async fn run_gateway_if_enabled(host: &str, port: u16, config: zeroclaw::config::Config, tx: Option<tokio::sync::broadcast::Sender<serde_json::Value>>) -> anyhow::Result<()> {
+    gateway::run_gateway(host, port, config, tx).await
+}
+
+#[cfg(not(feature = "gateway"))]
+async fn run_gateway_if_enabled(_host: &str, _port: u16, _config: zeroclaw::config::Config, _tx: Option<tokio::sync::broadcast::Sender<serde_json::Value>>) -> anyhow::Result<()> {
+    anyhow::bail!("Gateway feature is not enabled. Rebuild with --features gateway")
+}
+
+#[cfg(feature = "tui-onboarding")]
+async fn run_tui_if_enabled() -> anyhow::Result<()> {
+    tui::run_tui_onboarding().await
+}
+
+#[cfg(not(feature = "tui-onboarding"))]
+async fn run_tui_if_enabled() -> anyhow::Result<()> {
+    anyhow::bail!("TUI onboarding feature is not enabled. Rebuild with --features tui-onboarding")
 }

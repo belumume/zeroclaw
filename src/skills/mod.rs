@@ -2,6 +2,7 @@ pub use zeroclaw_misc::skills::*;
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
+#[cfg(feature = "skill-creation")]
 pub mod creator { pub use zeroclaw_misc::skills::creator::*; }
 pub mod audit { pub use zeroclaw_misc::skills::audit::*; }
 pub mod skill_tool { pub use zeroclaw_misc::skills::skill_tool::*; }

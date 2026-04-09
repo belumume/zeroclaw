@@ -24,6 +24,7 @@ pub mod cron_update;
 pub mod delegate;
 pub mod file_read;
 pub mod model_switch;
+#[cfg(feature = "gateway")]
 pub mod node_tool;
 pub mod read_skill;
 pub mod schedule;
@@ -121,6 +122,7 @@ pub use cron_update::CronUpdateTool;
 pub use delegate::DelegateTool;
 pub use file_read::FileReadTool;
 pub use model_switch::ModelSwitchTool;
+#[cfg(feature = "gateway")]
 pub use node_tool::NodeTool;
 pub use read_skill::ReadSkillTool;
 pub use schedule::ScheduleTool;

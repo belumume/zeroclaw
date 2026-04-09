@@ -29,7 +29,9 @@ pub use zeroclaw_channels::clawdtalk::{ClawdTalkChannel};
 pub use zeroclaw_channels::dingtalk::DingTalkChannel;
 pub use zeroclaw_channels::discord::DiscordChannel;
 pub use zeroclaw_channels::discord_history::DiscordHistoryChannel;
+#[cfg(feature = "channel-email")]
 pub use zeroclaw_channels::email_channel::EmailChannel;
+#[cfg(feature = "channel-email")]
 pub use zeroclaw_channels::gmail_push::GmailPushChannel;
 pub use zeroclaw_channels::imessage::IMessageChannel;
 pub use zeroclaw_channels::irc::IrcChannel;
@@ -4513,6 +4515,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 lq.allowed_senders.clone(),
             )))
         }
+        #[cfg(feature = "channel-email")]
         "email" => {
             let em = config
                 .channels_config
@@ -4521,6 +4524,7 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 .context("Email channel is not configured")?;
             Ok(Arc::new(EmailChannel::new(em.clone())))
         }
+        #[cfg(feature = "channel-email")]
         "gmail_push" | "gmail-push" => {
             let gp = config
                 .channels_config
@@ -4987,6 +4991,7 @@ fn collect_configured_channels(
         }
     }
 
+    #[cfg(feature = "channel-email")]
     if let Some(ref email_cfg) = config.channels_config.email {
         channels.push(ConfiguredChannel {
             display_name: "Email",
@@ -4994,6 +4999,7 @@ fn collect_configured_channels(
         });
     }
 
+    #[cfg(feature = "channel-email")]
     if let Some(ref gp_cfg) = config.channels_config.gmail_push {
         if gp_cfg.enabled {
             channels.push(ConfiguredChannel {

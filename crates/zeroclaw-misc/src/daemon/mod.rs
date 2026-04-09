@@ -67,22 +67,25 @@ pub async fn run(config: Config, host: String, port: u16) -> Result<()> {
     let mut handles: Vec<JoinHandle<()>> = vec![spawn_state_writer(config.clone())];
 
     {
-        let gateway_cfg = config.clone();
-        let gateway_host = host.clone();
-        let gateway_event_tx = event_tx.clone();
-        handles.push(spawn_component_supervisor(
-            "gateway",
-            initial_backoff,
-            max_backoff,
-            move || {
-                let cfg = gateway_cfg.clone();
-                let host = gateway_host.clone();
-                let tx = gateway_event_tx.clone();
-                async move {
-                    Box::pin(crate::gateway::run_gateway(&host, port, cfg, Some(tx))).await
-                }
-            },
-        ));
+        #[cfg(feature = "gateway")]
+        {
+            let gateway_cfg = config.clone();
+            let gateway_host = host.clone();
+            let gateway_event_tx = event_tx.clone();
+            handles.push(spawn_component_supervisor(
+                "gateway",
+                initial_backoff,
+                max_backoff,
+                move || {
+                    let cfg = gateway_cfg.clone();
+                    let host = gateway_host.clone();
+                    let tx = gateway_event_tx.clone();
+                    async move {
+                        Box::pin(crate::gateway::run_gateway(&host, port, cfg, Some(tx))).await
+                    }
+                },
+            ));
+        }
     }
 
     {
