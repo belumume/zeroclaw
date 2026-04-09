@@ -1,9 +1,12 @@
 //! Configuration schema, secrets, and related types for ZeroClaw.
 
 pub mod autonomy;
+pub mod cost;
 pub mod domain_matcher;
 pub mod helpers;
+pub mod pairing;
 pub mod provider_aliases;
+pub mod runtime;
 pub mod scattered_types;
 pub mod schema;
 pub mod secrets;

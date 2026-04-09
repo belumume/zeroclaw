@@ -13007,7 +13007,9 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "chacha20poly1305",
+ "chrono",
  "directories",
+ "hex",
  "hostname",
  "parking_lot",
  "rand 0.10.0",
@@ -13018,6 +13020,7 @@ dependencies = [
  "schemars 1.2.1",
  "serde",
  "serde_json",
+ "sha2",
  "shellexpand",
  "tempfile",
  "thiserror 2.0.18",
