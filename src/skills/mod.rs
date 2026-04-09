@@ -4,16 +4,16 @@ use anyhow::{Context, Result};
 use std::path::PathBuf;
 #[cfg(feature = "skill-creation")]
 pub mod creator {
-    pub use zeroclaw_misc::skills::creator::*;
+    
 }
 pub mod audit {
     pub use zeroclaw_misc::skills::audit::*;
 }
 pub mod skill_tool {
-    pub use zeroclaw_misc::skills::skill_tool::*;
+    
 }
 pub mod skill_http {
-    pub use zeroclaw_misc::skills::skill_http::*;
+    
 }
 
 pub fn handle_command(command: crate::SkillCommands, config: &crate::config::Config) -> Result<()> {
