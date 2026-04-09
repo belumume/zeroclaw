@@ -4,7 +4,7 @@
 //! minimal — load, append, remove_last, list — so that JSONL and SQLite (and
 //! future backends) share a common interface.
 
-use zeroclaw_types::provider::ChatMessage;
+use zeroclaw_api::provider::ChatMessage;
 use chrono::{DateTime, Utc};
 
 /// Metadata about a persisted session.

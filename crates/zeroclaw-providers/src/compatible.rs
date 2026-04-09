@@ -456,11 +456,11 @@ impl OpenAiCompatibleProvider {
         }
     }
 
-    fn tool_specs_to_openai_format(tools: &[zeroclaw_types::tool::ToolSpec]) -> Vec<serde_json::Value> {
+    fn tool_specs_to_openai_format(tools: &[zeroclaw_api::tool::ToolSpec]) -> Vec<serde_json::Value> {
         tools
             .iter()
             .map(|tool| {
-                let params = zeroclaw_types::schema::SchemaCleanr::clean_for_openai(tool.parameters.clone());
+                let params = zeroclaw_api::schema::SchemaCleanr::clean_for_openai(tool.parameters.clone());
                 serde_json::json!({
                     "type": "function",
                     "function": {
@@ -1423,14 +1423,14 @@ impl OpenAiCompatibleProvider {
     }
 
     fn convert_tool_specs(
-        tools: Option<&[zeroclaw_types::tool::ToolSpec]>,
+        tools: Option<&[zeroclaw_api::tool::ToolSpec]>,
     ) -> Option<Vec<serde_json::Value>> {
         tools.map(|items| {
             items
                 .iter()
                 .map(|tool| {
                     let params =
-                        zeroclaw_types::schema::SchemaCleanr::clean_for_openai(tool.parameters.clone());
+                        zeroclaw_api::schema::SchemaCleanr::clean_for_openai(tool.parameters.clone());
                     serde_json::json!({
                         "type": "function",
                         "function": {
@@ -1567,7 +1567,7 @@ impl OpenAiCompatibleProvider {
 
     fn with_prompt_guided_tool_instructions(
         messages: &[ChatMessage],
-        tools: Option<&[zeroclaw_types::tool::ToolSpec]>,
+        tools: Option<&[zeroclaw_api::tool::ToolSpec]>,
     ) -> Vec<ChatMessage> {
         let Some(tools) = tools else {
             return messages.to_vec();
@@ -1577,7 +1577,7 @@ impl OpenAiCompatibleProvider {
             return messages.to_vec();
         }
 
-        let instructions = zeroclaw_types::provider::build_tool_instructions_text(tools);
+        let instructions = zeroclaw_api::provider::build_tool_instructions_text(tools);
         let mut modified_messages = messages.to_vec();
 
         if let Some(system_message) = modified_messages.iter_mut().find(|m| m.role == "system") {
@@ -1655,8 +1655,8 @@ impl OpenAiCompatibleProvider {
 
 #[async_trait]
 impl Provider for OpenAiCompatibleProvider {
-    fn capabilities(&self) -> zeroclaw_types::provider::ProviderCapabilities {
-        zeroclaw_types::provider::ProviderCapabilities {
+    fn capabilities(&self) -> zeroclaw_api::provider::ProviderCapabilities {
+        zeroclaw_api::provider::ProviderCapabilities {
             native_tool_calling: self.native_tool_calling,
             vision: self.supports_vision,
             prompt_caching: false,
@@ -3151,7 +3151,7 @@ mod tests {
     #[test]
     fn prompt_guided_tool_fallback_injects_system_instruction() {
         let input = vec![ChatMessage::user("check status")];
-        let tools = vec![zeroclaw_types::tool::ToolSpec {
+        let tools = vec![zeroclaw_api::tool::ToolSpec {
             name: "shell_exec".to_string(),
             description: "Execute shell command".to_string(),
             parameters: serde_json::json!({
@@ -3326,7 +3326,7 @@ mod tests {
 
     #[test]
     fn tool_specs_convert_to_openai_format() {
-        let specs = vec![zeroclaw_types::tool::ToolSpec {
+        let specs = vec![zeroclaw_api::tool::ToolSpec {
             name: "shell".to_string(),
             description: "Run shell command".to_string(),
             parameters: serde_json::json!({

@@ -20,7 +20,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 // Re-export TurnEvent from zeroclaw-types for backwards compatibility.
-pub use zeroclaw_types::agent::TurnEvent;
+pub use zeroclaw_api::agent::TurnEvent;
 
 pub struct Agent {
     provider: Box<dyn Provider>,

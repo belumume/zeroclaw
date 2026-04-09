@@ -153,7 +153,7 @@ pub(crate) fn filter_by_allowed_tools(
 }
 
 // Re-export from zeroclaw-types for backwards compatibility.
-pub use zeroclaw_types::TOOL_LOOP_THREAD_ID;
+pub use zeroclaw_api::TOOL_LOOP_THREAD_ID;
 
 // Re-export tool call parsing from the standalone parser crate.
 pub(crate) use zeroclaw_tool_call_parser::{
@@ -278,7 +278,7 @@ pub enum DraftEvent {
     Content(String),
 }
 
-pub use zeroclaw_types::TOOL_CHOICE_OVERRIDE;
+pub use zeroclaw_api::TOOL_CHOICE_OVERRIDE;
 
 /// Convert a tool registry to OpenAI function-calling format for native tool support.
 fn tools_to_openai_format(tools_registry: &[Box<dyn Tool>]) -> Vec<serde_json::Value> {

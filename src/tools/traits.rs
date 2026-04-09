@@ -1,4 +1,4 @@
-pub use zeroclaw_types::tool::*;
+pub use zeroclaw_api::tool::*;
 
 #[cfg(test)]
 mod tests {

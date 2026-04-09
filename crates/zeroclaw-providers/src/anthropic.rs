@@ -3,7 +3,7 @@ use crate::traits::{
     Provider, ProviderCapabilities, StreamChunk, StreamError, StreamEvent, StreamOptions,
     StreamResult, TokenUsage, ToolCall as ProviderToolCall,
 };
-use zeroclaw_types::tool::ToolSpec;
+use zeroclaw_api::tool::ToolSpec;
 use async_trait::async_trait;
 use base64::Engine as _;
 use futures_util::stream::{self, StreamExt};
@@ -832,7 +832,7 @@ impl Provider for AnthropicProvider {
 
         // Check for tool_choice override from the agent loop (e.g. "any"
         // to force tool use for hardware requests).
-        let tool_choice_override = zeroclaw_types::TOOL_CHOICE_OVERRIDE
+        let tool_choice_override = zeroclaw_api::TOOL_CHOICE_OVERRIDE
             .try_with(Clone::clone)
             .ok()
             .flatten();
@@ -986,7 +986,7 @@ impl Provider for AnthropicProvider {
             Self::apply_cache_to_last_message(&mut messages);
         }
 
-        let tool_choice_override = zeroclaw_types::TOOL_CHOICE_OVERRIDE
+        let tool_choice_override = zeroclaw_api::TOOL_CHOICE_OVERRIDE
             .try_with(Clone::clone)
             .ok()
             .flatten();

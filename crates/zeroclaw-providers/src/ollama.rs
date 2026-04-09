@@ -836,7 +836,7 @@ impl Provider for OllamaProvider {
 
     async fn chat(
         &self,
-        request: zeroclaw_types::provider::ChatRequest<'_>,
+        request: zeroclaw_api::provider::ChatRequest<'_>,
         model: &str,
         temperature: f64,
     ) -> anyhow::Result<ChatResponse> {
@@ -847,7 +847,7 @@ impl Provider for OllamaProvider {
                     .iter()
                     .map(|s| {
                         let params =
-                            zeroclaw_types::schema::SchemaCleanr::clean_for_openai(s.parameters.clone());
+                            zeroclaw_api::schema::SchemaCleanr::clean_for_openai(s.parameters.clone());
                         serde_json::json!({
                             "type": "function",
                             "function": {

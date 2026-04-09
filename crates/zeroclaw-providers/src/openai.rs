@@ -2,7 +2,7 @@ use crate::traits::{
     ChatMessage, ChatRequest as ProviderChatRequest, ChatResponse as ProviderChatResponse,
     Provider, TokenUsage, ToolCall as ProviderToolCall,
 };
-use zeroclaw_types::tool::ToolSpec;
+use zeroclaw_api::tool::ToolSpec;
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -829,7 +829,7 @@ mod tests {
 
     #[test]
     fn convert_messages_round_trips_reasoning_content() {
-        use zeroclaw_types::provider::ChatMessage;
+        use zeroclaw_api::provider::ChatMessage;
 
         let history_json = serde_json::json!({
             "content": "I will check",
@@ -852,7 +852,7 @@ mod tests {
 
     #[test]
     fn convert_messages_no_reasoning_content_when_absent() {
-        use zeroclaw_types::provider::ChatMessage;
+        use zeroclaw_api::provider::ChatMessage;
 
         let history_json = serde_json::json!({
             "content": "I will check",

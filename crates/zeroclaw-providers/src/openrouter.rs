@@ -3,7 +3,7 @@ use crate::traits::{
     ChatMessage, ChatRequest as ProviderChatRequest, ChatResponse as ProviderChatResponse,
     Provider, ProviderCapabilities, TokenUsage, ToolCall as ProviderToolCall,
 };
-use zeroclaw_types::tool::ToolSpec;
+use zeroclaw_api::tool::ToolSpec;
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::de::DeserializeOwned;
@@ -1188,7 +1188,7 @@ mod tests {
 
     #[test]
     fn convert_tools_skips_invalid_names() {
-        use zeroclaw_types::tool::ToolSpec;
+        use zeroclaw_api::tool::ToolSpec;
 
         let tools = vec![
             ToolSpec {
@@ -1216,7 +1216,7 @@ mod tests {
 
     #[test]
     fn convert_tools_returns_none_when_all_invalid() {
-        use zeroclaw_types::tool::ToolSpec;
+        use zeroclaw_api::tool::ToolSpec;
 
         let tools = vec![ToolSpec {
             name: "mcp:bad.name".into(),

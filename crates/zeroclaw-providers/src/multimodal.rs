@@ -1,5 +1,5 @@
 use zeroclaw_config::schema::{MultimodalConfig, build_runtime_proxy_client_with_timeouts};
-use zeroclaw_types::provider::ChatMessage;
+use zeroclaw_api::provider::ChatMessage;
 use base64::{Engine as _, engine::general_purpose::STANDARD};
 use reqwest::Client;
 use std::path::Path;

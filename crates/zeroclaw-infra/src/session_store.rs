@@ -6,7 +6,7 @@
 //! are loaded from disk to restore conversation context.
 
 use crate::session_backend::SessionBackend;
-use zeroclaw_types::provider::ChatMessage;
+use zeroclaw_api::provider::ChatMessage;
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
 

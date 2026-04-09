@@ -1,4 +1,4 @@
-pub use zeroclaw_types::provider::*;
+pub use zeroclaw_api::provider::*;
 
 #[cfg(test)]
 mod tests {

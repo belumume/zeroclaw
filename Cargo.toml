@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/zeroclaw-types", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
+members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
 resolver = "2"
 
 [package]
@@ -35,7 +35,7 @@ path = "src/lib.rs"
 
 [dependencies]
 # Internal workspace crates
-zeroclaw-types = { path = "crates/zeroclaw-types" }
+zeroclaw-api = { path = "crates/zeroclaw-api" }
 zeroclaw-infra = { path = "crates/zeroclaw-infra" }
 zeroclaw-config = { path = "crates/zeroclaw-config" }
 zeroclaw-providers = { path = "crates/zeroclaw-providers" }

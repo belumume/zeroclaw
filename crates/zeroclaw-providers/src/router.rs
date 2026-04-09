@@ -318,7 +318,7 @@ impl Provider for RouterProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zeroclaw_types::tool::ToolSpec;
+    use zeroclaw_api::tool::ToolSpec;
     use futures_util::StreamExt;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};

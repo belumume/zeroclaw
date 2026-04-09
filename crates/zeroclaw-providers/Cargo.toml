@@ -7,7 +7,7 @@ description = "LLM provider implementations, auth services, and multimodal proce
 publish = false
 
 [dependencies]
-zeroclaw-types = { path = "../zeroclaw-types" }
+zeroclaw-api = { path = "../zeroclaw-api" }
 zeroclaw-config = { path = "../zeroclaw-config" }
 anyhow = "1.0"
 async-trait = "0.1"

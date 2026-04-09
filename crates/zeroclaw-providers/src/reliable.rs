@@ -1291,7 +1291,7 @@ impl Provider for ReliableProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zeroclaw_types::tool::ToolSpec;
+    use zeroclaw_api::tool::ToolSpec;
     use futures_util::StreamExt;
     use std::sync::Arc;
 

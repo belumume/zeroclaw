@@ -1190,8 +1190,8 @@ impl GeminiProvider {
 
 #[async_trait]
 impl Provider for GeminiProvider {
-    fn capabilities(&self) -> zeroclaw_types::provider::ProviderCapabilities {
-        zeroclaw_types::provider::ProviderCapabilities {
+    fn capabilities(&self) -> zeroclaw_api::provider::ProviderCapabilities {
+        zeroclaw_api::provider::ProviderCapabilities {
             vision: true,
             native_tool_calling: false,
             prompt_caching: false,

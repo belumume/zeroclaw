@@ -15,7 +15,7 @@
 use crate::config::{MediaPipelineConfig, TranscriptionConfig};
 
 // Re-export media types from zeroclaw-types for backwards compatibility.
-pub use zeroclaw_types::media::{MediaAttachment, MediaKind};
+pub use zeroclaw_api::media::{MediaAttachment, MediaKind};
 
 /// The media understanding pipeline.
 ///

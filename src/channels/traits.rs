@@ -1,4 +1,4 @@
-pub use zeroclaw_types::channel::*;
+pub use zeroclaw_api::channel::*;
 
 #[cfg(test)]
 mod tests {

@@ -7,7 +7,7 @@
 use crate::session_backend::{
     SessionBackend, SessionMetadata, SessionQuery, SessionState,
 };
-use zeroclaw_types::provider::ChatMessage;
+use zeroclaw_api::provider::ChatMessage;
 use anyhow::{Context, Result};
 use chrono::{DateTime, Duration, Utc};
 use parking_lot::Mutex;

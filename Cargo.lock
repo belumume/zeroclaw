@@ -12934,6 +12934,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeroclaw-api"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures-util",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "zeroclaw-config"
 version = "0.1.0"
 dependencies = [
@@ -12963,8 +12979,8 @@ dependencies = [
  "url",
  "uuid",
  "webpki-roots 1.0.6",
+ "zeroclaw-api",
  "zeroclaw-macros",
- "zeroclaw-types",
 ]
 
 [[package]]
@@ -12999,7 +13015,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tracing",
- "zeroclaw-types",
+ "zeroclaw-api",
 ]
 
 [[package]]
@@ -13042,8 +13058,8 @@ dependencies = [
  "tokio-util",
  "tracing",
  "uuid",
+ "zeroclaw-api",
  "zeroclaw-config",
- "zeroclaw-types",
 ]
 
 [[package]]
@@ -13075,22 +13091,6 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
- "tracing",
-]
-
-[[package]]
-name = "zeroclaw-types"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "futures-util",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "tokio-util",
  "tracing",
 ]
 
@@ -13195,12 +13195,12 @@ dependencies = [
  "webpki-roots 1.0.6",
  "which",
  "wiremock",
+ "zeroclaw-api",
  "zeroclaw-config",
  "zeroclaw-infra",
  "zeroclaw-macros",
  "zeroclaw-providers",
  "zeroclaw-tool-call-parser",
- "zeroclaw-types",
  "zip",
 ]
 

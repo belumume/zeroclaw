@@ -7,7 +7,7 @@ description = "Configuration schema, secrets, and related types for ZeroClaw."
 publish = false
 
 [dependencies]
-zeroclaw-types = { path = "../zeroclaw-types" }
+zeroclaw-api = { path = "../zeroclaw-api" }
 zeroclaw-macros = { path = "../zeroclaw-macros", version = "0.1.0" }
 anyhow = "1.0"
 chacha20poly1305 = "0.10"

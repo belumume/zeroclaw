@@ -1,1 +1,1 @@
-pub use zeroclaw_types::schema::*;
+pub use zeroclaw_api::schema::*;
