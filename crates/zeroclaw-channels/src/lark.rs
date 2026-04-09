@@ -393,7 +393,7 @@ pub struct LarkChannel {
     /// Platform variant: Lark (international) or Feishu (CN).
     platform: LarkPlatform,
     /// How to receive events: WebSocket long-connection or HTTP webhook.
-    receive_mode: zeroclaw_config::schema::schema::LarkReceiveMode,
+    receive_mode: zeroclaw_config::schema::LarkReceiveMode,
     /// Cached tenant access token
     tenant_token: Arc<RwLock<Option<CachedTenantToken>>>,
     /// Dedup set: WS message_ids seen in last ~30 min to prevent double-dispatch
@@ -444,7 +444,7 @@ impl LarkChannel {
             resolved_bot_open_id: Arc::new(StdRwLock::new(None)),
             mention_only,
             platform,
-            receive_mode: zeroclaw_config::schema::schema::LarkReceiveMode::default(),
+            receive_mode: zeroclaw_config::schema::LarkReceiveMode::default(),
             tenant_token: Arc::new(RwLock::new(None)),
             ws_seen_ids: Arc::new(RwLock::new(HashMap::new())),
             proxy_url: None,
@@ -457,7 +457,7 @@ impl LarkChannel {
 
     /// Build from `LarkConfig` using legacy compatibility:
     /// when `use_feishu=true`, this instance routes to Feishu endpoints.
-    pub fn from_config(config: &zeroclaw_config::schema::schema::LarkConfig) -> Self {
+    pub fn from_config(config: &zeroclaw_config::schema::LarkConfig) -> Self {
         let platform = if config.use_feishu {
             LarkPlatform::Feishu
         } else {
@@ -480,7 +480,7 @@ impl LarkChannel {
     /// Build from `LarkConfig` forcing `LarkPlatform::Lark`, ignoring the
     /// legacy `use_feishu` flag.  Used by the channel factory when the config
     /// section is explicitly `[channels_config.lark]`.
-    pub fn from_lark_config(config: &zeroclaw_config::schema::schema::LarkConfig) -> Self {
+    pub fn from_lark_config(config: &zeroclaw_config::schema::LarkConfig) -> Self {
         let mut ch = Self::new_with_platform(
             config.app_id.clone(),
             config.app_secret.clone(),
@@ -496,7 +496,7 @@ impl LarkChannel {
     }
 
     /// Build from `FeishuConfig` with `LarkPlatform::Feishu`.
-    pub fn from_feishu_config(config: &zeroclaw_config::schema::schema::FeishuConfig) -> Self {
+    pub fn from_feishu_config(config: &zeroclaw_config::schema::FeishuConfig) -> Self {
         let mut ch = Self::new_with_platform(
             config.app_id.clone(),
             config.app_secret.clone(),
@@ -3290,14 +3290,14 @@ mod tests {
             "https://open.larksuite.com/open-apis/im/v1/messages/om_test_message_id/reactions"
         );
 
-        let feishu_cfg = zeroclaw_config::schema::schema::FeishuConfig {
+        let feishu_cfg = zeroclaw_config::schema::FeishuConfig {
             enabled: true,
             app_id: "cli_app123".into(),
             app_secret: "secret456".into(),
             encrypt_key: None,
             verification_token: Some("vtoken789".into()),
             allowed_users: vec!["*".into()],
-            receive_mode: zeroclaw_config::schema::schema::LarkReceiveMode::Webhook,
+            receive_mode: zeroclaw_config::schema::LarkReceiveMode::Webhook,
             port: Some(9898),
             proxy_url: None,
         };

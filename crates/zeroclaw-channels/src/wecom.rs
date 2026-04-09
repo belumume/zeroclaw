@@ -151,7 +151,7 @@ mod tests {
 webhook_key = "key-abc-123"
 allowed_users = ["user1", "*"]
 "#;
-        let config: zeroclaw_config::schema::schema::WeComConfig = toml::from_str(toml_str).unwrap();
+        let config: zeroclaw_config::schema::WeComConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.webhook_key, "key-abc-123");
         assert_eq!(config.allowed_users, vec!["user1", "*"]);
     }
@@ -161,7 +161,7 @@ allowed_users = ["user1", "*"]
         let toml_str = r#"
 webhook_key = "key"
 "#;
-        let config: zeroclaw_config::schema::schema::WeComConfig = toml::from_str(toml_str).unwrap();
+        let config: zeroclaw_config::schema::WeComConfig = toml::from_str(toml_str).unwrap();
         assert!(config.allowed_users.is_empty());
     }
 }

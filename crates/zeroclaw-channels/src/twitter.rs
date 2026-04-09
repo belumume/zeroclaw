@@ -471,7 +471,7 @@ mod tests {
 bearer_token = "AAAA"
 allowed_users = ["user1"]
 "#;
-        let config: zeroclaw_config::schema::schema::TwitterConfig = toml::from_str(toml_str).unwrap();
+        let config: zeroclaw_config::schema::TwitterConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.bearer_token, "AAAA");
         assert_eq!(config.allowed_users, vec!["user1"]);
     }
@@ -481,7 +481,7 @@ allowed_users = ["user1"]
         let toml_str = r#"
 bearer_token = "tok"
 "#;
-        let config: zeroclaw_config::schema::schema::TwitterConfig = toml::from_str(toml_str).unwrap();
+        let config: zeroclaw_config::schema::TwitterConfig = toml::from_str(toml_str).unwrap();
         assert!(config.allowed_users.is_empty());
     }
 }

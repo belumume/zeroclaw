@@ -142,7 +142,7 @@ impl EmailChannel {
     fn extract_attachments(
         &self,
         parsed: &mail_parser::Message,
-    ) -> Vec<super::media_pipeline::MediaAttachment> {
+    ) -> Vec<zeroclaw_api::media::MediaAttachment> {
         let mut attachments = Vec::new();
         let mut total_size = 0;
 
@@ -178,7 +178,7 @@ impl EmailChannel {
                 .unwrap_or("attachment")
                 .to_string();
 
-            attachments.push(super::media_pipeline::MediaAttachment {
+            attachments.push(zeroclaw_api::media::MediaAttachment {
                 file_name,
                 data,
                 mime_type: mime_str,
@@ -493,7 +493,7 @@ struct ParsedEmail {
     sender: String,
     content: String,
     timestamp: u64,
-    attachments: Vec<super::media_pipeline::MediaAttachment>,
+    attachments: Vec<zeroclaw_api::media::MediaAttachment>,
 }
 
 /// Result from waiting on IDLE

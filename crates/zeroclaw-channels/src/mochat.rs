@@ -309,7 +309,7 @@ api_url = "https://mochat.example.com"
 api_token = "secret"
 allowed_users = ["user1"]
 "#;
-        let config: zeroclaw_config::schema::schema::MochatConfig = toml::from_str(toml_str).unwrap();
+        let config: zeroclaw_config::schema::MochatConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.api_url, "https://mochat.example.com");
         assert_eq!(config.api_token, "secret");
         assert_eq!(config.allowed_users, vec!["user1"]);
@@ -321,7 +321,7 @@ allowed_users = ["user1"]
 api_url = "https://mochat.example.com"
 api_token = "secret"
 "#;
-        let config: zeroclaw_config::schema::schema::MochatConfig = toml::from_str(toml_str).unwrap();
+        let config: zeroclaw_config::schema::MochatConfig = toml::from_str(toml_str).unwrap();
         assert!(config.allowed_users.is_empty());
         assert_eq!(config.poll_interval_secs, 5);
     }
