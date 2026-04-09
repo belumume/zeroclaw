@@ -271,9 +271,7 @@ pub enum DraftEvent {
     Content(String),
 }
 
-tokio::task_local! {
-    pub(crate) static TOOL_CHOICE_OVERRIDE: Option<String>;
-}
+pub use zeroclaw_types::TOOL_CHOICE_OVERRIDE;
 
 /// Convert a tool registry to OpenAI function-calling format for native tool support.
 fn tools_to_openai_format(tools_registry: &[Box<dyn Tool>]) -> Vec<serde_json::Value> {

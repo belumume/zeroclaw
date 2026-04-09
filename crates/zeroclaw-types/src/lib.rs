@@ -13,10 +13,15 @@ pub mod agent;
 pub mod channel;
 pub mod media;
 pub mod provider;
+pub mod schema;
 pub mod tool;
 
 tokio::task_local! {
     /// Current thread/sender ID for per-sender rate limiting.
     /// Set by the agent loop, read by SecurityPolicy.
     pub static TOOL_LOOP_THREAD_ID: Option<String>;
+
+    /// Override for tool choice mode, set by the agent loop.
+    /// Read by providers that support native tool calling.
+    pub static TOOL_CHOICE_OVERRIDE: Option<String>;
 }

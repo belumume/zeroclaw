@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/zeroclaw-types", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
+members = [".", "crates/zeroclaw-types", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
 resolver = "2"
 
 [package]
@@ -38,6 +38,7 @@ path = "src/lib.rs"
 zeroclaw-types = { path = "crates/zeroclaw-types" }
 zeroclaw-infra = { path = "crates/zeroclaw-infra" }
 zeroclaw-config = { path = "crates/zeroclaw-config" }
+zeroclaw-providers = { path = "crates/zeroclaw-providers" }
 # Internal proc macros
 zeroclaw-macros = { path = "crates/zeroclaw-macros", version = "0.1.0" }
 # CLI - minimal and fast
