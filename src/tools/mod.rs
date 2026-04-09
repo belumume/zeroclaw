@@ -321,7 +321,7 @@ pub fn register_skill_tools(
         .map(|t| t.name().to_string())
         .collect();
     for tool in skill_tools {
-        if existing_names.contains(tool.name()) {
+        if existing_names.contains(&*tool.name()) {
             tracing::warn!(
                 "Skill tool '{}' shadows built-in tool, skipping",
                 tool.name()

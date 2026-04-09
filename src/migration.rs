@@ -1,3 +1,5 @@
+pub use zeroclaw_misc::migration::*;
+
 
 pub use zeroclaw_misc::migration::*;
 

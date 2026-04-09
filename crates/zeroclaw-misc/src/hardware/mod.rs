@@ -132,7 +132,7 @@ pub fn load_hardware_context_prompt(aliases: &[&str]) -> String {
 /// Inner helper that reads hardware context from an explicit base directory.
 /// Separated from [`load_hardware_context_prompt`] to allow unit-testing with
 /// a temporary directory.
-fn load_hardware_context_from_dir(hw_dir: &std::path::Path, aliases: &[&str]) -> String {
+pub fn load_hardware_context_from_dir(hw_dir: &std::path::Path, aliases: &[&str]) -> String {
     let mut sections: Vec<String> = Vec::new();
 
     // 1. Global HARDWARE.md

@@ -6,26 +6,17 @@
 pub use zeroclaw_misc::peripherals::*;
 
 
-pub mod traits;
 
 #[cfg(feature = "hardware")]
-pub mod serial;
 
 #[cfg(feature = "hardware")]
-pub mod arduino_flash;
 #[cfg(feature = "hardware")]
-pub mod arduino_upload;
 #[cfg(feature = "hardware")]
-pub mod capabilities_tool;
 #[cfg(feature = "hardware")]
-pub mod nucleo_flash;
 #[cfg(feature = "hardware")]
-pub mod uno_q_bridge;
 #[cfg(feature = "hardware")]
-pub mod uno_q_setup;
 
 #[cfg(all(feature = "peripheral-rpi", target_os = "linux"))]
-pub mod rpi;
 
 #[cfg(any(feature = "hardware", feature = "peripheral-rpi"))]
 pub use traits::Peripheral;

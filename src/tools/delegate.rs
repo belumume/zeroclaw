@@ -1047,7 +1047,7 @@ impl DelegateTool {
             workspace_dir,
             model_name: &agent_config.model,
             tools: sub_tools,
-            skills: &skills,
+            skills: skills.as_slice(),
             skills_prompt_mode: crate::config::SkillsPromptInjectionMode::Full,
             identity_config: None,
             dispatcher_instructions: "",

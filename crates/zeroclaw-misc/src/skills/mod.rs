@@ -969,7 +969,7 @@ fn parse_clawhub_url(source: &str) -> Option<Url> {
     Some(parsed)
 }
 
-fn is_clawhub_source(source: &str) -> bool {
+pub fn is_clawhub_source(source: &str) -> bool {
     if source.starts_with("clawhub:") {
         return true;
     }
@@ -1046,7 +1046,7 @@ fn clawhub_skill_dir_name(source: &str) -> Result<String> {
     })
 }
 
-fn is_git_source(source: &str) -> bool {
+pub fn is_git_source(source: &str) -> bool {
     // ClawHub URLs look like https:// but are not git repos
     if is_clawhub_source(source) {
         return false;
@@ -1196,7 +1196,7 @@ fn copy_dir_recursive_secure(src: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-fn install_local_skill_source(
+pub fn install_local_skill_source(
     source: &str,
     skills_path: &Path,
     allow_scripts: bool,
@@ -1233,7 +1233,7 @@ fn install_local_skill_source(
     }
 }
 
-fn install_git_skill_source(
+pub fn install_git_skill_source(
     source: &str,
     skills_path: &Path,
     allow_scripts: bool,
@@ -1259,7 +1259,7 @@ fn install_git_skill_source(
     }
 }
 
-fn install_clawhub_skill_source(
+pub fn install_clawhub_skill_source(
     source: &str,
     skills_path: &Path,
     allow_scripts: bool,
