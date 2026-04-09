@@ -95,6 +95,8 @@ libc = "0.2"
 # Optional deps for specific features
 matrix-sdk = { version = "0.16", optional = true, default-features = false, features = ["e2e-encryption", "rustls-tls", "markdown", "sqlite"] }
 nostr-sdk = { version = "0.44", default-features = false, features = ["nip04", "nip59"], optional = true }
+probe-rs = { version = "0.31", optional = true }
+pdf-extract = { version = "0.10", optional = true }
 nusb = { version = "0.2", default-features = false, optional = true }
 tokio-serial = { version = "5", default-features = false, optional = true }
 
@@ -140,6 +142,13 @@ channel-whatsapp-cloud = ["zeroclaw-channels/channel-whatsapp-cloud"]
 channel-voice-call = ["zeroclaw-channels/channel-voice-call"]
 whatsapp-web = ["zeroclaw-channels/whatsapp-web"]
 voice-wake = ["zeroclaw-channels/voice-wake"]
+
+browser-native = []
+rag-pdf = ["dep:pdf-extract"]
+probe = ["dep:probe-rs"]
+plugins-wasm = []
+webauthn = []
+sandbox-bubblewrap = []
 
 [dev-dependencies]
 tempfile = "3.26"

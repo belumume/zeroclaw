@@ -308,26 +308,26 @@ observability-otel = ["agent-runtime", "zeroclaw-misc/observability-otel"]
 hardware = ["agent-runtime", "zeroclaw-misc/hardware"]
 peripheral-rpi = ["agent-runtime", "zeroclaw-misc/peripheral-rpi"]
 # Browser backend feature alias used by cfg(feature = "browser-native")
-browser-native = ["dep:fantoccini"]
+browser-native = ["dep:fantoccini", "zeroclaw-tools/browser-native", "zeroclaw-misc/browser-native"]
 # Backward-compatible alias for older invocations
 fantoccini = ["browser-native"]
 # Sandbox feature aliases used by cfg(feature = "sandbox-*")
 sandbox-landlock = ["dep:landlock"]
-sandbox-bubblewrap = []
+sandbox-bubblewrap = ["zeroclaw-misc/sandbox-bubblewrap"]
 # Backward-compatible alias for older invocations
 landlock = ["sandbox-landlock"]
 # Prometheus metrics observer (requires 64-bit atomics; disable on 32-bit targets)
 metrics = ["observability-prometheus"]
 # probe = probe-rs for Nucleo memory read (adds ~50 deps; optional)
-probe = ["dep:probe-rs"]
+probe = ["dep:probe-rs", "zeroclaw-misc/probe"]
 # rag-pdf = PDF ingestion for datasheet RAG
-rag-pdf = ["dep:pdf-extract"]
+rag-pdf = ["dep:pdf-extract", "zeroclaw-tools/rag-pdf", "zeroclaw-misc/rag-pdf"]
 # skill-creation = Autonomous skill creation from successful multi-step tasks
 skill-creation = ["agent-runtime", "zeroclaw-misc/skill-creation"]
 whatsapp-web = ["agent-runtime", "zeroclaw-misc/whatsapp-web"]
 voice-wake = ["agent-runtime", "zeroclaw-misc/voice-wake", "zeroclaw-config/voice-wake"]
-plugins-wasm = ["dep:extism"]
-webauthn = []
+plugins-wasm = ["dep:extism", "zeroclaw-misc/plugins-wasm"]
+webauthn = ["zeroclaw-misc/webauthn"]
 # Meta-feature for CI: all features except those requiring system C libraries
 # not available on standard CI runners (e.g., voice-wake needs libasound2-dev).
 ci-all = [
