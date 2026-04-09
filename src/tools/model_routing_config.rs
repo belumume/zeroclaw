@@ -281,9 +281,9 @@ impl ModelRoutingConfigTool {
 
         json!({
             "default": {
-                "provider": cfg.default_provider,
-                "model": cfg.default_model,
-                "temperature": cfg.default_temperature,
+                "provider": cfg.providers.fallback,
+                "model": cfg.providers.fallback_provider().and_then(|e| e.model.as_deref()),
+                "temperature": cfg.providers.fallback_provider().and_then(|e| e.temperature).unwrap_or(0.7),
             },
             "query_classification": {
                 "enabled": cfg.query_classification.enabled,
@@ -397,7 +397,7 @@ impl ModelRoutingConfigTool {
 
         // Capture previous values for rollback on probe failure.
         let previous_provider = cfg.providers.fallback.clone();
-        let previous_fallback_entry = cfg
+        let previous_fallback_provider = cfg
             .providers
             .fallback
             .as_deref()
@@ -441,17 +441,19 @@ impl ModelRoutingConfigTool {
             MaybeSet::Unset => {}
         }
 
-        cfg.resolve_provider_cache();
         cfg.save().await?;
 
         // Probe the new model with a minimal API call to catch invalid model IDs
         // before the channel hot-reload picks up the change.
-        if let (Some(provider_name), Some(model_name)) =
-            (cfg.default_provider.clone(), cfg.default_model.clone())
-        {
+        let current_provider = cfg.providers.fallback.clone();
+        let current_model = cfg
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.model.clone());
+        if let (Some(provider_name), Some(model_name)) = (current_provider, current_model) {
             if let Err(probe_err) = self.probe_model(&provider_name, &model_name).await {
                 if crate::providers::reliable::is_non_retryable(&probe_err) {
-                    let reverted_model = previous_fallback_entry
+                    let reverted_model = previous_fallback_provider
                         .as_ref()
                         .and_then(|e| e.model.as_deref())
                         .unwrap_or("(none)")
@@ -459,12 +461,11 @@ impl ModelRoutingConfigTool {
 
                     // Rollback to previous config.
                     cfg.providers.fallback = previous_provider;
-                    if let Some(prev_entry) = previous_fallback_entry {
+                    if let Some(prev_entry) = previous_fallback_provider {
                         if let Some(fb) = cfg.providers.fallback.as_deref() {
                             cfg.providers.models.insert(fb.to_string(), prev_entry);
                         }
                     }
-                    cfg.resolve_provider_cache();
                     cfg.save().await?;
 
                     return Ok(ToolResult {
@@ -503,7 +504,11 @@ impl ModelRoutingConfigTool {
 
         // Use the runtime config's API key (which includes env-sourced keys),
         // not the on-disk config (which may have no key at all).
-        let api_key = self.config.api_key.as_deref();
+        let api_key = self
+            .config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.api_key.as_deref());
         if api_key.is_none_or(|k| k.trim().is_empty()) {
             return Ok(());
         }
@@ -511,7 +516,10 @@ impl ModelRoutingConfigTool {
         let provider = match providers::create_provider_with_url(
             provider_name,
             api_key,
-            self.config.api_url.as_deref(),
+            self.config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.base_url.as_deref()),
         ) {
             Ok(p) => p,
             Err(_) => return Ok(()),

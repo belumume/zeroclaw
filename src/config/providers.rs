@@ -28,3 +28,15 @@ pub struct ProvidersConfig {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub embedding_routes: Vec<EmbeddingRouteConfig>,
 }
+
+impl ProvidersConfig {
+    pub fn fallback_provider(&self) -> Option<&ModelProviderConfig> {
+        self.fallback
+            .as_deref()
+            .and_then(|name| self.models.get(name))
+    }
+    pub fn fallback_provider_mut(&mut self) -> Option<&mut ModelProviderConfig> {
+        let name = self.fallback.clone()?;
+        self.models.get_mut(&name)
+    }
+}

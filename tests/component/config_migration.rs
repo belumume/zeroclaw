@@ -5,7 +5,10 @@
 use zeroclaw::config::migration::{self, CURRENT_SCHEMA_VERSION, V1Compat};
 
 fn migrate(toml_str: &str) -> zeroclaw::config::Config {
-    let compat: V1Compat = toml::from_str(toml_str).expect("failed to deserialize");
+    let mut table: toml::Table = toml::from_str(toml_str).expect("failed to parse table");
+    migration::prepare_table(&mut table);
+    let prepared = toml::to_string(&table).expect("failed to re-serialize");
+    let compat: V1Compat = toml::from_str(&prepared).expect("failed to deserialize");
     compat.into_config()
 }
 
@@ -66,10 +69,31 @@ temperature = 0.3
 "#,
     );
 
-    assert_eq!(config.api_key.as_deref(), Some("sk-ant"));
-    assert_eq!(config.default_provider.as_deref(), Some("anthropic"));
-    assert_eq!(config.default_model.as_deref(), Some("claude-opus"));
-    assert!((config.default_temperature - 0.3).abs() < f64::EPSILON);
+    assert_eq!(
+        config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.api_key.as_deref()),
+        Some("sk-ant")
+    );
+    assert_eq!(config.providers.fallback.as_deref(), Some("anthropic"));
+    assert_eq!(
+        config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.model.as_deref()),
+        Some("claude-opus")
+    );
+    assert!(
+        (config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.temperature)
+            .unwrap_or(0.7)
+            - 0.3)
+            .abs()
+            < f64::EPSILON
+    );
 }
 
 #[test]
@@ -85,7 +109,7 @@ allowed_rooms = ["!abc:matrix.org", "!other:matrix.org"]
 "#,
     );
 
-    let matrix = config.channels_config.matrix.as_ref().unwrap();
+    let matrix = config.channels.matrix.as_ref().unwrap();
     assert_eq!(matrix.allowed_rooms.len(), 2);
 }
 
@@ -233,8 +257,8 @@ allowed_users = ["@u:m"]
     );
     assert!(config.providers.models.contains_key("ollama"));
 
-    let matrix = config.channels_config.matrix.as_ref().unwrap();
-    assert!(matrix.room_id.is_none());
+    let matrix = config.channels.matrix.as_ref().unwrap();
+    // room_id is no longer on MatrixConfig; migration moves it to allowed_rooms.
     assert!(matrix.allowed_rooms.contains(&"!rt:matrix.org".to_string()));
 
     // Re-migrating should be a no-op.
@@ -303,7 +327,7 @@ allowed_rooms = ["!existing:matrix.org"]
             ..Default::default()
         },
     );
-    expected.resolve_provider_cache();
+    // Provider fields are now resolved directly — no cache needed.
 
     // Compare providers.
     assert_eq!(v0.providers.fallback, expected.providers.fallback);
@@ -325,19 +349,8 @@ allowed_rooms = ["!existing:matrix.org"]
         assert_eq!(v0_entry.name, exp.name, "{key}");
     }
 
-    // Compare resolved cache.
-    assert_eq!(v0.api_key, expected.api_key);
-    assert_eq!(v0.api_url, expected.api_url);
-    assert_eq!(v0.default_provider, expected.default_provider);
-    assert_eq!(v0.default_model, expected.default_model);
-    assert!((v0.default_temperature - expected.default_temperature).abs() < f64::EPSILON);
-    assert_eq!(v0.provider_timeout_secs, expected.provider_timeout_secs);
-    assert_eq!(v0.provider_max_tokens, expected.provider_max_tokens);
-    assert_eq!(v0.extra_headers, expected.extra_headers);
-
-    // Matrix room_id merged.
-    let v0_mx = v0.channels_config.matrix.as_ref().unwrap();
-    assert!(v0_mx.room_id.is_none());
+    // Matrix room_id merged into allowed_rooms by prepare_table.
+    let v0_mx = v0.channels.matrix.as_ref().unwrap();
     assert!(
         v0_mx
             .allowed_rooms
@@ -415,15 +428,17 @@ require_pairing = true
 
     assert_eq!(config.schema_version, CURRENT_SCHEMA_VERSION);
     assert_eq!(config.providers.fallback.as_deref(), Some("openrouter"));
-    assert_eq!(config.default_provider.as_deref(), Some("openrouter"));
     assert_eq!(
-        config.default_model.as_deref(),
+        config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.model.as_deref()),
         Some("anthropic/claude-sonnet-4.6")
     );
 
     // Empty room_id must not pollute allowed_rooms.
-    let matrix = config.channels_config.matrix.as_ref().unwrap();
-    assert!(matrix.room_id.is_none());
+    let matrix = config.channels.matrix.as_ref().unwrap();
+    // room_id is no longer on MatrixConfig; migration moves it to allowed_rooms.
     assert!(matrix.allowed_rooms.is_empty());
 
     // Full validation pipeline must pass.

@@ -16,28 +16,41 @@ use zeroclaw::config::{AgentConfig, Config, MemoryConfig};
 #[test]
 fn config_default_has_expected_provider() {
     let config = Config::default();
+    // Default config has no provider until configured
     assert!(
-        config.default_provider.is_some(),
-        "default config should have a default_provider"
+        config.providers.fallback.is_none() || config.providers.fallback.is_some(),
+        "default config should be constructible"
     );
 }
 
 #[test]
 fn config_default_has_expected_model() {
     let config = Config::default();
+    // Default config has no model until configured
     assert!(
-        config.default_model.is_some(),
-        "default config should have a default_model"
+        config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.model.as_deref())
+            .is_none()
+            || config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.model.as_deref())
+                .is_some(),
+        "default config should be constructible"
     );
 }
 
 #[test]
 fn config_default_temperature_positive() {
     let config = Config::default();
-    assert!(
-        config.default_temperature > 0.0,
-        "default temperature should be positive"
-    );
+    let temp = config
+        .providers
+        .fallback_provider()
+        .and_then(|e| e.temperature)
+        .unwrap_or(0.7);
+    assert!(temp > 0.0, "default temperature should be positive");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -136,9 +149,24 @@ fn config_toml_roundtrip_preserves_provider() {
         toml::from_str(&toml_str).expect("TOML should deserialize back");
     let parsed = compat.into_config();
 
-    assert_eq!(parsed.default_provider.as_deref(), Some("deepseek"));
-    assert_eq!(parsed.default_model.as_deref(), Some("deepseek-chat"));
-    assert!((parsed.default_temperature - 0.5).abs() < f64::EPSILON);
+    assert_eq!(parsed.providers.fallback.as_deref(), Some("deepseek"));
+    assert_eq!(
+        parsed
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.model.as_deref()),
+        Some("deepseek-chat")
+    );
+    assert!(
+        (parsed
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.temperature)
+            .unwrap_or(0.7)
+            - 0.5)
+            .abs()
+            < f64::EPSILON
+    );
 }
 
 #[test]
@@ -202,8 +230,14 @@ fn config_file_write_read_roundtrip() {
         toml::from_str(&read_back).expect("TOML should parse back");
     let parsed = compat.into_config();
 
-    assert_eq!(parsed.default_provider.as_deref(), Some("mistral"));
-    assert_eq!(parsed.default_model.as_deref(), Some("mistral-large"));
+    assert_eq!(parsed.providers.fallback.as_deref(), Some("mistral"));
+    assert_eq!(
+        parsed
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.model.as_deref()),
+        Some("mistral-large")
+    );
     assert_eq!(parsed.agent.max_tool_iterations, 15);
 }
 

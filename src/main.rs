@@ -1093,7 +1093,13 @@ async fn main() -> Result<()> {
             temperature,
             peripheral,
         } => {
-            let final_temperature = temperature.unwrap_or(config.default_temperature);
+            let final_temperature = temperature.unwrap_or_else(|| {
+                config
+                    .providers
+                    .fallback_provider()
+                    .and_then(|e| e.temperature)
+                    .unwrap_or(0.7)
+            });
 
             Box::pin(agent::run(
                 config,
@@ -1278,11 +1284,15 @@ async fn main() -> Result<()> {
             println!();
             println!(
                 "🤖 Provider:      {}",
-                config.default_provider.as_deref().unwrap_or("openrouter")
+                config.providers.fallback.as_deref().unwrap_or("openrouter")
             );
             println!(
                 "   Model:         {}",
-                config.default_model.as_deref().unwrap_or("(default)")
+                config
+                    .providers
+                    .fallback_provider()
+                    .and_then(|e| e.model.as_deref())
+                    .unwrap_or("(default)")
             );
             println!("📊 Observability:  {}", config.observability.backend);
             println!(
@@ -1370,7 +1380,7 @@ async fn main() -> Result<()> {
             println!();
             println!("Channels:");
             println!("  CLI:      ✅ always");
-            for (channel, configured) in config.channels_config.channels() {
+            for (channel, configured) in config.channels.channels() {
                 println!(
                     "  {:9} {}",
                     channel.name(),
@@ -1432,7 +1442,8 @@ async fn main() -> Result<()> {
         Commands::Providers => {
             let providers = providers::list_providers();
             let current = config
-                .default_provider
+                .providers
+                .fallback
                 .as_deref()
                 .unwrap_or("openrouter")
                 .trim()
@@ -3112,12 +3123,18 @@ mod tests {
     fn agent_fallback_uses_config_default_temperature() {
         // Test that when user doesn't provide --temperature,
         // the fallback logic works correctly
-        let mut config = Config::default(); // default_temperature = 0.7
-        config.default_temperature = 1.5;
+        let mut config = Config::default();
+        config.ensure_fallback_provider().temperature = Some(1.5);
 
         // Simulate None temperature (user didn't provide --temperature)
         let user_temperature: Option<f64> = std::hint::black_box(None);
-        let final_temperature = user_temperature.unwrap_or(config.default_temperature);
+        let final_temperature = user_temperature.unwrap_or_else(|| {
+            config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.temperature)
+                .unwrap_or(0.7)
+        });
 
         assert!((final_temperature - 1.5).abs() < f64::EPSILON);
     }
@@ -3125,11 +3142,17 @@ mod tests {
     #[test]
     fn agent_fallback_uses_hardcoded_when_config_uses_default() {
         // Test that when config uses default value (0.7), fallback still works
-        let config = Config::default(); // default_temperature = 0.7
+        let config = Config::default();
 
         // Simulate None temperature (user didn't provide --temperature)
         let user_temperature: Option<f64> = std::hint::black_box(None);
-        let final_temperature = user_temperature.unwrap_or(config.default_temperature);
+        let final_temperature = user_temperature.unwrap_or_else(|| {
+            config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.temperature)
+                .unwrap_or(0.7)
+        });
 
         assert!((final_temperature - 0.7).abs() < f64::EPSILON);
     }

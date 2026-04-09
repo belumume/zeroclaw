@@ -287,7 +287,10 @@ async fn run_agent_job(
     let memory_context = match crate::memory::create_memory(
         &config.memory,
         &config.workspace_dir,
-        config.api_key.as_deref(),
+        config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.api_key.as_deref()),
     ) {
         Ok(mem) => match mem.recall(&prompt, 5, None, None, None).await {
             Ok(entries) if !entries.is_empty() => {
@@ -323,7 +326,11 @@ async fn run_agent_job(
                 Some(prefixed_prompt),
                 None,
                 model_override,
-                config.default_temperature,
+                config
+                    .providers
+                    .fallback_provider()
+                    .and_then(|e| e.temperature)
+                    .unwrap_or(0.7),
                 vec![],
                 false,
                 None,
@@ -513,7 +520,7 @@ pub(crate) async fn deliver_announcement(
     match channel.to_ascii_lowercase().as_str() {
         "telegram" => {
             let tg = config
-                .channels_config
+                .channels
                 .telegram
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("telegram channel not configured"))?;
@@ -528,7 +535,7 @@ pub(crate) async fn deliver_announcement(
         }
         "discord" => {
             let dc = config
-                .channels_config
+                .channels
                 .discord
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("discord channel not configured"))?;
@@ -545,7 +552,7 @@ pub(crate) async fn deliver_announcement(
         }
         "slack" => {
             let sl = config
-                .channels_config
+                .channels
                 .slack
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("slack channel not configured"))?;
@@ -563,7 +570,7 @@ pub(crate) async fn deliver_announcement(
         }
         "mattermost" => {
             let mm = config
-                .channels_config
+                .channels
                 .mattermost
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("mattermost channel not configured"))?;
@@ -581,7 +588,7 @@ pub(crate) async fn deliver_announcement(
         }
         "signal" => {
             let sg = config
-                .channels_config
+                .channels
                 .signal
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("signal channel not configured"))?;
@@ -601,20 +608,23 @@ pub(crate) async fn deliver_announcement(
             #[cfg(feature = "channel-matrix")]
             {
                 let mx = config
-                    .channels_config
+                    .channels
                     .matrix
                     .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("matrix channel not configured"))?;
-                let room_id =
-                    resolve_matrix_delivery_room(mx.room_id.as_deref().unwrap_or(""), target);
-                let channel = MatrixChannel::new_with_session_hint_and_zeroclaw_dir(
+                let room_id = resolve_matrix_delivery_room(
+                    mx.allowed_rooms.first().map(|s| s.as_str()).unwrap_or(""),
+                    target,
+                );
+                let channel = MatrixChannel::new_full(
                     mx.homeserver.clone(),
                     mx.access_token.clone(),
-                    room_id,
                     mx.allowed_users.clone(),
+                    vec![room_id],
                     mx.user_id.clone(),
                     mx.device_id.clone(),
                     config.config_path.parent().map(|path| path.to_path_buf()),
+                    None,
                 );
                 channel
                     .send(&SendMessage::new(safe_output.as_str(), target))
@@ -629,7 +639,7 @@ pub(crate) async fn deliver_announcement(
             #[cfg(feature = "whatsapp-web")]
             {
                 let wa = config
-                    .channels_config
+                    .channels
                     .whatsapp
                     .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("whatsapp channel not configured"))?;
@@ -660,7 +670,7 @@ pub(crate) async fn deliver_announcement(
         }
         "qq" => {
             let qq = config
-                .channels_config
+                .channels
                 .qq
                 .as_ref()
                 .ok_or_else(|| anyhow::anyhow!("qq channel not configured"))?;
@@ -677,7 +687,7 @@ pub(crate) async fn deliver_announcement(
             #[cfg(feature = "channel-lark")]
             {
                 let lk = config
-                    .channels_config
+                    .channels
                     .lark
                     .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("lark channel not configured"))?;
@@ -695,7 +705,7 @@ pub(crate) async fn deliver_announcement(
             #[cfg(feature = "channel-lark")]
             {
                 let fs = config
-                    .channels_config
+                    .channels
                     .feishu
                     .as_ref()
                     .ok_or_else(|| anyhow::anyhow!("feishu channel not configured"))?;

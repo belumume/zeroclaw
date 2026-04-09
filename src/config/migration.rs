@@ -36,6 +36,7 @@ pub const V1_LEGACY_KEYS: &[&str] = &[
     "model_providers",
     "model_routes",
     "embedding_routes",
+    "channels_config",
 ];
 
 /// Wraps the current Config with extra fields from V1 that no longer exist on Config.
@@ -80,14 +81,11 @@ impl V1Compat {
         let needs_migration = from < CURRENT_SCHEMA_VERSION || self.has_legacy_fields();
 
         if !needs_migration {
-            self.config.resolve_provider_cache();
             return self.config;
         }
 
         self.migrate_providers();
-        self.migrate_matrix_room_id();
         self.config.schema_version = CURRENT_SCHEMA_VERSION;
-        self.config.resolve_provider_cache();
 
         tracing::info!(
             from = from,
@@ -173,14 +171,40 @@ impl V1Compat {
             self.config.providers.embedding_routes = std::mem::take(&mut self.embedding_routes);
         }
     }
+}
 
-    fn migrate_matrix_room_id(&mut self) {
-        if let Some(ref mut matrix) = self.config.channels_config.matrix {
-            if let Some(room_id) = matrix.room_id.take() {
-                if !room_id.is_empty() && !matrix.allowed_rooms.contains(&room_id) {
-                    matrix.allowed_rooms.push(room_id);
+/// Pre-deserialization table migration for nested field changes that
+/// `#[serde(flatten)]` cannot capture (e.g. removing a field from a nested
+/// struct and moving its value elsewhere).
+///
+/// Called on the raw `toml::Table` before it is deserialized into `V1Compat`.
+pub fn prepare_table(table: &mut toml::Table) {
+    // Migrate channels_config.matrix.room_id → channels_config.matrix.allowed_rooms
+    for key in &["channels_config", "channels"] {
+        if let Some(toml::Value::Table(channels)) = table.get_mut(*key) {
+            if let Some(toml::Value::Table(matrix)) = channels.get_mut("matrix") {
+                if let Some(toml::Value::String(room_id)) = matrix.remove("room_id") {
+                    if !room_id.is_empty() {
+                        let rooms = matrix
+                            .entry("allowed_rooms")
+                            .or_insert_with(|| toml::Value::Array(Vec::new().into()));
+                        if let toml::Value::Array(arr) = rooms {
+                            let already_present =
+                                arr.iter().any(|v| v.as_str() == Some(room_id.as_str()));
+                            if !already_present {
+                                arr.push(toml::Value::String(room_id));
+                            }
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    // Rename legacy `channels_config` key to `channels`
+    if table.contains_key("channels_config") && !table.contains_key("channels") {
+        if let Some(val) = table.remove("channels_config") {
+            table.insert("channels".to_string(), val);
         }
     }
 }
@@ -194,7 +218,10 @@ impl V1Compat {
 /// Migrate a raw TOML config file, preserving comments and formatting.
 /// Returns `None` if already at current version.
 pub fn migrate_file(raw: &str) -> Result<Option<String>> {
-    let compat: V1Compat = toml::from_str(raw).context("Failed to deserialize config")?;
+    let mut table: toml::Table = toml::from_str(raw).context("Failed to parse config table")?;
+    prepare_table(&mut table);
+    let prepared = toml::to_string(&table).context("Failed to re-serialize prepared table")?;
+    let compat: V1Compat = toml::from_str(&prepared).context("Failed to deserialize config")?;
     if compat.config.schema_version >= CURRENT_SCHEMA_VERSION && !compat.has_legacy_fields() {
         return Ok(None);
     }
@@ -206,6 +233,14 @@ pub fn migrate_file(raw: &str) -> Result<Option<String>> {
 
     // Sync the original document (with comments) to match the target.
     let mut doc: DocumentMut = raw.parse().context("Failed to parse config.toml")?;
+
+    // Rename channels_config → channels in the document to preserve comments.
+    if doc.contains_key("channels_config") && !doc.contains_key("channels") {
+        if let Some(val) = doc.remove("channels_config") {
+            doc.insert("channels", val);
+        }
+    }
+
     sync_table(doc.as_table_mut(), &target);
 
     Ok(Some(doc.to_string()))

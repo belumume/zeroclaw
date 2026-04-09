@@ -479,7 +479,7 @@ impl LarkChannel {
 
     /// Build from `LarkConfig` forcing `LarkPlatform::Lark`, ignoring the
     /// legacy `use_feishu` flag.  Used by the channel factory when the config
-    /// section is explicitly `[channels_config.lark]`.
+    /// section is explicitly `[channels.lark]`.
     pub fn from_lark_config(config: &crate::config::schema::LarkConfig) -> Self {
         let mut ch = Self::new_with_platform(
             config.app_id.clone(),
@@ -1900,7 +1900,7 @@ impl LarkChannel {
         }
 
         let port = self.port.ok_or_else(|| {
-            anyhow::anyhow!("Lark webhook mode requires `port` to be set in [channels_config.lark]")
+            anyhow::anyhow!("Lark webhook mode requires `port` to be set in [channels.lark]")
         })?;
 
         let state = AppState {

@@ -104,7 +104,7 @@ pub async fn run_wizard(force: bool) -> Result<Config> {
     let (provider, api_key, model, provider_api_url) = setup_provider(&workspace_dir).await?;
 
     print_step(3, 9, "Channels (How You Talk to ZeroClaw)");
-    let channels_config = setup_channels(None)?;
+    let channels = setup_channels(None)?;
 
     print_step(4, 9, "Tunnel (Expose to Internet)");
     let tunnel_config = setup_tunnel()?;
@@ -126,7 +126,7 @@ pub async fn run_wizard(force: bool) -> Result<Config> {
 
     // ── Build config ──
     // Defaults: SQLite memory, supervised autonomy, workspace-scoped, native runtime
-    let mut config = Config {
+    let config = Config {
         workspace_dir: workspace_dir.clone(),
         config_path: config_path.clone(),
         schema_version: crate::config::migration::CURRENT_SCHEMA_VERSION,
@@ -146,16 +146,6 @@ pub async fn run_wizard(force: bool) -> Result<Config> {
             p.fallback = Some(provider);
             p
         },
-        api_key: None,
-        api_url: None,
-        api_path: None,
-        default_provider: None,
-        default_model: None,
-        model_providers: std::collections::HashMap::new(),
-        default_temperature: 0.0,
-        provider_timeout_secs: 0,
-        provider_max_tokens: None,
-        extra_headers: std::collections::HashMap::new(),
         observability: ObservabilityConfig::default(),
         autonomy: AutonomyConfig::default(),
         trust: crate::trust::TrustConfig::default(),
@@ -172,11 +162,9 @@ pub async fn run_wizard(force: bool) -> Result<Config> {
         pacing: crate::config::PacingConfig::default(),
         skills: crate::config::SkillsConfig::default(),
         pipeline: crate::config::PipelineConfig::default(),
-        model_routes: Vec::new(),
-        embedding_routes: Vec::new(),
         heartbeat: HeartbeatConfig::default(),
         cron: crate::config::CronConfig::default(),
-        channels_config,
+        channels,
         memory: memory_config, // User-selected memory backend
         storage: StorageConfig::default(),
         tunnel: tunnel_config,
@@ -227,7 +215,6 @@ pub async fn run_wizard(force: bool) -> Result<Config> {
         sop: crate::config::SopConfig::default(),
         shell_tool: crate::config::ShellToolConfig::default(),
     };
-    config.resolve_provider_cache();
 
     println!(
         "  {} Security: {} | workspace-scoped",
@@ -248,9 +235,15 @@ pub async fn run_wizard(force: bool) -> Result<Config> {
     print_summary(&config);
 
     // ── Offer to launch channels immediately ─────────────────────
-    let has_channels = has_launchable_channels(&config.channels_config);
+    let has_channels = has_launchable_channels(&config.channels);
 
-    if has_channels && config.api_key.is_some() {
+    if has_channels
+        && config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.api_key.as_deref())
+            .is_some()
+    {
         let launch: bool = Confirm::new()
             .with_prompt(format!(
                 "  {} Launch channels now? (connected channels → AI → reply)",
@@ -290,7 +283,7 @@ pub async fn run_channels_repair_wizard() -> Result<Config> {
     let mut config = Box::pin(Config::load_or_init()).await?;
 
     print_step(1, 1, "Channels (How You Talk to ZeroClaw)");
-    config.channels_config = setup_channels(Some(config.channels_config.clone()))?;
+    config.channels = setup_channels(Some(config.channels.clone()))?;
     config.save().await?;
     persist_workspace_selection(&config.config_path).await?;
 
@@ -301,9 +294,15 @@ pub async fn run_channels_repair_wizard() -> Result<Config> {
         style(config.config_path.display()).green()
     );
 
-    let has_channels = has_launchable_channels(&config.channels_config);
+    let has_channels = has_launchable_channels(&config.channels);
 
-    if has_channels && config.api_key.is_some() {
+    if has_channels
+        && config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.api_key.as_deref())
+            .is_some()
+    {
         let launch: bool = Confirm::new()
             .with_prompt(format!(
                 "  {} Launch channels now? (connected channels → AI → reply)",
@@ -366,8 +365,14 @@ async fn run_provider_update_wizard(workspace_dir: &Path, config_path: &Path) ->
     );
     print_summary(&config);
 
-    let has_channels = has_launchable_channels(&config.channels_config);
-    if has_channels && config.api_key.is_some() {
+    let has_channels = has_launchable_channels(&config.channels);
+    if has_channels
+        && config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.api_key.as_deref())
+            .is_some()
+    {
         let launch: bool = Confirm::new()
             .with_prompt(format!(
                 "  {} Launch channels now? (connected channels → AI → reply)",
@@ -408,7 +413,6 @@ fn apply_provider_update(
         Some(api_key)
     };
     config.providers.fallback = Some(provider);
-    config.resolve_provider_cache();
 }
 
 // ── Quick setup (zero prompts) ───────────────────────────────────
@@ -600,7 +604,7 @@ async fn run_quick_setup_with_home(
     // Create memory config based on backend choice
     let memory_config = memory_config_defaults_for_backend(&memory_backend_name);
 
-    let mut config = Config {
+    let config = Config {
         workspace_dir: workspace_dir.clone(),
         config_path: config_path.clone(),
         schema_version: crate::config::migration::CURRENT_SCHEMA_VERSION,
@@ -619,16 +623,6 @@ async fn run_quick_setup_with_home(
             p.fallback = Some(provider_name.clone());
             p
         },
-        api_key: None,
-        api_url: None,
-        api_path: None,
-        default_provider: None,
-        default_model: None,
-        model_providers: std::collections::HashMap::new(),
-        default_temperature: 0.0,
-        provider_timeout_secs: 0,
-        provider_max_tokens: None,
-        extra_headers: std::collections::HashMap::new(),
         observability: ObservabilityConfig::default(),
         autonomy: AutonomyConfig::default(),
         trust: crate::trust::TrustConfig::default(),
@@ -645,11 +639,9 @@ async fn run_quick_setup_with_home(
         pacing: crate::config::PacingConfig::default(),
         skills: crate::config::SkillsConfig::default(),
         pipeline: crate::config::PipelineConfig::default(),
-        model_routes: Vec::new(),
-        embedding_routes: Vec::new(),
         heartbeat: HeartbeatConfig::default(),
         cron: crate::config::CronConfig::default(),
-        channels_config: ChannelsConfig::default(),
+        channels: ChannelsConfig::default(),
         memory: memory_config,
         storage: StorageConfig::default(),
         tunnel: crate::config::TunnelConfig::default(),
@@ -700,7 +692,6 @@ async fn run_quick_setup_with_home(
         sop: crate::config::SopConfig::default(),
         shell_tool: crate::config::ShellToolConfig::default(),
     };
-    config.resolve_provider_cache();
 
     config.save().await?;
     persist_workspace_selection(&config.config_path).await?;
@@ -1963,7 +1954,7 @@ pub async fn run_models_refresh(
     force: bool,
 ) -> Result<()> {
     let provider_name = provider_override
-        .or(config.default_provider.as_deref())
+        .or(config.providers.fallback.as_deref())
         .unwrap_or("openrouter")
         .trim()
         .to_string();
@@ -1999,9 +1990,21 @@ pub async fn run_models_refresh(
         }
     }
 
-    let api_key = config.api_key.clone().unwrap_or_default();
+    let api_key = config
+        .providers
+        .fallback_provider()
+        .and_then(|e| e.api_key.clone())
+        .unwrap_or_default();
 
-    match fetch_live_models_for_provider(&provider_name, &api_key, config.api_url.as_deref()).await
+    match fetch_live_models_for_provider(
+        &provider_name,
+        &api_key,
+        config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.base_url.as_deref()),
+    )
+    .await
     {
         Ok(models) if !models.is_empty() => {
             cache_live_models_for_provider(&config.workspace_dir, &provider_name, &models).await?;
@@ -2048,7 +2051,7 @@ pub async fn run_models_refresh(
 
 pub async fn run_models_list(config: &Config, provider_override: Option<&str>) -> Result<()> {
     let provider_name = provider_override
-        .or(config.default_provider.as_deref())
+        .or(config.providers.fallback.as_deref())
         .unwrap_or("openrouter");
 
     let cached = load_any_cached_models_for_provider(&config.workspace_dir, provider_name).await?;
@@ -2071,7 +2074,12 @@ pub async fn run_models_list(config: &Config, provider_override: Option<&str>) -
     );
     println!();
     for model in &cached.models {
-        let marker = if config.default_model.as_deref() == Some(model.as_str()) {
+        let marker = if config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.model.as_deref())
+            == Some(model.as_str())
+        {
             "* "
         } else {
             "  "
@@ -2089,7 +2097,7 @@ pub async fn run_models_set(config: &Config, model: &str) -> Result<()> {
     }
 
     let mut updated = config.clone();
-    updated.default_model = Some(model.to_string());
+    updated.ensure_fallback_provider().model = Some(model.to_string());
     updated.save().await?;
 
     println!();
@@ -2099,15 +2107,27 @@ pub async fn run_models_set(config: &Config, model: &str) -> Result<()> {
 }
 
 pub async fn run_models_status(config: &Config) -> Result<()> {
-    let provider = config.default_provider.as_deref().unwrap_or("openrouter");
-    let model = config.default_model.as_deref().unwrap_or("(not set)");
+    let provider = config.providers.fallback.as_deref().unwrap_or("openrouter");
+    let model = config
+        .providers
+        .fallback_provider()
+        .and_then(|e| e.model.as_deref())
+        .unwrap_or("(not set)");
 
     println!();
     println!("  Provider:  {}", style(provider).cyan());
     println!("  Model:     {}", style(model).cyan());
     println!(
         "  Temp:      {}",
-        style(format!("{:.1}", config.default_temperature)).cyan()
+        style(format!(
+            "{:.1}",
+            config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.temperature)
+                .unwrap_or(0.7)
+        ))
+        .cyan()
     );
 
     match load_any_cached_models_for_provider(&config.workspace_dir, provider).await? {
@@ -4378,7 +4398,7 @@ fn setup_channels(existing: Option<ChannelsConfig>) -> Result<ChannelsConfig> {
                 let room_id: String = if let Some(ref mx) = config.matrix {
                     Input::new()
                         .with_prompt("  Room ID (e.g. !abc123:matrix.org)")
-                        .default(mx.room_id.clone().unwrap_or_default())
+                        .default(mx.allowed_rooms.first().cloned().unwrap_or_default())
                         .interact_text()?
                 } else {
                     Input::new()
@@ -4423,18 +4443,23 @@ fn setup_channels(existing: Option<ChannelsConfig>) -> Result<ChannelsConfig> {
                 };
 
                 let existing_mx = config.matrix.as_ref();
+                // Merge the prompted room_id into allowed_rooms
+                let mut allowed_rooms = existing_mx
+                    .map(|m| m.allowed_rooms.clone())
+                    .unwrap_or_default();
+                if !room_id.is_empty() && !allowed_rooms.contains(&room_id) {
+                    allowed_rooms.insert(0, room_id);
+                }
+
                 config.matrix = Some(MatrixConfig {
                     enabled: true,
                     homeserver: homeserver.trim_end_matches('/').to_string(),
                     access_token,
                     user_id: detected_user_id,
                     device_id: detected_device_id,
-                    room_id: Some(room_id),
                     allowed_users,
                     // Preserve non-prompted fields from existing config (#4655)
-                    allowed_rooms: existing_mx
-                        .map(|m| m.allowed_rooms.clone())
-                        .unwrap_or_default(),
+                    allowed_rooms,
                     interrupt_on_new_message: existing_mx
                         .map(|m| m.interrupt_on_new_message)
                         .unwrap_or(false),
@@ -6046,7 +6071,7 @@ async fn scaffold_workspace(
 
 #[allow(clippy::too_many_lines)]
 fn print_summary(config: &Config) {
-    let has_channels = has_launchable_channels(&config.channels_config);
+    let has_channels = has_launchable_channels(&config.channels);
 
     println!();
     println!(
@@ -6072,12 +6097,16 @@ fn print_summary(config: &Config) {
     println!(
         "    {} Provider:      {}",
         style("🤖").cyan(),
-        config.default_provider.as_deref().unwrap_or("openrouter")
+        config.providers.fallback.as_deref().unwrap_or("openrouter")
     );
     println!(
         "    {} Model:         {}",
         style("🧠").cyan(),
-        config.default_model.as_deref().unwrap_or("(default)")
+        config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.model.as_deref())
+            .unwrap_or("(default)")
     );
     println!(
         "    {} Autonomy:      {:?}",
@@ -6092,7 +6121,7 @@ fn print_summary(config: &Config) {
     );
 
     // Channels summary
-    let channels = config.channels_config.channels();
+    let channels = config.channels.channels();
     let channels = channels
         .iter()
         .filter_map(|(channel, ok)| ok.then_some(channel.name()));
@@ -6107,7 +6136,12 @@ fn print_summary(config: &Config) {
     println!(
         "    {} API Key:       {}",
         style("🔑").cyan(),
-        if config.api_key.is_some() {
+        if config
+            .providers
+            .fallback_provider()
+            .and_then(|e| e.api_key.as_deref())
+            .is_some()
+        {
             style("configured").green().to_string()
         } else {
             style("not set (set via env var or config)")
@@ -6192,8 +6226,14 @@ fn print_summary(config: &Config) {
 
     let mut step = 1u8;
 
-    let provider = config.default_provider.as_deref().unwrap_or("openrouter");
-    if config.api_key.is_none() && !provider_supports_keyless_local_usage(provider) {
+    let provider = config.providers.fallback.as_deref().unwrap_or("openrouter");
+    if config
+        .providers
+        .fallback_provider()
+        .and_then(|e| e.api_key.as_deref())
+        .is_none()
+        && !provider_supports_keyless_local_usage(provider)
+    {
         if provider == "openai-codex" {
             println!(
                 "    {} Authenticate OpenAI Codex:",
@@ -6342,7 +6382,7 @@ mod tests {
         let mut config = Config::default();
         config.memory.backend = "markdown".to_string();
         config.skills.open_skills_enabled = true;
-        config.channels_config.cli = false;
+        config.channels.cli = false;
 
         apply_provider_update(
             &mut config,
@@ -6362,14 +6402,20 @@ mod tests {
             Some("https://openrouter.ai/api/v1")
         );
 
-        // Resolved cache populated.
-        assert_eq!(config.default_provider.as_deref(), Some("openrouter"));
-        assert_eq!(config.api_key.as_deref(), Some("sk-updated"));
+        // Resolved through providers.
+        assert_eq!(config.providers.fallback.as_deref(), Some("openrouter"));
+        assert_eq!(
+            config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.api_key.as_deref()),
+            Some("sk-updated")
+        );
 
         // Non-provider settings untouched.
         assert_eq!(config.memory.backend, "markdown");
         assert!(config.skills.open_skills_enabled);
-        assert!(!config.channels_config.cli);
+        assert!(!config.channels.cli);
     }
 
     #[test]
@@ -6384,7 +6430,6 @@ mod tests {
                 ..Default::default()
             },
         );
-        config.resolve_provider_cache();
 
         apply_provider_update(
             &mut config,
@@ -6401,9 +6446,21 @@ mod tests {
         assert!(entry.api_key.is_none());
         assert!(entry.base_url.is_none());
 
-        // Resolved cache.
-        assert!(config.api_key.is_none());
-        assert!(config.api_url.is_none());
+        // Resolved through providers.
+        assert!(
+            config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.api_key.as_deref())
+                .is_none()
+        );
+        assert!(
+            config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.base_url.as_deref())
+                .is_none()
+        );
     }
 
     #[tokio::test]
@@ -6435,9 +6492,15 @@ mod tests {
             Some("sk-issue946")
         );
 
-        // Resolved cache.
-        assert_eq!(config.default_provider.as_deref(), Some("openrouter"));
-        assert_eq!(config.default_model.as_deref(), Some("custom-model-946"));
+        // Resolved through providers.
+        assert_eq!(config.providers.fallback.as_deref(), Some("openrouter"));
+        assert_eq!(
+            config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.model.as_deref()),
+            Some("custom-model-946")
+        );
 
         // Serialized TOML uses V2 layout.
         let config_raw = tokio::fs::read_to_string(config.config_path).await.unwrap();
@@ -6464,8 +6527,14 @@ mod tests {
         .unwrap();
 
         let expected = default_model_for_provider("anthropic");
-        assert_eq!(config.default_provider.as_deref(), Some("anthropic"));
-        assert_eq!(config.default_model.as_deref(), Some(expected.as_str()));
+        assert_eq!(config.providers.fallback.as_deref(), Some("anthropic"));
+        assert_eq!(
+            config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.model.as_deref()),
+            Some(expected.as_str())
+        );
     }
 
     #[tokio::test]
@@ -6526,9 +6595,21 @@ mod tests {
         .await
         .expect("quick setup should overwrite existing config with --force");
 
-        assert_eq!(config.default_provider.as_deref(), Some("openrouter"));
-        assert_eq!(config.default_model.as_deref(), Some("custom-model-fresh"));
-        assert_eq!(config.api_key.as_deref(), Some("sk-force"));
+        assert_eq!(config.providers.fallback.as_deref(), Some("openrouter"));
+        assert_eq!(
+            config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.model.as_deref()),
+            Some("custom-model-fresh")
+        );
+        assert_eq!(
+            config
+                .providers
+                .fallback_provider()
+                .and_then(|e| e.api_key.as_deref()),
+            Some("sk-force")
+        );
 
         let config_raw = tokio::fs::read_to_string(config.config_path).await.unwrap();
         assert!(config_raw.contains("fallback = \"openrouter\""));
@@ -7701,11 +7782,9 @@ mod tests {
             .await
             .unwrap();
 
-        let config = Config {
-            workspace_dir: tmp.path().to_path_buf(),
-            default_provider: Some("openai".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().to_path_buf();
+        config.providers.fallback = Some("openai".to_string());
 
         run_models_refresh(&config, None, false).await.unwrap();
     }
@@ -7714,12 +7793,10 @@ mod tests {
     async fn run_models_refresh_rejects_unsupported_provider() {
         let tmp = TempDir::new().unwrap();
 
-        let config = Config {
-            workspace_dir: tmp.path().to_path_buf(),
-            // Use a non-provider channel key to keep this test deterministic and offline.
-            default_provider: Some("imessage".to_string()),
-            ..Config::default()
-        };
+        let mut config = Config::default();
+        config.workspace_dir = tmp.path().to_path_buf();
+        // Use a non-provider channel key to keep this test deterministic and offline.
+        config.providers.fallback = Some("imessage".to_string());
 
         let err = run_models_refresh(&config, None, true).await.unwrap_err();
         assert!(
@@ -7954,9 +8031,8 @@ mod tests {
             access_token: "old-token".into(),
             user_id: None,
             device_id: None,
-            room_id: Some("!r:m".into()),
             allowed_users: vec![],
-            allowed_rooms: vec![],
+            allowed_rooms: vec!["!r:m".into()],
             interrupt_on_new_message: false,
             stream_mode: StreamMode::default(),
             draft_update_interval_ms: 1500,
@@ -7987,9 +8063,8 @@ mod tests {
             access_token: "tok".into(),
             user_id: None,
             device_id: Some("ZEROCLAW".into()),
-            room_id: Some("!r:m".into()),
             allowed_users: vec!["@u:m".into()],
-            allowed_rooms: vec!["!keep:m.org".into()],
+            allowed_rooms: vec!["!r:m".into(), "!keep:m.org".into()],
             interrupt_on_new_message: true,
             stream_mode: StreamMode::Partial,
             draft_update_interval_ms: 2000,
@@ -8013,7 +8088,10 @@ mod tests {
             .unwrap_or(1500);
         let preserved_multi_ms = existing_mx.map(|m| m.multi_message_delay_ms).unwrap_or(800);
 
-        assert_eq!(preserved_rooms, vec!["!keep:m.org".to_string()]);
+        assert_eq!(
+            preserved_rooms,
+            vec!["!r:m".to_string(), "!keep:m.org".to_string()]
+        );
         assert!(preserved_interrupt);
         assert!(matches!(preserved_stream, StreamMode::Partial));
         assert_eq!(preserved_draft_ms, 2000);

@@ -11,7 +11,7 @@
 //! 1. Create a Google Cloud Pub/Sub topic and grant `gmail-api-push@system.gserviceaccount.com`
 //!    the **Pub/Sub Publisher** role on that topic.
 //! 2. Create a push subscription pointing to `https://<your-domain>/webhook/gmail`.
-//! 3. Configure `[channels_config.gmail_push]` in `config.toml` with `topic` and
+//! 3. Configure `[channels.gmail_push]` in `config.toml` with `topic` and
 //!    `oauth_token` (or set `GMAIL_PUSH_OAUTH_TOKEN` env var).
 //!
 //! The channel automatically calls `users.watch` to register the subscription
