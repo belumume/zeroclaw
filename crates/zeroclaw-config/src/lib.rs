@@ -7,6 +7,7 @@ pub mod provider_aliases;
 pub mod scattered_types;
 pub mod schema;
 pub mod secrets;
+pub mod policy;
 pub mod traits;
 pub mod workspace;
 
@@ -19,5 +20,6 @@ pub mod config {
 
 /// Shim module so `Configurable` derive macro's generated `crate::security::*` paths resolve.
 pub mod security {
+    pub use crate::policy::SecurityPolicy;
     pub use crate::secrets::SecretStore;
 }
