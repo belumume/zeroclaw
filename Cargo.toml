@@ -40,9 +40,9 @@ zeroclaw-infra = { path = "crates/zeroclaw-infra" }
 zeroclaw-config = { path = "crates/zeroclaw-config", default-features = false }
 zeroclaw-providers = { path = "crates/zeroclaw-providers" }
 zeroclaw-memory = { path = "crates/zeroclaw-memory" }
-zeroclaw-channels = { path = "crates/zeroclaw-channels", default-features = false }
-zeroclaw-tools = { path = "crates/zeroclaw-tools" }
-zeroclaw-misc = { path = "crates/zeroclaw-misc", default-features = false }
+zeroclaw-channels = { path = "crates/zeroclaw-channels", default-features = false, optional = true }
+zeroclaw-tools = { path = "crates/zeroclaw-tools", optional = true }
+zeroclaw-misc = { path = "crates/zeroclaw-misc", default-features = false, optional = true }
 zeroclaw-tool-call-parser = { path = "crates/zeroclaw-tool-call-parser" }
 # Internal proc macros
 zeroclaw-macros = { path = "crates/zeroclaw-macros", version = "0.1.0" }
@@ -267,45 +267,46 @@ default = [
 ]
 
 # Tier 1 — major subsystems
-gateway = ["zeroclaw-misc/gateway"]
-schema-export = ["zeroclaw-misc/schema-export", "zeroclaw-config/schema-export"]
-tui-onboarding = ["zeroclaw-misc/tui-onboarding"]
+agent-runtime = ["dep:zeroclaw-misc", "dep:zeroclaw-channels", "dep:zeroclaw-tools"]
+gateway = ["agent-runtime", "zeroclaw-misc/gateway"]
+schema-export = ["agent-runtime", "zeroclaw-misc/schema-export", "zeroclaw-config/schema-export"]
+tui-onboarding = ["agent-runtime", "zeroclaw-misc/tui-onboarding"]
 
 # Tier 2 — channels (root → misc → channels forwarding chain)
-channel-email = ["zeroclaw-misc/channel-email"]
-channel-telegram = ["zeroclaw-misc/channel-telegram"]
-channel-lark = ["zeroclaw-misc/channel-lark"]
+channel-email = ["agent-runtime", "zeroclaw-misc/channel-email"]
+channel-telegram = ["agent-runtime", "zeroclaw-misc/channel-telegram"]
+channel-lark = ["agent-runtime", "zeroclaw-misc/channel-lark"]
 channel-nostr = ["zeroclaw-misc/channel-nostr", "dep:nostr-sdk"]
 channel-matrix = ["zeroclaw-misc/channel-matrix", "dep:matrix-sdk"]
-channel-discord = ["zeroclaw-misc/channel-discord"]
-channel-slack = ["zeroclaw-misc/channel-slack"]
-channel-signal = ["zeroclaw-misc/channel-signal"]
-channel-mattermost = ["zeroclaw-misc/channel-mattermost"]
-channel-irc = ["zeroclaw-misc/channel-irc"]
-channel-imessage = ["zeroclaw-misc/channel-imessage"]
-channel-dingtalk = ["zeroclaw-misc/channel-dingtalk"]
-channel-qq = ["zeroclaw-misc/channel-qq"]
-channel-bluesky = ["zeroclaw-misc/channel-bluesky"]
-channel-twitter = ["zeroclaw-misc/channel-twitter"]
-channel-reddit = ["zeroclaw-misc/channel-reddit"]
-channel-notion = ["zeroclaw-misc/channel-notion"]
-channel-linq = ["zeroclaw-misc/channel-linq"]
-channel-wati = ["zeroclaw-misc/channel-wati"]
-channel-nextcloud = ["zeroclaw-misc/channel-nextcloud"]
-channel-mochat = ["zeroclaw-misc/channel-mochat"]
-channel-wecom = ["zeroclaw-misc/channel-wecom"]
-channel-clawdtalk = ["zeroclaw-misc/channel-clawdtalk"]
-channel-webhook = ["zeroclaw-misc/channel-webhook"]
-channel-acp-server = ["zeroclaw-misc/channel-acp-server"]
-channel-whatsapp-cloud = ["zeroclaw-misc/channel-whatsapp-cloud"]
-channel-voice-call = ["zeroclaw-misc/channel-voice-call"]
+channel-discord = ["agent-runtime", "zeroclaw-misc/channel-discord"]
+channel-slack = ["agent-runtime", "zeroclaw-misc/channel-slack"]
+channel-signal = ["agent-runtime", "zeroclaw-misc/channel-signal"]
+channel-mattermost = ["agent-runtime", "zeroclaw-misc/channel-mattermost"]
+channel-irc = ["agent-runtime", "zeroclaw-misc/channel-irc"]
+channel-imessage = ["agent-runtime", "zeroclaw-misc/channel-imessage"]
+channel-dingtalk = ["agent-runtime", "zeroclaw-misc/channel-dingtalk"]
+channel-qq = ["agent-runtime", "zeroclaw-misc/channel-qq"]
+channel-bluesky = ["agent-runtime", "zeroclaw-misc/channel-bluesky"]
+channel-twitter = ["agent-runtime", "zeroclaw-misc/channel-twitter"]
+channel-reddit = ["agent-runtime", "zeroclaw-misc/channel-reddit"]
+channel-notion = ["agent-runtime", "zeroclaw-misc/channel-notion"]
+channel-linq = ["agent-runtime", "zeroclaw-misc/channel-linq"]
+channel-wati = ["agent-runtime", "zeroclaw-misc/channel-wati"]
+channel-nextcloud = ["agent-runtime", "zeroclaw-misc/channel-nextcloud"]
+channel-mochat = ["agent-runtime", "zeroclaw-misc/channel-mochat"]
+channel-wecom = ["agent-runtime", "zeroclaw-misc/channel-wecom"]
+channel-clawdtalk = ["agent-runtime", "zeroclaw-misc/channel-clawdtalk"]
+channel-webhook = ["agent-runtime", "zeroclaw-misc/channel-webhook"]
+channel-acp-server = ["agent-runtime", "zeroclaw-misc/channel-acp-server"]
+channel-whatsapp-cloud = ["agent-runtime", "zeroclaw-misc/channel-whatsapp-cloud"]
+channel-voice-call = ["agent-runtime", "zeroclaw-misc/channel-voice-call"]
 channel-feishu = ["channel-lark"]  # Alias
 
 # Tier 3 — backends and integrations
-observability-prometheus = ["zeroclaw-misc/observability-prometheus"]
-observability-otel = ["zeroclaw-misc/observability-otel"]
-hardware = ["zeroclaw-misc/hardware"]
-peripheral-rpi = ["zeroclaw-misc/peripheral-rpi"]
+observability-prometheus = ["agent-runtime", "zeroclaw-misc/observability-prometheus"]
+observability-otel = ["agent-runtime", "zeroclaw-misc/observability-otel"]
+hardware = ["agent-runtime", "zeroclaw-misc/hardware"]
+peripheral-rpi = ["agent-runtime", "zeroclaw-misc/peripheral-rpi"]
 # Browser backend feature alias used by cfg(feature = "browser-native")
 browser-native = ["dep:fantoccini"]
 # Backward-compatible alias for older invocations
@@ -322,9 +323,9 @@ probe = ["dep:probe-rs"]
 # rag-pdf = PDF ingestion for datasheet RAG
 rag-pdf = ["dep:pdf-extract"]
 # skill-creation = Autonomous skill creation from successful multi-step tasks
-skill-creation = ["zeroclaw-misc/skill-creation"]
-whatsapp-web = ["zeroclaw-misc/whatsapp-web"]
-voice-wake = ["zeroclaw-misc/voice-wake"]
+skill-creation = ["agent-runtime", "zeroclaw-misc/skill-creation"]
+whatsapp-web = ["agent-runtime", "zeroclaw-misc/whatsapp-web"]
+voice-wake = ["agent-runtime", "zeroclaw-misc/voice-wake"]
 plugins-wasm = ["dep:extism"]
 webauthn = []
 # Meta-feature for CI: all features except those requiring system C libraries
