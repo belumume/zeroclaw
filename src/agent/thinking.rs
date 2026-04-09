@@ -14,64 +14,8 @@
 //! 3. Agent config (`agent.thinking.default_level`)
 //! 4. Global default (`Medium`)
 
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use zeroclaw_macros::Configurable;
-
-/// How deeply the model should reason for a given message.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum ThinkingLevel {
-    /// No chain-of-thought. Fastest, most concise responses.
-    Off,
-    /// Minimal reasoning. Brief, direct answers.
-    Minimal,
-    /// Light reasoning. Short explanations when needed.
-    Low,
-    /// Balanced reasoning (default). Moderate depth.
-    #[default]
-    Medium,
-    /// Deep reasoning. Thorough analysis and step-by-step thinking.
-    High,
-    /// Maximum reasoning depth. Exhaustive analysis.
-    Max,
-}
-
-impl crate::config::HasPropKind for ThinkingLevel {
-    const PROP_KIND: crate::config::PropKind = crate::config::PropKind::Enum;
-}
-
-impl ThinkingLevel {
-    /// Parse a thinking level from a string (case-insensitive).
-    pub fn from_str_insensitive(s: &str) -> Option<Self> {
-        match s.to_lowercase().as_str() {
-            "off" | "none" => Some(Self::Off),
-            "minimal" | "min" => Some(Self::Minimal),
-            "low" => Some(Self::Low),
-            "medium" | "med" | "default" => Some(Self::Medium),
-            "high" => Some(Self::High),
-            "max" | "maximum" => Some(Self::Max),
-            _ => None,
-        }
-    }
-}
-
-/// Configuration for thinking/reasoning level control.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Configurable)]
-#[prefix = "agent.thinking"]
-pub struct ThinkingConfig {
-    /// Default thinking level when no directive is present.
-    #[serde(default)]
-    pub default_level: ThinkingLevel,
-}
-
-impl Default for ThinkingConfig {
-    fn default() -> Self {
-        Self {
-            default_level: ThinkingLevel::Medium,
-        }
-    }
-}
+// Re-exported from zeroclaw-config.
+pub use zeroclaw_config::scattered_types::{ThinkingConfig, ThinkingLevel};
 
 /// Parameters derived from a thinking level, applied to the LLM request.
 #[derive(Debug, Clone, PartialEq)]

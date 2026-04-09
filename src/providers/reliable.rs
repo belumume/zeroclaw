@@ -2064,22 +2064,7 @@ mod tests {
         );
     }
 
-    // ── Arc<ModelAwareMock> Provider impl for test ──
-
-    #[async_trait]
-    impl Provider for Arc<ModelAwareMock> {
-        async fn chat_with_system(
-            &self,
-            system_prompt: Option<&str>,
-            message: &str,
-            model: &str,
-            temperature: f64,
-        ) -> anyhow::Result<String> {
-            self.as_ref()
-                .chat_with_system(system_prompt, message, model, temperature)
-                .await
-        }
-    }
+    // Arc<ModelAwareMock> Provider impl provided by blanket impl in zeroclaw-types.
 
     /// Mock provider that implements `chat()` with native tool support.
     struct NativeToolMock {
@@ -2318,33 +2303,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
-    impl Provider for Arc<NativeModelAwareMock> {
-        async fn chat_with_system(
-            &self,
-            system_prompt: Option<&str>,
-            message: &str,
-            model: &str,
-            temperature: f64,
-        ) -> anyhow::Result<String> {
-            self.as_ref()
-                .chat_with_system(system_prompt, message, model, temperature)
-                .await
-        }
-
-        fn supports_native_tools(&self) -> bool {
-            true
-        }
-
-        async fn chat(
-            &self,
-            request: ChatRequest<'_>,
-            model: &str,
-            temperature: f64,
-        ) -> anyhow::Result<ChatResponse> {
-            self.as_ref().chat(request, model, temperature).await
-        }
-    }
+    // Arc<NativeModelAwareMock> Provider impl provided by blanket impl in zeroclaw-types.
 
     /// Gap 3: `chat()` tries fallback models on failure,
     /// matching behavior of `model_failover_tries_fallback_model`.
@@ -2706,39 +2665,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
-    impl Provider for Arc<StreamingToolEventMock> {
-        async fn chat_with_system(
-            &self,
-            system_prompt: Option<&str>,
-            message: &str,
-            model: &str,
-            temperature: f64,
-        ) -> anyhow::Result<String> {
-            self.as_ref()
-                .chat_with_system(system_prompt, message, model, temperature)
-                .await
-        }
-
-        fn supports_streaming(&self) -> bool {
-            self.as_ref().supports_streaming()
-        }
-
-        fn supports_streaming_tool_events(&self) -> bool {
-            self.as_ref().supports_streaming_tool_events()
-        }
-
-        fn stream_chat(
-            &self,
-            request: ChatRequest<'_>,
-            model: &str,
-            temperature: f64,
-            options: StreamOptions,
-        ) -> stream::BoxStream<'static, StreamResult<StreamEvent>> {
-            self.as_ref()
-                .stream_chat(request, model, temperature, options)
-        }
-    }
+    // Arc<StreamingToolEventMock> Provider impl provided by blanket impl in zeroclaw-types.
 
     #[tokio::test]
     async fn stream_chat_prefers_provider_with_tool_event_support() {

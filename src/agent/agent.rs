@@ -1,6 +1,7 @@
 use crate::agent::dispatcher::{
     NativeToolDispatcher, ParsedToolCall, ToolDispatcher, ToolExecutionResult, XmlToolDispatcher,
 };
+use crate::agent::eval::AutoClassifyExt;
 use crate::agent::memory_loader::{DefaultMemoryLoader, MemoryLoader};
 use crate::agent::prompt::{PromptContext, SystemPromptBuilder};
 use crate::config::Config;
@@ -18,24 +19,8 @@ use std::io::Write as IoWrite;
 use std::sync::Arc;
 use std::time::Instant;
 
-/// Events emitted during a streamed agent turn.
-///
-/// Consumers receive these through a `tokio::sync::mpsc::Sender<TurnEvent>`
-/// passed to [`Agent::turn_streamed`].
-#[derive(Debug, Clone)]
-pub enum TurnEvent {
-    /// A text chunk from the LLM response (may arrive many times).
-    Chunk { delta: String },
-    /// A reasoning/thinking chunk from a thinking model (may arrive many times).
-    Thinking { delta: String },
-    /// The agent is invoking a tool.
-    ToolCall {
-        name: String,
-        args: serde_json::Value,
-    },
-    /// A tool has returned a result.
-    ToolResult { name: String, output: String },
-}
+// Re-export TurnEvent from zeroclaw-types for backwards compatibility.
+pub use zeroclaw_types::agent::TurnEvent;
 
 pub struct Agent {
     provider: Box<dyn Provider>,

@@ -2,109 +2,12 @@ use std::fmt::Write;
 use std::time::Duration;
 
 use anyhow::Result;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use zeroclaw_macros::Configurable;
-
 use std::sync::Arc;
 
 use crate::memory::traits::Memory;
 use crate::providers::traits::{ChatMessage, Provider};
 
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
-
-fn default_enabled() -> bool {
-    true
-}
-fn default_threshold_ratio() -> f64 {
-    0.50
-}
-fn default_protect_first_n() -> usize {
-    3
-}
-fn default_protect_last_n() -> usize {
-    4
-}
-fn default_max_passes() -> u32 {
-    3
-}
-fn default_summary_max_chars() -> usize {
-    4_000
-}
-fn default_source_max_chars() -> usize {
-    50_000
-}
-fn default_timeout_secs() -> u64 {
-    60
-}
-fn default_identifier_policy() -> String {
-    "strict".to_string()
-}
-fn default_tool_result_retrim_chars() -> usize {
-    2_000
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Configurable)]
-#[prefix = "agent.context-compression"]
-pub struct ContextCompressionConfig {
-    /// Enable automatic context compression. Default: `true`.
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
-    /// Fraction of context window that triggers compression (0.0–1.0). Default: `0.50`.
-    #[serde(default = "default_threshold_ratio")]
-    pub threshold_ratio: f64,
-    /// Number of messages to protect at the start (system prompt + initial context). Default: `3`.
-    #[serde(default = "default_protect_first_n")]
-    pub protect_first_n: usize,
-    /// Number of messages to protect at the end (recent conversation). Default: `4`.
-    #[serde(default = "default_protect_last_n")]
-    pub protect_last_n: usize,
-    /// Maximum compression passes before giving up. Default: `3`.
-    #[serde(default = "default_max_passes")]
-    pub max_passes: u32,
-    /// Maximum characters retained in stored compaction summary. Default: `4000`.
-    #[serde(default = "default_summary_max_chars")]
-    pub summary_max_chars: usize,
-    /// Safety cap for compaction source transcript passed to the summarizer. Default: `50000`.
-    #[serde(default = "default_source_max_chars")]
-    pub source_max_chars: usize,
-    /// Timeout in seconds for the summarization LLM call. Default: `60`.
-    #[serde(default = "default_timeout_secs")]
-    pub timeout_secs: u64,
-    /// Override model for summarization (cheaper/faster). Default: same as main model.
-    #[serde(default)]
-    pub summary_model: Option<String>,
-    /// Identifier preservation policy: `"strict"` or `"off"`. Default: `"strict"`.
-    #[serde(default = "default_identifier_policy")]
-    pub identifier_policy: String,
-    /// Maximum chars for old tool results during fast-trim pass. Default: `2000`.
-    #[serde(default = "default_tool_result_retrim_chars")]
-    pub tool_result_retrim_chars: usize,
-    /// Tool names exempt from result trimming. Default: `[]`.
-    #[serde(default)]
-    pub tool_result_trim_exempt: Vec<String>,
-}
-
-impl Default for ContextCompressionConfig {
-    fn default() -> Self {
-        Self {
-            enabled: default_enabled(),
-            threshold_ratio: default_threshold_ratio(),
-            protect_first_n: default_protect_first_n(),
-            protect_last_n: default_protect_last_n(),
-            max_passes: default_max_passes(),
-            summary_max_chars: default_summary_max_chars(),
-            source_max_chars: default_source_max_chars(),
-            timeout_secs: default_timeout_secs(),
-            summary_model: None,
-            identifier_policy: default_identifier_policy(),
-            tool_result_retrim_chars: default_tool_result_retrim_chars(),
-            tool_result_trim_exempt: Vec::new(),
-        }
-    }
-}
+pub use zeroclaw_config::scattered_types::ContextCompressionConfig;
 
 // ---------------------------------------------------------------------------
 // Result

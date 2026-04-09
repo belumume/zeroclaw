@@ -152,12 +152,8 @@ pub(crate) fn filter_by_allowed_tools(
     }
 }
 
-tokio::task_local! {
-    /// Stable thread/conversation identifier from the incoming channel message.
-    /// Used by [`PerSenderTracker`] to isolate rate-limit buckets per chat.
-    /// Set from the channel's thread ID, topic ID, or message ID.
-    pub static TOOL_LOOP_THREAD_ID: Option<String>;
-}
+// Re-export from zeroclaw-types for backwards compatibility.
+pub use zeroclaw_types::TOOL_LOOP_THREAD_ID;
 
 /// Run a future with the thread ID set in task-local storage.
 /// Rate-limiting reads this to assign per-sender buckets.

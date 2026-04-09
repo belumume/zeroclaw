@@ -1,0 +1,23 @@
+//! Configuration schema, secrets, and related types for ZeroClaw.
+
+pub mod autonomy;
+pub mod domain_matcher;
+pub mod helpers;
+pub mod provider_aliases;
+pub mod scattered_types;
+pub mod schema;
+pub mod secrets;
+pub mod traits;
+pub mod workspace;
+
+/// Shim module so `Configurable` derive macro's generated `crate::config::*` paths resolve.
+/// The macro was written assuming it runs inside the root crate where `mod config` exists.
+pub mod config {
+    pub use crate::helpers::*;
+    pub use crate::traits::*;
+}
+
+/// Shim module so `Configurable` derive macro's generated `crate::security::*` paths resolve.
+pub mod security {
+    pub use crate::secrets::SecretStore;
+}

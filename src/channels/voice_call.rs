@@ -10,102 +10,13 @@ use std::fmt;
 use std::sync::Arc;
 
 use anyhow::{Result, bail};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, mpsc};
 use tracing::{debug, info, warn};
-use zeroclaw_macros::Configurable;
 
 use super::traits::{Channel, ChannelMessage, SendMessage};
 
-// ── Configuration ────────────────────────────────────────────────
-
-/// Which telephony provider to use.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum VoiceProvider {
-    #[default]
-    Twilio,
-    Telnyx,
-    Plivo,
-}
-
-impl crate::config::HasPropKind for VoiceProvider {
-    const PROP_KIND: crate::config::PropKind = crate::config::PropKind::Enum;
-}
-
-impl fmt::Display for VoiceProvider {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Twilio => write!(f, "twilio"),
-            Self::Telnyx => write!(f, "telnyx"),
-            Self::Plivo => write!(f, "plivo"),
-        }
-    }
-}
-
-/// Configuration for the voice call channel.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Configurable)]
-#[prefix = "channels.voice-call"]
-pub struct VoiceCallConfig {
-    /// Telephony provider: `twilio`, `telnyx`, or `plivo`.
-    #[serde(default)]
-    pub provider: VoiceProvider,
-    /// Account SID (Twilio) / API Key (Telnyx) / Auth ID (Plivo).
-    pub account_id: String,
-    /// Auth token / API secret.
-    pub auth_token: String,
-    /// Phone number to use for outbound calls (E.164 format).
-    pub from_number: String,
-    /// Port to listen on for telephony webhooks. Default: 8090.
-    #[serde(default = "default_webhook_port")]
-    pub webhook_port: u16,
-    /// Whether outbound calls require user approval. Default: true.
-    #[serde(default = "default_true")]
-    pub require_outbound_approval: bool,
-    /// Whether to log full call transcriptions to workspace. Default: true.
-    #[serde(default = "default_true")]
-    pub transcription_logging: bool,
-    /// TTS voice to use for call audio output. Provider-specific.
-    #[serde(default)]
-    pub tts_voice: Option<String>,
-    /// Maximum call duration in seconds. Default: 3600 (1 hour).
-    #[serde(default = "default_max_call_duration")]
-    pub max_call_duration_secs: u64,
-    /// Webhook base URL override (e.g. ngrok/Tailscale tunnel URL).
-    /// If unset, the system will try to auto-detect.
-    #[serde(default)]
-    pub webhook_base_url: Option<String>,
-}
-
-fn default_webhook_port() -> u16 {
-    8090
-}
-
-fn default_true() -> bool {
-    true
-}
-
-fn default_max_call_duration() -> u64 {
-    3600
-}
-
-impl Default for VoiceCallConfig {
-    fn default() -> Self {
-        Self {
-            provider: VoiceProvider::default(),
-            account_id: String::new(),
-            auth_token: String::new(),
-            from_number: String::new(),
-            webhook_port: default_webhook_port(),
-            require_outbound_approval: default_true(),
-            transcription_logging: default_true(),
-            tts_voice: None,
-            max_call_duration_secs: default_max_call_duration(),
-            webhook_base_url: None,
-        }
-    }
-}
+pub use zeroclaw_config::scattered_types::{VoiceCallConfig, VoiceProvider};
 
 // ── Call state ────────────────────────────────────────────────────
 

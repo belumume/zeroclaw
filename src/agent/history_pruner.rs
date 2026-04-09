@@ -1,51 +1,6 @@
 use crate::providers::traits::ChatMessage;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use zeroclaw_macros::Configurable;
 
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
-
-fn default_max_tokens() -> usize {
-    8192
-}
-
-fn default_keep_recent() -> usize {
-    4
-}
-
-fn default_collapse() -> bool {
-    true
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Configurable)]
-#[prefix = "agent.history-pruning"]
-pub struct HistoryPrunerConfig {
-    /// Enable history pruning. Default: false.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Maximum estimated tokens for message history. Default: 8192.
-    #[serde(default = "default_max_tokens")]
-    pub max_tokens: usize,
-    /// Keep the N most recent messages untouched. Default: 4.
-    #[serde(default = "default_keep_recent")]
-    pub keep_recent: usize,
-    /// Collapse old tool call/result pairs into short summaries. Default: true.
-    #[serde(default = "default_collapse")]
-    pub collapse_tool_results: bool,
-}
-
-impl Default for HistoryPrunerConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            max_tokens: 8192,
-            keep_recent: 4,
-            collapse_tool_results: true,
-        }
-    }
-}
+pub use zeroclaw_config::scattered_types::HistoryPrunerConfig;
 
 // ---------------------------------------------------------------------------
 // Stats

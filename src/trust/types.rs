@@ -1,57 +1,8 @@
 use chrono::{DateTime, Utc};
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use zeroclaw_macros::Configurable;
 
-/// Configuration for trust scoring
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Configurable)]
-#[prefix = "trust"]
-pub struct TrustConfig {
-    /// Initial trust score for new domains (default 0.8)
-    #[serde(default = "default_initial_score")]
-    pub initial_score: f64,
-    /// Half-life for trust decay in days (default 30)
-    #[serde(default = "default_decay_half_life")]
-    pub decay_half_life_days: f64,
-    /// Score below which regression is flagged (default 0.5)
-    #[serde(default = "default_regression_threshold")]
-    pub regression_threshold: f64,
-    /// Score penalty per correction event (default 0.05)
-    #[serde(default = "default_correction_penalty")]
-    pub correction_penalty: f64,
-    /// Score boost per success event (default 0.01)
-    #[serde(default = "default_success_boost")]
-    pub success_boost: f64,
-}
-
-fn default_initial_score() -> f64 {
-    0.8
-}
-fn default_decay_half_life() -> f64 {
-    30.0
-}
-fn default_regression_threshold() -> f64 {
-    0.5
-}
-fn default_correction_penalty() -> f64 {
-    0.05
-}
-fn default_success_boost() -> f64 {
-    0.01
-}
-
-impl Default for TrustConfig {
-    fn default() -> Self {
-        Self {
-            initial_score: default_initial_score(),
-            decay_half_life_days: default_decay_half_life(),
-            regression_threshold: default_regression_threshold(),
-            correction_penalty: default_correction_penalty(),
-            success_boost: default_success_boost(),
-        }
-    }
-}
+pub use zeroclaw_config::scattered_types::TrustConfig;
 
 /// Per-domain trust score
 #[derive(Debug, Clone, Serialize, Deserialize)]

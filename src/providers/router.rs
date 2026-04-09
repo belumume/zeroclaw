@@ -400,21 +400,7 @@ mod tests {
         (router, mocks)
     }
 
-    // Arc<MockProvider> should also be a Provider
-    #[async_trait]
-    impl Provider for Arc<MockProvider> {
-        async fn chat_with_system(
-            &self,
-            system_prompt: Option<&str>,
-            message: &str,
-            model: &str,
-            temperature: f64,
-        ) -> anyhow::Result<String> {
-            self.as_ref()
-                .chat_with_system(system_prompt, message, model, temperature)
-                .await
-        }
-    }
+    // Arc<MockProvider> Provider impl provided by blanket impl in zeroclaw-types.
 
     struct StreamingMockProvider {
         stream_calls: Arc<AtomicUsize>,
@@ -465,35 +451,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
-    impl Provider for Arc<StreamingMockProvider> {
-        async fn chat_with_system(
-            &self,
-            system_prompt: Option<&str>,
-            message: &str,
-            model: &str,
-            temperature: f64,
-        ) -> anyhow::Result<String> {
-            self.as_ref()
-                .chat_with_system(system_prompt, message, model, temperature)
-                .await
-        }
-
-        fn supports_streaming(&self) -> bool {
-            self.as_ref().supports_streaming()
-        }
-
-        fn stream_chat_with_history(
-            &self,
-            messages: &[ChatMessage],
-            model: &str,
-            temperature: f64,
-            options: StreamOptions,
-        ) -> BoxStream<'static, StreamResult<StreamChunk>> {
-            self.as_ref()
-                .stream_chat_with_history(messages, model, temperature, options)
-        }
-    }
+    // Arc<StreamingMockProvider> Provider impl provided by blanket impl in zeroclaw-types.
 
     struct ToolEventStreamingMockProvider {
         stream_calls: Arc<AtomicUsize>,
@@ -555,39 +513,7 @@ mod tests {
         }
     }
 
-    #[async_trait]
-    impl Provider for Arc<ToolEventStreamingMockProvider> {
-        async fn chat_with_system(
-            &self,
-            system_prompt: Option<&str>,
-            message: &str,
-            model: &str,
-            temperature: f64,
-        ) -> anyhow::Result<String> {
-            self.as_ref()
-                .chat_with_system(system_prompt, message, model, temperature)
-                .await
-        }
-
-        fn supports_streaming(&self) -> bool {
-            self.as_ref().supports_streaming()
-        }
-
-        fn supports_streaming_tool_events(&self) -> bool {
-            self.as_ref().supports_streaming_tool_events()
-        }
-
-        fn stream_chat(
-            &self,
-            request: ChatRequest<'_>,
-            model: &str,
-            temperature: f64,
-            options: StreamOptions,
-        ) -> BoxStream<'static, StreamResult<StreamEvent>> {
-            self.as_ref()
-                .stream_chat(request, model, temperature, options)
-        }
-    }
+    // Arc<ToolEventStreamingMockProvider> Provider impl provided by blanket impl in zeroclaw-types.
 
     #[tokio::test]
     async fn routes_hint_to_correct_provider() {

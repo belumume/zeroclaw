@@ -1,22 +1,10 @@
 use parking_lot::Mutex;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-/// How much autonomy the agent has
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum AutonomyLevel {
-    /// Read-only: can observe but not act
-    ReadOnly,
-    /// Supervised: acts but requires approval for risky operations
-    #[default]
-    Supervised,
-    /// Full: autonomous execution within policy bounds
-    Full,
-}
+// Re-export from zeroclaw-config.
+pub use zeroclaw_config::autonomy::AutonomyLevel;
 
 /// Risk score for shell command execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

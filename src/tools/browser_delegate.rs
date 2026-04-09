@@ -14,58 +14,10 @@ use crate::security::SecurityPolicy;
 use crate::tools::traits::{Tool, ToolResult};
 use async_trait::async_trait;
 use regex::Regex;
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::time::{Duration, timeout};
-use zeroclaw_macros::Configurable;
 
-/// Configuration for browser delegation (`[browser_delegate]` section).
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Configurable)]
-#[prefix = "browser-delegate"]
-pub struct BrowserDelegateConfig {
-    /// Enable browser delegation tool.
-    #[serde(default)]
-    pub enabled: bool,
-    /// CLI binary to use for browser tasks (default: `"claude"`).
-    #[serde(default = "default_browser_cli")]
-    pub cli_binary: String,
-    /// Chrome profile directory for persistent SSO sessions.
-    #[serde(default)]
-    pub chrome_profile_dir: String,
-    /// Allowed domains for browser navigation (empty = allow all non-blocked).
-    #[serde(default)]
-    pub allowed_domains: Vec<String>,
-    /// Blocked domains for browser navigation.
-    #[serde(default)]
-    pub blocked_domains: Vec<String>,
-    /// Task timeout in seconds.
-    #[serde(default = "default_browser_task_timeout")]
-    pub task_timeout_secs: u64,
-}
-
-/// Default CLI binary for browser delegation.
-fn default_browser_cli() -> String {
-    "claude".into()
-}
-
-/// Default task timeout in seconds (2 minutes).
-fn default_browser_task_timeout() -> u64 {
-    120
-}
-
-impl Default for BrowserDelegateConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            cli_binary: default_browser_cli(),
-            chrome_profile_dir: String::new(),
-            allowed_domains: Vec::new(),
-            blocked_domains: Vec::new(),
-            task_timeout_secs: default_browser_task_timeout(),
-        }
-    }
-}
+pub use zeroclaw_config::scattered_types::BrowserDelegateConfig;
 
 /// Tool that delegates browser-based tasks to a browser-capable CLI subprocess.
 pub struct BrowserDelegateTool {

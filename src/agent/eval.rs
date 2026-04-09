@@ -1,7 +1,4 @@
-use serde::{Deserialize, Serialize};
-
-use schemars::JsonSchema;
-use zeroclaw_macros::Configurable;
+pub use zeroclaw_config::scattered_types::{AutoClassifyConfig, EvalConfig};
 
 // ── Complexity estimation ───────────────────────────────────────
 
@@ -67,88 +64,23 @@ pub fn estimate_complexity(message: &str) -> ComplexityTier {
     ComplexityTier::Standard
 }
 
-// ── Auto-classify config ────────────────────────────────────────
+// ── Auto-classify extension ─────────────────────────────────────
 
-/// Configuration for automatic complexity-based classification.
+/// Extension trait adding complexity-tier mapping to `AutoClassifyConfig`.
 ///
-/// When the rule-based classifier in `QueryClassificationConfig` produces no
-/// match, the eval layer can fall back to `estimate_complexity` and map the
-/// resulting tier to a routing hint.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Configurable)]
-#[prefix = "agent.auto-classify"]
-pub struct AutoClassifyConfig {
-    /// Hint to use for `Simple` complexity tier (e.g. `"fast"`).
-    #[serde(default)]
-    pub simple_hint: Option<String>,
-    /// Hint to use for `Standard` complexity tier.
-    #[serde(default)]
-    pub standard_hint: Option<String>,
-    /// Hint to use for `Complex` complexity tier (e.g. `"reasoning"`).
-    #[serde(default)]
-    pub complex_hint: Option<String>,
-    /// Hint prefix for cost-optimized routing (default: `"cost-optimized"`).
-    #[serde(default = "default_cost_optimized_hint")]
-    pub cost_optimized_hint: String,
-}
-
-fn default_cost_optimized_hint() -> String {
-    "cost-optimized".to_string()
-}
-
-impl Default for AutoClassifyConfig {
-    fn default() -> Self {
-        Self {
-            simple_hint: None,
-            standard_hint: None,
-            complex_hint: None,
-            cost_optimized_hint: default_cost_optimized_hint(),
-        }
-    }
-}
-
-impl AutoClassifyConfig {
+/// This lives here rather than in `zeroclaw_config` because `ComplexityTier`
+/// is defined in the main crate.
+pub trait AutoClassifyExt {
     /// Map a complexity tier to the configured hint, if any.
-    pub fn hint_for(&self, tier: ComplexityTier) -> Option<&str> {
+    fn hint_for(&self, tier: ComplexityTier) -> Option<&str>;
+}
+
+impl AutoClassifyExt for AutoClassifyConfig {
+    fn hint_for(&self, tier: ComplexityTier) -> Option<&str> {
         match tier {
             ComplexityTier::Simple => self.simple_hint.as_deref(),
             ComplexityTier::Standard => self.standard_hint.as_deref(),
             ComplexityTier::Complex => self.complex_hint.as_deref(),
-        }
-    }
-}
-
-// ── Post-response eval ──────────────────────────────────────────
-
-/// Configuration for the post-response quality evaluator.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Configurable)]
-#[prefix = "agent.eval"]
-pub struct EvalConfig {
-    /// Enable the eval quality gate.
-    #[serde(default)]
-    pub enabled: bool,
-    /// Minimum quality score (0.0–1.0) to accept a response.
-    /// Below this threshold, a retry with a higher-tier model is suggested.
-    #[serde(default = "default_min_quality_score")]
-    pub min_quality_score: f64,
-    /// Maximum retries with escalated models before accepting whatever we get.
-    #[serde(default = "default_max_retries")]
-    pub max_retries: u32,
-}
-
-fn default_min_quality_score() -> f64 {
-    0.5
-}
-
-fn default_max_retries() -> u32 {
-    1
-}
-
-impl Default for EvalConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            min_quality_score: default_min_quality_score(),
-            max_retries: default_max_retries(),
         }
     }
 }
@@ -265,7 +197,7 @@ pub fn evaluate_response(
     };
 
     // Determine retry hint: if score is low, suggest escalating
-    let retry_hint = if score <= default_min_quality_score() {
+    let retry_hint = if score <= EvalConfig::default().min_quality_score {
         // Try to escalate: Simple→Standard→Complex
         let next_tier = match complexity {
             ComplexityTier::Simple => Some(ComplexityTier::Standard),

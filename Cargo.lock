@@ -12934,6 +12934,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeroclaw-config"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chacha20poly1305",
+ "directories",
+ "hostname",
+ "parking_lot",
+ "rand 0.10.0",
+ "regex",
+ "reqwest 0.12.28",
+ "rustls 0.23.37",
+ "rustls-pki-types",
+ "schemars 1.2.1",
+ "serde",
+ "serde_json",
+ "shellexpand",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-rustls 0.26.4",
+ "tokio-socks",
+ "tokio-stream",
+ "tokio-tungstenite 0.29.0",
+ "toml 1.1.2+spec-1.1.0",
+ "tracing",
+ "url",
+ "uuid",
+ "webpki-roots 1.0.6",
+ "zeroclaw-macros",
+ "zeroclaw-types",
+]
+
+[[package]]
 name = "zeroclaw-desktop"
 version = "0.1.0"
 dependencies = [
@@ -12950,6 +12984,22 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-store",
  "tokio",
+]
+
+[[package]]
+name = "zeroclaw-infra"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "parking_lot",
+ "portable-atomic",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "zeroclaw-types",
 ]
 
 [[package]]
@@ -12981,6 +13031,21 @@ dependencies = [
  "tokio-test",
  "toml 1.1.2+spec-1.1.0",
  "tracing",
+]
+
+[[package]]
+name = "zeroclaw-types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures-util",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -13084,7 +13149,10 @@ dependencies = [
  "webpki-roots 1.0.6",
  "which",
  "wiremock",
+ "zeroclaw-config",
+ "zeroclaw-infra",
  "zeroclaw-macros",
+ "zeroclaw-types",
  "zip",
 ]
 
