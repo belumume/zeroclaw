@@ -225,10 +225,10 @@ pub async fn wait_for_serial_port(
 
     loop {
         for pattern in *patterns {
-            if let Ok(mut hits) = glob::glob(pattern) {
-                if let Some(Ok(path)) = hits.next() {
-                    return Some(path);
-                }
+            if let Ok(mut hits) = glob::glob(pattern)
+                && let Some(Ok(path)) = hits.next()
+            {
+                return Some(path);
             }
         }
 

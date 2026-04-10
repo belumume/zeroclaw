@@ -84,16 +84,16 @@ impl RpiModel {
             return Some(Self::from_model_string(model));
         }
         // Fallback: scan /proc/cpuinfo for a "Model" line.
-        if let Ok(cpuinfo) = fs::read_to_string("/proc/cpuinfo") {
-            if cpuinfo.contains("Raspberry Pi") {
-                for line in cpuinfo.lines() {
-                    if let Some(rest) = line.strip_prefix("Model") {
-                        let model = rest.trim_start_matches(':').trim();
-                        return Some(Self::from_model_string(model));
-                    }
+        if let Ok(cpuinfo) = fs::read_to_string("/proc/cpuinfo")
+            && cpuinfo.contains("Raspberry Pi")
+        {
+            for line in cpuinfo.lines() {
+                if let Some(rest) = line.strip_prefix("Model") {
+                    let model = rest.trim_start_matches(':').trim();
+                    return Some(Self::from_model_string(model));
                 }
-                return Some(Self::Unknown("Raspberry Pi (unknown model)".into()));
             }
+            return Some(Self::Unknown("Raspberry Pi (unknown model)".into()));
         }
         None
     }

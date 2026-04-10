@@ -381,14 +381,14 @@ impl MatrixChannel {
 
     async fn load_or_generate_device_id(&self) -> anyhow::Result<String> {
         // Try to load a previously persisted device_id
-        if let Some(path) = self.device_id_path() {
-            if path.exists() {
-                let stored = tokio::fs::read_to_string(&path).await?;
-                let stored = stored.trim().to_string();
-                if !stored.is_empty() {
-                    tracing::info!("Matrix using persisted device_id from {}", path.display());
-                    return Ok(stored);
-                }
+        if let Some(path) = self.device_id_path()
+            && path.exists()
+        {
+            let stored = tokio::fs::read_to_string(&path).await?;
+            let stored = stored.trim().to_string();
+            if !stored.is_empty() {
+                tracing::info!("Matrix using persisted device_id from {}", path.display());
+                return Ok(stored);
             }
         }
 
@@ -467,10 +467,10 @@ impl MatrixChannel {
         recent_lookup.insert(event_id_owned.clone());
         recent_order.push_back(event_id_owned);
 
-        if recent_order.len() > MAX_RECENT_EVENT_IDS {
-            if let Some(evicted) = recent_order.pop_front() {
-                recent_lookup.remove(&evicted);
-            }
+        if recent_order.len() > MAX_RECENT_EVENT_IDS
+            && let Some(evicted) = recent_order.pop_front()
+        {
+            recent_lookup.remove(&evicted);
         }
 
         false
@@ -533,15 +533,14 @@ impl MatrixChannel {
                 };
 
                 let resolved_user_id = if let Some(whoami) = whoami.as_ref() {
-                    if let Some(hinted) = self.session_owner_hint.as_ref() {
-                        if hinted != &whoami.user_id {
+                    if let Some(hinted) = self.session_owner_hint.as_ref()
+                        && hinted != &whoami.user_id {
                             tracing::warn!(
                                 "Matrix configured user_id '{}' does not match whoami '{}'; using whoami.",
                                 crate::security::redact(hinted),
                                 crate::security::redact(&whoami.user_id)
                             );
                         }
-                    }
                     whoami.user_id.clone()
                 } else {
                     self.session_owner_hint.clone().ok_or_else(|| {
@@ -835,13 +834,13 @@ impl Channel for MatrixChannel {
 
         let mut content = RoomMessageEventContent::text_markdown(&message.content);
 
-        if let Some(ref thread_ts) = message.thread_ts {
-            if let Ok(thread_root) = thread_ts.parse::<OwnedEventId>() {
-                content.relates_to = Some(Relation::Thread(Thread::plain(
-                    thread_root.clone(),
-                    thread_root,
-                )));
-            }
+        if let Some(ref thread_ts) = message.thread_ts
+            && let Ok(thread_root) = thread_ts.parse::<OwnedEventId>()
+        {
+            content.relates_to = Some(Relation::Thread(Thread::plain(
+                thread_root.clone(),
+                thread_root,
+            )));
         }
 
         room.send(content).await?;
@@ -870,53 +869,51 @@ impl Channel for MatrixChannel {
                 .map(|o| o.status.success())
                 .unwrap_or(false);
 
-            if tts_ok && mp3_path.exists() {
-                if let Ok(audio_data) = tokio::fs::read(&mp3_path).await {
-                    let upload_url = format!(
-                        "{}/_matrix/media/v3/upload?filename=voice-reply.mp3",
-                        self.homeserver
+            if tts_ok
+                && mp3_path.exists()
+                && let Ok(audio_data) = tokio::fs::read(&mp3_path).await
+            {
+                let upload_url = format!(
+                    "{}/_matrix/media/v3/upload?filename=voice-reply.mp3",
+                    self.homeserver
+                );
+                if let Ok(resp) = self
+                    .http_client
+                    .post(&upload_url)
+                    .header("Authorization", self.auth_header_value())
+                    .header("Content-Type", "audio/mpeg")
+                    .body(audio_data)
+                    .send()
+                    .await
+                    && resp.status().is_success()
+                    && let Ok(body) = resp.json::<serde_json::Value>().await
+                    && let Some(content_uri) = body["content_uri"].as_str()
+                {
+                    let encoded_room = Self::encode_path_segment(&target_room_id);
+                    let txn_id = format!(
+                        "voice_{}",
+                        std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis()
                     );
-                    if let Ok(resp) = self
+                    let audio_msg = serde_json::json!({
+                        "msgtype": "m.audio",
+                        "body": "Voice reply",
+                        "url": content_uri,
+                        "info": { "mimetype": "audio/mpeg" }
+                    });
+                    let send_url = format!(
+                        "{}/_matrix/client/v3/rooms/{}/send/m.room.message/{}",
+                        self.homeserver, encoded_room, txn_id
+                    );
+                    let _ = self
                         .http_client
-                        .post(&upload_url)
+                        .put(&send_url)
                         .header("Authorization", self.auth_header_value())
-                        .header("Content-Type", "audio/mpeg")
-                        .body(audio_data)
+                        .json(&audio_msg)
                         .send()
-                        .await
-                    {
-                        if resp.status().is_success() {
-                            if let Ok(body) = resp.json::<serde_json::Value>().await {
-                                if let Some(content_uri) = body["content_uri"].as_str() {
-                                    let encoded_room = Self::encode_path_segment(&target_room_id);
-                                    let txn_id = format!(
-                                        "voice_{}",
-                                        std::time::SystemTime::now()
-                                            .duration_since(std::time::UNIX_EPOCH)
-                                            .unwrap_or_default()
-                                            .as_millis()
-                                    );
-                                    let audio_msg = serde_json::json!({
-                                        "msgtype": "m.audio",
-                                        "body": "Voice reply",
-                                        "url": content_uri,
-                                        "info": { "mimetype": "audio/mpeg" }
-                                    });
-                                    let send_url = format!(
-                                        "{}/_matrix/client/v3/rooms/{}/send/m.room.message/{}",
-                                        self.homeserver, encoded_room, txn_id
-                                    );
-                                    let _ = self
-                                        .http_client
-                                        .put(&send_url)
-                                        .header("Authorization", self.auth_header_value())
-                                        .json(&audio_msg)
-                                        .send()
-                                        .await;
-                                }
-                            }
-                        }
-                    }
+                        .await;
                 }
             }
         }
@@ -1529,13 +1526,13 @@ impl Channel for MatrixChannel {
                 let mut content = RoomMessageEventContent::text_markdown(initial_text);
 
                 // Preserve threading if applicable.
-                if let Some(ref thread_ts) = message.thread_ts {
-                    if let Ok(thread_root) = thread_ts.parse::<OwnedEventId>() {
-                        content.relates_to = Some(Relation::Thread(Thread::plain(
-                            thread_root.clone(),
-                            thread_root,
-                        )));
-                    }
+                if let Some(ref thread_ts) = message.thread_ts
+                    && let Ok(thread_root) = thread_ts.parse::<OwnedEventId>()
+                {
+                    content.relates_to = Some(Relation::Thread(Thread::plain(
+                        thread_root.clone(),
+                        thread_root,
+                    )));
                 }
 
                 let response = room.send(content).await?;

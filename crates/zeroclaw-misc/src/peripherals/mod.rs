@@ -41,9 +41,6 @@ pub fn list_configured_boards(config: &PeripheralsConfig) -> Vec<&PeripheralBoar
     config.boards.iter().collect()
 }
 
-/// Handle `zeroclaw peripheral` subcommands.
-#[allow(clippy::module_name_repetitions)]
-
 /// Create and connect peripherals from config, returning their tools.
 /// Returns empty vec if peripherals disabled or hardware feature off.
 #[cfg(feature = "hardware")]
@@ -99,13 +96,13 @@ pub async fn create_peripheral_tools(config: &PeripheralsConfig) -> Result<Vec<B
                 }
                 serial_transports.push((board.board.clone(), p.transport()));
                 tools.extend(p.tools());
-                if board.board == "arduino-uno" {
-                    if let Some(ref path) = board.path {
-                        tools.push(Box::new(arduino_upload::ArduinoUploadTool::new(
-                            path.clone(),
-                        )));
-                        tracing::info!("Arduino upload tool added (port: {})", path);
-                    }
+                if board.board == "arduino-uno"
+                    && let Some(ref path) = board.path
+                {
+                    tools.push(Box::new(arduino_upload::ArduinoUploadTool::new(
+                        path.clone(),
+                    )));
+                    tracing::info!("Arduino upload tool added (port: {})", path);
                 }
                 tracing::info!(board = %board.board, "Serial peripheral connected");
             }

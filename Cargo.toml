@@ -58,9 +58,6 @@ tokio-stream = { version = "0.1.18", default-features = false, features = ["fs",
 # HTTP client - minimal features
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "blocking", "multipart", "stream", "socks"] }
 
-# Matrix client + E2EE decryption
-matrix-sdk = { version = "0.16", optional = true, default-features = false, features = ["e2e-encryption", "rustls-tls", "markdown", "sqlite"] }
-
 # Serialization
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde_json = { version = "1.0", default-features = false, features = ["std"] }
@@ -77,9 +74,6 @@ schemars = "1.2"
 tracing = { version = "0.1", default-features = false }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "env-filter"] }
 
-# Observability - Prometheus metrics (optional; requires AtomicU64, unavailable on 32-bit)
-prometheus = { version = "0.14", default-features = false, optional = true }
-
 # Base64 encoding (screenshots, image data)
 base64 = "0.22"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
@@ -90,10 +84,6 @@ urlencoding = "2.1"
 # HTML to plain text conversion (web_fetch tool)
 nanohtml2text = "0.2"
 
-# Optional Rust-native browser automation backend
-fantoccini = { version = "0.22.1", optional = true, default-features = false, features = ["rustls-tls"] }
-
-# MQTT client for IoT / SOP event fan-in
 rumqttc = "0.24"
 
 # Tarball extraction for binary updates
@@ -105,7 +95,6 @@ indicatif = "0.18"
 
 # Temp files (update pipeline rollback)
 tempfile = "3.26"
-
 
 # Zip extraction for ClawhHub / OpenClaw registry installers
 zip = { version = "8.1", default-features = false, features = ["deflate-flate2"] }
@@ -134,9 +123,6 @@ rand = "0.10"
 # Portable atomic fallbacks for targets without native 64-bit atomics
 portable-atomic = "1"
 
-# serde-big-array for wa-rs storage (large array serialization)
-serde-big-array = { version = "0.5", optional = true }
-
 # Fast mutexes that don't poison on panic
 parking_lot = "0.12"
 
@@ -145,9 +131,6 @@ async-trait = "0.1"
 
 # HMAC-SHA256 (Zhipu/GLM JWT auth)
 ring = "0.17"
-
-# Protobuf encode/decode (Lark WS frame codec, WhatsApp storage)
-prost = { version = "0.14", default-features = false, features = ["derive"], optional = true }
 
 # LRU cache for bounded sender state
 lru = "0.16"
@@ -176,7 +159,6 @@ which = "8.0"
 tokio-tungstenite = { version = "0.29", features = ["rustls-tls-webpki-roots"] }
 tokio-socks = "0.5"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
-nostr-sdk = { version = "0.44", default-features = false, features = ["nip04", "nip59"], optional = true }
 regex = "1.10"
 hostname = "0.4.2"
 rustls = "0.23"
@@ -202,50 +184,12 @@ http-body-util = "0.1"
 rust-embed = "8"
 mime_guess = "2"
 
-# OpenTelemetry — OTLP trace + metrics export.
 # Use the blocking HTTP exporter client to avoid Tokio-reactor panics in
-# OpenTelemetry background batch threads when ZeroClaw emits spans/metrics from
 # non-Tokio contexts.
-opentelemetry = { version = "0.31", default-features = false, features = ["trace", "metrics"], optional = true }
-opentelemetry_sdk = { version = "0.31", default-features = false, features = ["trace", "metrics"], optional = true }
-opentelemetry-otlp = { version = "0.31", default-features = false, features = ["trace", "metrics", "http-proto", "reqwest-blocking-client", "reqwest-rustls-webpki-roots"], optional = true }
 
-# Serial port for peripheral communication (STM32, etc.)
-tokio-serial = { version = "5", default-features = false, optional = true }
-
-# USB device enumeration (hardware discovery) — only on platforms nusb supports
 # (Linux, macOS, Windows). Android/Termux uses target_os="android" and is excluded.
-[target.'cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))'.dependencies]
-nusb = { version = "0.2", default-features = false, optional = true }
 
-# probe-rs for STM32/Nucleo memory read (Phase B)
-probe-rs = { version = "0.31", optional = true }
-
-# PDF extraction for datasheet RAG (optional, enable with --features rag-pdf)
-pdf-extract = { version = "0.10", optional = true }
-
-# WASM plugin runtime (extism)
-extism = { version = "1.20", optional = true }
-
-# Cross-platform audio capture for voice wake word detection (optional, enable with --features voice-wake)
-cpal = { version = "0.15", optional = true }
-
-# Terminal QR rendering for WhatsApp Web pairing flow.
-qrcode = { version = "0.14", optional = true }
-
-# WhatsApp Web client (wa-rs) — optional, enable with --features whatsapp-web
 # Uses wa-rs for Bot and Client, wa-rs-core for storage traits, custom rusqlite backend avoids Diesel conflict.
-wa-rs = { version = "0.2", optional = true, default-features = false }
-wa-rs-core = { version = "0.2", optional = true, default-features = false }
-wa-rs-binary = { version = "0.2", optional = true, default-features = false }
-wa-rs-proto = { version = "0.2", optional = true, default-features = false }
-wa-rs-ureq-http = { version = "0.2", optional = true }
-wa-rs-tokio-transport = { version = "0.2", optional = true, default-features = false }
-
-# Raspberry Pi GPIO / Landlock (Linux only) — target-specific to avoid compile failure on macOS
-[target.'cfg(target_os = "linux")'.dependencies]
-rppal = { version = "0.22", optional = true }
-landlock = { version = "0.4", optional = true }
 
 # Unix-specific dependencies (for root check, etc.)
 [target.'cfg(unix)'.dependencies]
@@ -253,8 +197,16 @@ libc = "0.2"
 
 [features]
 default = [
-    "gateway", "tui-onboarding", "schema-export",
-    "observability-prometheus", "skill-creation",
+    "agent-runtime",
+    "observability-prometheus",
+    "schema-export",
+]
+
+# The full agent runtime — agent loop, channels, tools, gateway, TUI, all subsystems.
+# Without this, you get the kernel: config + providers + memory + CLI chat.
+agent-runtime = [
+    "dep:zeroclaw-misc", "dep:zeroclaw-channels", "dep:zeroclaw-tools",
+    "gateway", "tui-onboarding",
     "channel-email", "channel-telegram", "channel-lark",
     "channel-discord", "channel-slack", "channel-signal",
     "channel-mattermost", "channel-irc", "channel-imessage",
@@ -266,87 +218,71 @@ default = [
     "channel-voice-call",
 ]
 
-# Tier 1 — major subsystems
-agent-runtime = ["dep:zeroclaw-misc", "dep:zeroclaw-channels", "dep:zeroclaw-tools"]
-gateway = ["agent-runtime", "zeroclaw-misc/gateway"]
-schema-export = ["agent-runtime", "zeroclaw-misc/schema-export", "zeroclaw-config/schema-export"]
-tui-onboarding = ["agent-runtime", "zeroclaw-misc/tui-onboarding"]
+# Major subsystems — each forwards to exactly ONE crate
+gateway = ["zeroclaw-misc/gateway"]
+tui-onboarding = ["zeroclaw-misc/tui-onboarding"]
+schema-export = ["zeroclaw-config/schema-export"]
 
-# Tier 2 — channels (root → misc → channels forwarding chain)
-channel-email = ["agent-runtime", "zeroclaw-misc/channel-email"]
-channel-telegram = ["agent-runtime", "zeroclaw-misc/channel-telegram"]
-channel-lark = ["agent-runtime", "zeroclaw-misc/channel-lark"]
-channel-nostr = ["agent-runtime", "zeroclaw-misc/channel-nostr", "zeroclaw-config/channel-nostr", "dep:nostr-sdk"]
-channel-matrix = ["zeroclaw-misc/channel-matrix", "dep:matrix-sdk"]
-channel-discord = ["agent-runtime", "zeroclaw-misc/channel-discord"]
-channel-slack = ["agent-runtime", "zeroclaw-misc/channel-slack"]
-channel-signal = ["agent-runtime", "zeroclaw-misc/channel-signal"]
-channel-mattermost = ["agent-runtime", "zeroclaw-misc/channel-mattermost"]
-channel-irc = ["agent-runtime", "zeroclaw-misc/channel-irc"]
-channel-imessage = ["agent-runtime", "zeroclaw-misc/channel-imessage"]
-channel-dingtalk = ["agent-runtime", "zeroclaw-misc/channel-dingtalk"]
-channel-qq = ["agent-runtime", "zeroclaw-misc/channel-qq"]
-channel-bluesky = ["agent-runtime", "zeroclaw-misc/channel-bluesky"]
-channel-twitter = ["agent-runtime", "zeroclaw-misc/channel-twitter"]
-channel-reddit = ["agent-runtime", "zeroclaw-misc/channel-reddit"]
-channel-notion = ["agent-runtime", "zeroclaw-misc/channel-notion"]
-channel-linq = ["agent-runtime", "zeroclaw-misc/channel-linq"]
-channel-wati = ["agent-runtime", "zeroclaw-misc/channel-wati"]
-channel-nextcloud = ["agent-runtime", "zeroclaw-misc/channel-nextcloud"]
-channel-mochat = ["agent-runtime", "zeroclaw-misc/channel-mochat"]
-channel-wecom = ["agent-runtime", "zeroclaw-misc/channel-wecom"]
-channel-clawdtalk = ["agent-runtime", "zeroclaw-misc/channel-clawdtalk"]
-channel-webhook = ["agent-runtime", "zeroclaw-misc/channel-webhook"]
-channel-acp-server = ["agent-runtime", "zeroclaw-misc/channel-acp-server"]
-channel-whatsapp-cloud = ["agent-runtime", "zeroclaw-misc/channel-whatsapp-cloud"]
-channel-voice-call = ["agent-runtime", "zeroclaw-misc/channel-voice-call"]
-channel-feishu = ["channel-lark"]  # Alias
+# Channels — each forwards to zeroclaw-misc (which forwards to zeroclaw-channels)
+channel-email = ["zeroclaw-misc/channel-email"]
+channel-telegram = ["zeroclaw-misc/channel-telegram"]
+channel-lark = ["zeroclaw-misc/channel-lark"]
+channel-nostr = ["zeroclaw-misc/channel-nostr"]
+channel-matrix = ["zeroclaw-misc/channel-matrix"]
+channel-discord = ["zeroclaw-misc/channel-discord"]
+channel-slack = ["zeroclaw-misc/channel-slack"]
+channel-signal = ["zeroclaw-misc/channel-signal"]
+channel-mattermost = ["zeroclaw-misc/channel-mattermost"]
+channel-irc = ["zeroclaw-misc/channel-irc"]
+channel-imessage = ["zeroclaw-misc/channel-imessage"]
+channel-dingtalk = ["zeroclaw-misc/channel-dingtalk"]
+channel-qq = ["zeroclaw-misc/channel-qq"]
+channel-bluesky = ["zeroclaw-misc/channel-bluesky"]
+channel-twitter = ["zeroclaw-misc/channel-twitter"]
+channel-reddit = ["zeroclaw-misc/channel-reddit"]
+channel-notion = ["zeroclaw-misc/channel-notion"]
+channel-linq = ["zeroclaw-misc/channel-linq"]
+channel-wati = ["zeroclaw-misc/channel-wati"]
+channel-nextcloud = ["zeroclaw-misc/channel-nextcloud"]
+channel-mochat = ["zeroclaw-misc/channel-mochat"]
+channel-wecom = ["zeroclaw-misc/channel-wecom"]
+channel-clawdtalk = ["zeroclaw-misc/channel-clawdtalk"]
+channel-webhook = ["zeroclaw-misc/channel-webhook"]
+channel-acp-server = ["zeroclaw-misc/channel-acp-server"]
+channel-whatsapp-cloud = ["zeroclaw-misc/channel-whatsapp-cloud"]
+channel-voice-call = ["zeroclaw-misc/channel-voice-call"]
+channel-feishu = ["channel-lark"]
+whatsapp-web = ["zeroclaw-misc/whatsapp-web"]
+voice-wake = ["zeroclaw-misc/voice-wake"]
 
-# Tier 3 — backends and integrations
-observability-prometheus = ["agent-runtime", "zeroclaw-misc/observability-prometheus"]
-observability-otel = ["agent-runtime", "zeroclaw-misc/observability-otel"]
-hardware = ["agent-runtime", "zeroclaw-misc/hardware"]
-peripheral-rpi = ["agent-runtime", "zeroclaw-misc/peripheral-rpi"]
-# Browser backend feature alias used by cfg(feature = "browser-native")
-browser-native = ["dep:fantoccini", "zeroclaw-tools/browser-native", "zeroclaw-misc/browser-native"]
-# Backward-compatible alias for older invocations
-fantoccini = ["browser-native"]
-# Sandbox feature aliases used by cfg(feature = "sandbox-*")
-sandbox-landlock = ["dep:landlock"]
+# Backends and platform flags — each forwards to ONE crate
+observability-prometheus = ["zeroclaw-misc/observability-prometheus"]
+observability-otel = ["zeroclaw-misc/observability-otel"]
+hardware = ["zeroclaw-misc/hardware"]
+peripheral-rpi = ["zeroclaw-misc/peripheral-rpi"]
+sandbox-landlock = ["zeroclaw-misc/sandbox-landlock"]
 sandbox-bubblewrap = ["zeroclaw-misc/sandbox-bubblewrap"]
-# Backward-compatible alias for older invocations
-landlock = ["sandbox-landlock"]
-# Prometheus metrics observer (requires 64-bit atomics; disable on 32-bit targets)
-metrics = ["observability-prometheus"]
-# probe = probe-rs for Nucleo memory read (adds ~50 deps; optional)
-probe = ["dep:probe-rs", "zeroclaw-misc/probe"]
-# rag-pdf = PDF ingestion for datasheet RAG
-rag-pdf = ["dep:pdf-extract", "zeroclaw-tools/rag-pdf", "zeroclaw-misc/rag-pdf"]
-# skill-creation = Autonomous skill creation from successful multi-step tasks
-skill-creation = ["agent-runtime", "zeroclaw-misc/skill-creation"]
-whatsapp-web = ["agent-runtime", "zeroclaw-misc/whatsapp-web"]
-voice-wake = ["agent-runtime", "zeroclaw-misc/voice-wake", "zeroclaw-config/voice-wake"]
-plugins-wasm = ["dep:extism", "zeroclaw-misc/plugins-wasm"]
+browser-native = ["zeroclaw-tools/browser-native"]
+plugins-wasm = ["zeroclaw-misc/plugins-wasm"]
+probe = ["zeroclaw-misc/probe"]
+rag-pdf = ["zeroclaw-tools/rag-pdf"]
+skill-creation = ["zeroclaw-misc/skill-creation"]
 webauthn = ["zeroclaw-misc/webauthn"]
-# Meta-feature for CI: all features except those requiring system C libraries
-# not available on standard CI runners (e.g., voice-wake needs libasound2-dev).
+
+# Backward-compatible aliases
+fantoccini = ["browser-native"]
+landlock = ["sandbox-landlock"]
+metrics = ["observability-prometheus"]
+
+# CI meta-feature
 ci-all = [
-    "gateway", "tui-onboarding", "schema-export",
-    # All 28 channels
-    "channel-email", "channel-telegram", "channel-lark", "channel-nostr",
-    "channel-matrix", "channel-discord", "channel-slack", "channel-signal",
-    "channel-mattermost", "channel-irc", "channel-imessage",
-    "channel-dingtalk", "channel-qq", "channel-bluesky",
-    "channel-twitter", "channel-reddit", "channel-notion",
-    "channel-linq", "channel-wati", "channel-nextcloud",
-    "channel-mochat", "channel-wecom", "channel-clawdtalk",
-    "channel-webhook", "channel-acp-server", "channel-whatsapp-cloud",
-    "channel-voice-call", "whatsapp-web",
-    # Backends
+    "agent-runtime",
+    "channel-nostr", "channel-matrix", "whatsapp-web",
     "observability-prometheus", "observability-otel",
     "hardware", "peripheral-rpi",
-    "browser-native", "sandbox-landlock", "sandbox-bubblewrap",
-    "probe", "rag-pdf", "skill-creation", "plugins-wasm",
+    "sandbox-landlock", "sandbox-bubblewrap",
+    "browser-native", "plugins-wasm", "probe", "rag-pdf",
+    "skill-creation", "webauthn",
 ]
 
 [profile.dev]

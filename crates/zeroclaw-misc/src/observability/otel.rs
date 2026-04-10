@@ -445,13 +445,13 @@ impl Observer for OtelObserver {
                 self.request_latency.record(d.as_secs_f64(), &[]);
             }
             ObserverMetric::TokensUsed(t) => {
-                self.tokens_used.add(*t as u64, &[]);
+                self.tokens_used.add(*t, &[]);
             }
             ObserverMetric::ActiveSessions(s) => {
-                self.active_sessions.record(*s as u64, &[]);
+                self.active_sessions.record(*s, &[]);
             }
             ObserverMetric::QueueDepth(d) => {
-                self.queue_depth.record(*d as u64, &[]);
+                self.queue_depth.record(*d, &[]);
             }
             ObserverMetric::HandRunDuration {
                 hand_name,

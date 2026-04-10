@@ -68,17 +68,17 @@ impl LandlockSandbox {
             .map_err(|e| std::io::Error::other(e.to_string()))?;
 
         // Allow workspace directory (read/write)
-        if let Some(ref workspace) = self.workspace_dir {
-            if workspace.exists() {
-                let workspace_fd =
-                    PathFd::new(workspace).map_err(|e| std::io::Error::other(e.to_string()))?;
-                ruleset = ruleset
-                    .add_rule(PathBeneath::new(
-                        workspace_fd,
-                        AccessFs::ReadFile | AccessFs::WriteFile | AccessFs::ReadDir,
-                    ))
-                    .map_err(|e| std::io::Error::other(e.to_string()))?;
-            }
+        if let Some(ref workspace) = self.workspace_dir
+            && workspace.exists()
+        {
+            let workspace_fd =
+                PathFd::new(workspace).map_err(|e| std::io::Error::other(e.to_string()))?;
+            ruleset = ruleset
+                .add_rule(PathBeneath::new(
+                    workspace_fd,
+                    AccessFs::ReadFile | AccessFs::WriteFile | AccessFs::ReadDir,
+                ))
+                .map_err(|e| std::io::Error::other(e.to_string()))?;
         }
 
         // Allow /tmp for general operations

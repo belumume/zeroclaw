@@ -45,10 +45,10 @@ impl Tool for HardwareCapabilitiesTool {
         let mut outputs = Vec::new();
 
         for (board_name, transport) in &self.boards {
-            if let Some(b) = filter {
-                if b != board_name {
-                    continue;
-                }
+            if let Some(b) = filter
+                && b != board_name
+            {
+                continue;
             }
             match transport.capabilities().await {
                 Ok(result) => {

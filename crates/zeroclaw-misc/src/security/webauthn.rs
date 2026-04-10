@@ -481,13 +481,12 @@ impl WebAuthnManager {
             }
 
             // Update the sign counter
-            if let Some(user_creds) = all_credentials.get_mut(&credential.user_id) {
-                if let Some(cred) = user_creds
+            if let Some(user_creds) = all_credentials.get_mut(&credential.user_id)
+                && let Some(cred) = user_creds
                     .iter_mut()
                     .find(|c| c.credential_id == response.id)
-                {
-                    cred.sign_count = new_count;
-                }
+            {
+                cred.sign_count = new_count;
             }
             self.save_all_credentials(&all_credentials)?;
         }

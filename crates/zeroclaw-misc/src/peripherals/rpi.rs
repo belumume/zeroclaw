@@ -40,7 +40,7 @@ impl Peripheral for RpiGpioPeripheral {
 
     async fn connect(&mut self) -> anyhow::Result<()> {
         // Verify GPIO is accessible by doing a no-op init
-        let result = tokio::task::spawn_blocking(|| rppal::gpio::Gpio::new()).await??;
+        let result = tokio::task::spawn_blocking(rppal::gpio::Gpio::new).await??;
         drop(result);
         Ok(())
     }

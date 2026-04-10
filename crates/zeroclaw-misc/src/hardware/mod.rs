@@ -533,7 +533,7 @@ pub fn run_info(chip: &str) -> Result<()> {
     #[cfg(feature = "probe")]
     {
         match info_via_probe(chip) {
-            Ok(()) => return Ok(()),
+            Ok(()) => Ok(()),
             Err(e) => {
                 println!("probe-rs attach failed: {}", e);
                 println!();
@@ -541,7 +541,7 @@ pub fn run_info(chip: &str) -> Result<()> {
                     "Ensure Nucleo is connected via USB. The ST-Link is built into the board."
                 );
                 println!("No firmware needs to be flashed — probe-rs reads chip info over SWD.");
-                return Err(e.into());
+                Err(e)
             }
         }
     }
