@@ -462,6 +462,7 @@ impl OpenAiCompatibleProvider {
         }
     }
 
+    #[allow(dead_code)]
     fn tool_specs_to_openai_format(
         tools: &[zeroclaw_api::tool::ToolSpec],
     ) -> Vec<serde_json::Value> {

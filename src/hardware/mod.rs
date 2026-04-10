@@ -1,8 +1,10 @@
+#[allow(unused_imports)]
 pub use zeroclaw_misc::hardware::*;
 
 use crate::config::Config;
 use anyhow::Result;
 
+#[allow(dead_code)]
 pub fn handle_command(cmd: crate::HardwareCommands, _config: &Config) -> Result<()> {
     #[cfg(not(feature = "hardware"))]
     {

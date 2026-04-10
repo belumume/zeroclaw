@@ -1517,6 +1517,7 @@ Allowlist Telegram username (without '@') or numeric user ID.",
     }
 
     /// Download a Telegram photo by file_id, resize to fit within 1024px, and return as base64 data URI.
+    #[allow(dead_code)] // WIP: will be used for photo attachment support
     async fn resolve_photo_data_uri(&self, file_id: &str) -> anyhow::Result<String> {
         use base64::Engine as _;
 

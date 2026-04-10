@@ -212,6 +212,7 @@ struct GeminiUsageMetadata {
 
 /// Response envelope for the internal cloudcode-pa API.
 /// The internal API nests the standard response under a `response` field.
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct InternalGenerateContentResponse {
     response: GenerateContentResponse,
@@ -682,6 +683,7 @@ impl GeminiProvider {
     }
 
     /// Get the Gemini CLI config directory (~/.gemini)
+    #[allow(dead_code)]
     fn gemini_cli_dir() -> Option<PathBuf> {
         UserDirs::new().map(|u| u.home_dir().join(".gemini"))
     }

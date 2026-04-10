@@ -5,7 +5,6 @@ use async_trait::async_trait;
 use serde_json::json;
 use std::sync::Arc;
 use zeroclaw_api::tool::{Tool, ToolResult};
-use zeroclaw_providers as providers;
 
 pub struct ModelSwitchTool {
     security: Arc<SecurityPolicy>,

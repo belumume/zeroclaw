@@ -273,6 +273,7 @@ impl OllamaProvider {
             .to_string()
     }
 
+    #[allow(dead_code)]
     fn build_chat_request(
         &self,
         messages: Vec<Message>,

@@ -7,6 +7,7 @@ use zeroclaw_config::policy::SecurityPolicy;
 use zeroclaw_config::schema::GoogleWorkspaceAllowedOperation;
 
 /// Default `gws` command execution time before kill (overridden by config).
+#[cfg(test)]
 const DEFAULT_GWS_TIMEOUT_SECS: u64 = 30;
 /// Maximum output size in bytes (1MB).
 const MAX_OUTPUT_BYTES: usize = 1_048_576;
@@ -24,6 +25,7 @@ pub struct GoogleWorkspaceTool {
     allowed_operations: Vec<GoogleWorkspaceAllowedOperation>,
     credentials_path: Option<String>,
     default_account: Option<String>,
+    #[allow(dead_code)] // Config field for future rate-limiting
     rate_limit_per_minute: u32,
     timeout_secs: u64,
     audit_log: bool,

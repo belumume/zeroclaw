@@ -1,10 +1,10 @@
+#[allow(unused_imports)]
 pub use zeroclaw_misc::observability::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::*;
-    use std::path::{Path, PathBuf};
 
     #[test]
     fn factory_none_returns_noop() {

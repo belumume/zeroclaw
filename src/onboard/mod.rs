@@ -1,10 +1,9 @@
+#[allow(unused_imports)]
 pub use zeroclaw_misc::onboard::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::*;
-    use std::path::{Path, PathBuf};
 
     fn assert_reexport_exists<F>(_value: F) {}
 

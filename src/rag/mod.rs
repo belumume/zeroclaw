@@ -1,10 +1,9 @@
+#[allow(unused_imports)]
 pub use zeroclaw_misc::rag::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::*;
-    use std::path::{Path, PathBuf};
 
     #[test]
     fn parse_pin_aliases_key_value() {

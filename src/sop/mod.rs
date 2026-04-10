@@ -1,13 +1,12 @@
+#[allow(unused_imports)]
 pub use zeroclaw_misc::sop::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::*;
     use crate::sop::types::SopManifest;
     use std::fs;
     use std::path::{Path, PathBuf};
-    use zeroclaw_config::autonomy::AutonomyLevel;
 
     #[test]
     fn parse_steps_basic() {

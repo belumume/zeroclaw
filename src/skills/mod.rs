@@ -1,20 +1,26 @@
+#[allow(unused_imports)]
 pub use zeroclaw_misc::skills::*;
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 pub mod creator {
+    #[allow(unused_imports)]
     pub use zeroclaw_misc::skills::creator::*;
 }
 pub mod audit {
+    #[allow(unused_imports)]
     pub use zeroclaw_misc::skills::audit::*;
 }
 pub mod skill_tool {
+    #[allow(unused_imports)]
     pub use zeroclaw_misc::skills::skill_tool::*;
 }
 pub mod skill_http {
+    #[allow(unused_imports)]
     pub use zeroclaw_misc::skills::skill_http::*;
 }
 
+#[allow(dead_code)]
 pub fn handle_command(command: crate::SkillCommands, config: &crate::config::Config) -> Result<()> {
     let workspace_dir = &config.workspace_dir;
     match command {

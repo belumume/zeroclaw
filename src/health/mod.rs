@@ -1,10 +1,9 @@
+#[allow(unused_imports)]
 pub use zeroclaw_misc::health::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::*;
-    use std::path::{Path, PathBuf};
 
     fn unique_component(prefix: &str) -> String {
         format!("{prefix}-{}", uuid::Uuid::new_v4())

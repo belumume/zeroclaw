@@ -70,6 +70,7 @@ impl std::fmt::Debug for MatrixChannel {
     }
 }
 
+#[allow(dead_code)] // Deserialization target for Matrix /sync responses
 #[derive(Debug, Deserialize)]
 struct SyncResponse {
     next_batch: String,
@@ -77,24 +78,28 @@ struct SyncResponse {
     rooms: Rooms,
 }
 
+#[allow(dead_code)] // Deserialization target for Matrix /sync responses
 #[derive(Debug, Deserialize, Default)]
 struct Rooms {
     #[serde(default)]
     join: std::collections::HashMap<String, JoinedRoom>,
 }
 
+#[allow(dead_code)] // Deserialization target for Matrix /sync responses
 #[derive(Debug, Deserialize)]
 struct JoinedRoom {
     #[serde(default)]
     timeline: Timeline,
 }
 
+#[allow(dead_code)] // Deserialization target for Matrix /sync responses
 #[derive(Debug, Deserialize, Default)]
 struct Timeline {
     #[serde(default)]
     events: Vec<TimelineEvent>,
 }
 
+#[allow(dead_code)] // Deserialization target for Matrix /sync responses
 #[derive(Debug, Deserialize)]
 struct TimelineEvent {
     #[serde(rename = "type")]
@@ -106,6 +111,7 @@ struct TimelineEvent {
     content: EventContent,
 }
 
+#[allow(dead_code)] // Deserialization target for Matrix /sync responses
 #[derive(Debug, Deserialize, Default)]
 struct EventContent {
     #[serde(default)]
@@ -413,6 +419,7 @@ impl MatrixChannel {
         Ok(device_id)
     }
 
+    #[cfg(test)]
     fn is_user_allowed(&self, sender: &str) -> bool {
         Self::is_sender_allowed(&self.allowed_users, sender)
     }
@@ -436,10 +443,12 @@ impl MatrixChannel {
             .any(|r| r.eq_ignore_ascii_case(room_id))
     }
 
+    #[cfg(test)]
     fn is_room_allowed(&self, room_id: &str) -> bool {
         Self::is_room_allowed_static(&self.allowed_rooms, room_id)
     }
 
+    #[cfg(test)]
     fn is_supported_message_type(msgtype: &str) -> bool {
         matches!(msgtype, "m.text" | "m.notice")
     }
@@ -733,6 +742,7 @@ impl MatrixChannel {
         Ok(())
     }
 
+    #[cfg(test)]
     fn sync_filter_for_room(room_id: &str, timeline_limit: usize) -> String {
         let timeline_limit = timeline_limit.max(1);
         serde_json::json!({

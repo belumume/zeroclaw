@@ -7,6 +7,7 @@ use zeroclaw_api::channel::{Channel, ChannelMessage, SendMessage};
 /// through a configurable callback URL that WeCom posts to.
 pub struct WeComChannel {
     webhook_key: String,
+    #[allow(dead_code)] // used by is_user_allowed which is WIP
     allowed_users: Vec<String>,
 }
 
@@ -29,6 +30,7 @@ impl WeComChannel {
         )
     }
 
+    #[cfg(test)]
     fn is_user_allowed(&self, user_id: &str) -> bool {
         self.allowed_users.iter().any(|u| u == "*" || u == user_id)
     }

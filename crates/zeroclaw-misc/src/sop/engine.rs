@@ -922,7 +922,7 @@ fn parse_iso8601_secs(input: &str) -> Option<u64> {
     Some(days * 86400 + hour * 3600 + min * 60 + sec)
 }
 
-// Available for cross-crate testing
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::sop::types::SopExecutionMode;

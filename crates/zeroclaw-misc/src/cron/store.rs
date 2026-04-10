@@ -19,6 +19,7 @@ impl rusqlite::types::FromSql for JobType {
     }
 }
 
+#[cfg(test)]
 pub fn add_job(config: &Config, expression: &str, command: &str) -> Result<CronJob> {
     let schedule = Schedule::Cron {
         expr: expression.to_string(),

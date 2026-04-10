@@ -1,4 +1,3 @@
-#![allow(dead_code, unused_imports)]
 //! Miscellaneous subsystems extracted from the root crate.
 //! Security, observability, gateway, cron, SOP, skills, hardware, and more.
 

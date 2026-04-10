@@ -837,19 +837,6 @@ fn allows_unauthenticated_model_fetch(provider_name: &str) -> bool {
 }
 
 /// Pick a sensible default model for the given provider.
-const MINIMAX_ONBOARD_MODELS: [(&str, &str); 7] = [
-    (
-        "MiniMax-M2.7",
-        "MiniMax M2.7 (latest flagship, recommended)",
-    ),
-    ("MiniMax-M2.7-highspeed", "MiniMax M2.7 High-Speed (faster)"),
-    ("MiniMax-M2.5", "MiniMax M2.5 (stable)"),
-    ("MiniMax-M2.5-highspeed", "MiniMax M2.5 High-Speed (faster)"),
-    ("MiniMax-M2.1", "MiniMax M2.1 (previous gen)"),
-    ("MiniMax-M2.1-highspeed", "MiniMax M2.1 High-Speed (faster)"),
-    ("MiniMax-M2", "MiniMax M2 (legacy)"),
-];
-
 fn default_model_for_provider(provider: &str) -> String {
     match canonical_provider_name(provider) {
         "anthropic" => "claude-sonnet-4-5-20250929".into(),

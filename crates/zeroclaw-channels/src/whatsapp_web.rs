@@ -638,6 +638,7 @@ impl WhatsAppWebChannel {
 
     /// Upload a local file and send it as a native WhatsApp media message.
     #[cfg(feature = "whatsapp-web")]
+    #[allow(dead_code)] // WIP: not yet wired into send path
     async fn send_wa_attachment(
         client: &wa_rs::Client,
         to: &wa_rs_binary::jid::Jid,
@@ -754,6 +755,7 @@ impl WhatsAppWebChannel {
 /// Supported media attachment kinds for WhatsApp Web outgoing messages.
 #[cfg(feature = "whatsapp-web")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // WIP: used by send_wa_attachment, not yet wired into send path
 enum WaAttachmentKind {
     Image,
     Document,
@@ -764,6 +766,7 @@ enum WaAttachmentKind {
 
 #[cfg(feature = "whatsapp-web")]
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(dead_code)] // WIP: used by send_wa_attachment, not yet wired into send path
 struct WaAttachment {
     kind: WaAttachmentKind,
     target: String,
@@ -771,6 +774,7 @@ struct WaAttachment {
 
 #[cfg(feature = "whatsapp-web")]
 impl WaAttachmentKind {
+    #[allow(dead_code)] // WIP: used by parse_attachment_markers
     fn from_marker(marker: &str) -> Option<Self> {
         match marker.trim().to_ascii_uppercase().as_str() {
             "IMAGE" | "PHOTO" => Some(Self::Image),
@@ -785,6 +789,7 @@ impl WaAttachmentKind {
 
 /// Find the closing `]` that matches an already-consumed opening `[`.
 #[cfg(feature = "whatsapp-web")]
+#[allow(dead_code)] // WIP: used by parse_attachment_markers
 fn find_matching_close(s: &str) -> Option<usize> {
     let mut depth = 1usize;
     for (i, ch) in s.char_indices() {
@@ -805,6 +810,7 @@ fn find_matching_close(s: &str) -> Option<usize> {
 /// Extract `[KIND:target]` media markers from a message, returning cleaned text
 /// and a list of attachments. Unknown markers are left in the text verbatim.
 #[cfg(feature = "whatsapp-web")]
+#[allow(dead_code)] // WIP: not yet wired into send path
 fn parse_attachment_markers(message: &str) -> (String, Vec<WaAttachment>) {
     let mut cleaned = String::with_capacity(message.len());
     let mut attachments = Vec::new();
@@ -853,6 +859,7 @@ fn parse_attachment_markers(message: &str) -> (String, Vec<WaAttachment>) {
 
 /// Guess a MIME type from a file extension for WhatsApp media uploads.
 #[cfg(feature = "whatsapp-web")]
+#[allow(dead_code)] // WIP: used by send_wa_attachment, not yet wired into send path
 fn mime_from_path(path: &Path) -> &'static str {
     let ext = path
         .extension()
@@ -888,6 +895,7 @@ fn mime_from_path(path: &Path) -> &'static str {
 
 /// Map our attachment kind to the wa-rs `MediaType` used for upload encryption.
 #[cfg(feature = "whatsapp-web")]
+#[allow(dead_code)] // WIP: used by send_wa_attachment, not yet wired into send path
 fn wa_media_type(kind: WaAttachmentKind) -> wa_rs_core::download::MediaType {
     match kind {
         WaAttachmentKind::Image => wa_rs_core::download::MediaType::Image,

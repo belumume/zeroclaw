@@ -5,8 +5,7 @@ use crate::channels::MatrixChannel;
 #[cfg(feature = "whatsapp-web")]
 use crate::channels::WhatsAppWebChannel;
 use crate::channels::{
-    Channel, DiscordChannel, MattermostChannel, QQChannel, SendMessage, SignalChannel,
-    SlackChannel, TelegramChannel,
+    Channel, DiscordChannel, MattermostChannel, QQChannel, SendMessage, SignalChannel, SlackChannel,
 };
 use crate::cron::{
     CronJob, CronJobPatch, DeliveryConfig, JobType, Schedule, SessionTarget, all_overdue_jobs,
@@ -442,6 +441,7 @@ fn warn_if_high_frequency_agent_job(job: &CronJob) {
     }
 }
 
+#[cfg(any(feature = "channel-matrix", test))]
 fn resolve_matrix_delivery_room(configured_room_id: &str, target: &str) -> String {
     let target = target.trim();
     if target.is_empty() {

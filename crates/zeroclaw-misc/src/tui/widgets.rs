@@ -146,6 +146,7 @@ pub struct StepIndicator<'a> {
     pub status: StepStatus,
 }
 
+#[allow(dead_code)] // TUI widget variants for step progress display
 pub enum StepStatus {
     Pending,
     Active,

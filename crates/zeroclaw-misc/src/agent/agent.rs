@@ -44,6 +44,7 @@ pub struct Agent {
     classification_config: zeroclaw_config::schema::QueryClassificationConfig,
     available_hints: Vec<String>,
     route_model_by_hint: HashMap<String, String>,
+    #[allow(dead_code)] // WIP: stored for future runtime tool filtering
     allowed_tools: Option<Vec<String>>,
     response_cache: Option<Arc<zeroclaw_memory::response_cache::ResponseCache>>,
     tool_descriptions: Option<ToolDescriptions>,

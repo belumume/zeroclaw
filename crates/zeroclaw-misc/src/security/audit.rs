@@ -202,6 +202,7 @@ struct ChainState {
 pub struct AuditLogger {
     log_path: PathBuf,
     config: AuditConfig,
+    #[allow(dead_code)] // WIP: buffered writes for batch flushing
     buffer: Mutex<Vec<AuditEvent>>,
     chain: Mutex<ChainState>,
     /// Signing key (loaded once at construction time if sign_events enabled)

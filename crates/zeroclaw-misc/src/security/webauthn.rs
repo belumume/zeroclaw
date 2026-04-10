@@ -697,6 +697,7 @@ fn verify_es256_signature(public_key: &[u8], message: &[u8], sig: &[u8]) -> Resu
 ///   BIT STRING <uncompressed point>
 /// }
 /// ```
+#[cfg(test)]
 fn encode_p256_spki(uncompressed_point: &[u8]) -> Vec<u8> {
     // Fixed DER prefix for P-256 SubjectPublicKeyInfo
     let mut spki = vec![

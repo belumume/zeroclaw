@@ -202,6 +202,7 @@ fn first_nonempty(text: Option<&str>) -> Option<String> {
     })
 }
 
+#[allow(dead_code)]
 fn resolve_instructions(system_prompt: Option<&str>) -> String {
     first_nonempty(system_prompt).unwrap_or_else(|| DEFAULT_CODEX_INSTRUCTIONS.to_string())
 }
@@ -524,6 +525,7 @@ fn append_utf8_stream_chunk(
     }
 }
 
+#[allow(dead_code)]
 fn decode_utf8_stream_chunks<'a, I>(chunks: I) -> anyhow::Result<String>
 where
     I: IntoIterator<Item = &'a [u8]>,

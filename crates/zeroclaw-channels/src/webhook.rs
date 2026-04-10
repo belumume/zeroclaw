@@ -68,6 +68,7 @@ impl WebhookChannel {
     }
 
     /// Verify an incoming request's signature if a secret is configured.
+    #[cfg(test)]
     fn verify_signature(&self, body: &[u8], signature: Option<&str>) -> bool {
         let Some(ref secret) = self.secret else {
             return true; // No secret configured, accept all

@@ -173,6 +173,7 @@ const DEFAULT_CHANNEL_MAX_BACKOFF_SECS: u64 = 60;
 const MIN_CHANNEL_MESSAGE_TIMEOUT_SECS: u64 = 30;
 /// Default timeout for processing a single channel message (LLM + tools).
 /// Used as fallback when not configured in channels_config.message_timeout_secs.
+#[cfg(test)]
 const CHANNEL_MESSAGE_TIMEOUT_SECS: u64 = 300;
 /// Cap timeout scaling so large max_tool_iterations values do not create unbounded waits.
 const CHANNEL_MESSAGE_TIMEOUT_SCALE_CAP: u64 = 4;
@@ -205,6 +206,7 @@ fn effective_channel_message_timeout_secs(configured: u64) -> u64 {
     configured.max(MIN_CHANNEL_MESSAGE_TIMEOUT_SECS)
 }
 
+#[cfg(test)]
 fn channel_message_timeout_budget_secs(
     message_timeout_secs: u64,
     max_tool_iterations: usize,
@@ -1586,11 +1588,6 @@ fn build_config_text_response(
     );
     resp
 }
-
-/// Prefix used to signal that a runtime command response contains raw Block Kit
-/// JSON instead of plain text. [`SlackChannel::send`] detects this and posts
-/// the blocks directly via `chat.postMessage`.
-const BLOCK_KIT_PREFIX: &str = "__ZEROCLAW_BLOCK_KIT__";
 
 /// Build a Slack Block Kit JSON payload for the `/config` interactive UI.
 fn build_config_block_kit(

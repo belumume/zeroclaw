@@ -1,5 +1,3 @@
-#[cfg(feature = "schema-export")]
-use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;

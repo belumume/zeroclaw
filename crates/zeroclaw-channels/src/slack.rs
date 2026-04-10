@@ -781,6 +781,7 @@ impl SlackChannel {
         Some(Self::strip_bot_mentions(text, bot_user_id))
     }
 
+    #[cfg(test)]
     fn normalize_incoming_content(
         text: &str,
         require_mention: bool,

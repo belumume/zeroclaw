@@ -62,10 +62,10 @@ pub mod tool_registry;
 pub use aardvark::AardvarkTransport;
 
 use crate::hardware::device::DeviceRegistry;
+#[cfg(feature = "hardware")]
 use anyhow::Result;
 #[allow(unused_imports)]
 pub use tool_registry::{ToolError, ToolRegistry};
-use zeroclaw_config::schema::Config;
 
 // Re-export config types so wizard can use `hardware::HardwareConfig` etc.
 pub use zeroclaw_config::schema::{HardwareConfig, HardwareTransport};

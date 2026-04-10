@@ -100,8 +100,10 @@ const SESSION_LIMIT_REACHED: i32 = -32001;
 
 struct Session {
     agent: Agent,
+    #[allow(dead_code)] // WIP: intended for session expiry logic
     created_at: Instant,
     last_active: Instant,
+    #[allow(dead_code)] // WIP: stored for future session routing
     workspace_dir: String,
 }
 
@@ -495,6 +497,7 @@ impl AcpServer {
 struct RpcError {
     code: i32,
     message: String,
+    #[allow(dead_code)] // JSON-RPC spec field, used for structured error data
     data: Option<Value>,
 }
 

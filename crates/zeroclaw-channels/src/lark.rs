@@ -2303,10 +2303,6 @@ fn parse_post_content_details(content: &str) -> Option<ParsedPostContent> {
     }
 }
 
-fn parse_post_content(content: &str) -> Option<String> {
-    parse_post_content_details(content).map(|details| details.text)
-}
-
 /// Parse Feishu `list` message content into plain-text bullet lines.
 ///
 /// Feishu sends list/bullet content as a JSON structure with nested items,

@@ -29,7 +29,7 @@ pub use traits::Peripheral;
 
 use anyhow::Result;
 use zeroclaw_api::tool::Tool;
-use zeroclaw_config::schema::{Config, PeripheralBoardConfig, PeripheralsConfig};
+use zeroclaw_config::schema::{PeripheralBoardConfig, PeripheralsConfig};
 #[cfg(feature = "hardware")]
 use zeroclaw_tools::hardware_memory_map::HardwareMemoryMapTool;
 

@@ -8,7 +8,7 @@ use crate::tools::{self, Tool};
 use crate::util::truncate_with_ellipsis;
 use anyhow::Result;
 use futures_util::StreamExt;
-use regex::{Regex, RegexSet};
+use regex::Regex;
 use std::collections::HashSet;
 use std::fmt::Write;
 use std::io::Write as _;
@@ -196,19 +196,6 @@ fn compute_excluded_mcp_tools(
         .collect()
 }
 
-static SENSITIVE_KEY_PATTERNS: LazyLock<RegexSet> = LazyLock::new(|| {
-    RegexSet::new([
-        r"(?i)token",
-        r"(?i)api[_-]?key",
-        r"(?i)password",
-        r"(?i)secret",
-        r"(?i)user[_-]?key",
-        r"(?i)bearer",
-        r"(?i)credential",
-    ])
-    .unwrap()
-});
-
 static SENSITIVE_KV_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"(?i)(token|api[_-]?key|password|secret|user[_-]?key|bearer|credential)["']?\s*[:=]\s*(?:"([^"]{8,})"|'([^']{8,})'|([a-zA-Z0-9_\-\.]{8,}))"#).unwrap()
 });
@@ -281,6 +268,7 @@ pub enum DraftEvent {
 pub use zeroclaw_api::TOOL_CHOICE_OVERRIDE;
 
 /// Convert a tool registry to OpenAI function-calling format for native tool support.
+#[cfg(test)]
 fn tools_to_openai_format(tools_registry: &[Box<dyn Tool>]) -> Vec<serde_json::Value> {
     tools_registry
         .iter()
@@ -440,6 +428,7 @@ fn build_native_assistant_history(
     obj.to_string()
 }
 
+#[cfg(test)]
 fn resolve_display_text(
     response_text: &str,
     parsed_text: &str,

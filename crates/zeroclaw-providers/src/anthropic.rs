@@ -18,6 +18,7 @@ pub struct AnthropicProvider {
 
 const DEFAULT_ANTHROPIC_MAX_TOKENS: u32 = 4096;
 
+#[cfg(test)]
 #[derive(Debug, Serialize)]
 struct ChatRequest {
     model: String,
@@ -28,17 +29,20 @@ struct ChatRequest {
     temperature: f64,
 }
 
+#[cfg(test)]
 #[derive(Debug, Serialize)]
 struct Message {
     role: String,
     content: String,
 }
 
+#[cfg(test)]
 #[derive(Debug, Deserialize)]
 struct ChatResponse {
     content: Vec<ContentBlock>,
 }
 
+#[cfg(test)]
 #[derive(Debug, Deserialize)]
 struct ContentBlock {
     #[serde(rename = "type")]
@@ -159,6 +163,7 @@ struct AnthropicUsage {
     #[serde(default)]
     output_tokens: Option<u64>,
     #[serde(default)]
+    #[allow(dead_code)]
     cache_creation_input_tokens: Option<u64>,
     #[serde(default)]
     cache_read_input_tokens: Option<u64>,
@@ -252,6 +257,7 @@ impl AnthropicProvider {
     }
 
     /// Cache system prompts larger than ~1024 tokens (3KB of text)
+    #[allow(dead_code)]
     fn should_cache_system(text: &str) -> bool {
         text.len() > 3072
     }
@@ -502,15 +508,6 @@ impl AnthropicProvider {
         });
 
         (system_prompt, native_messages)
-    }
-
-    fn parse_text_response(response: ChatResponse) -> anyhow::Result<String> {
-        response
-            .content
-            .into_iter()
-            .find(|c| c.kind == "text")
-            .and_then(|c| c.text)
-            .ok_or_else(|| anyhow::anyhow!("No response from Anthropic"))
     }
 
     fn parse_native_response(response: NativeChatResponse) -> ProviderChatResponse {

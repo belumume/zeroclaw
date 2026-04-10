@@ -11,7 +11,9 @@ const DEFAULT_API_VERSION: &str = "2024-08-01-preview";
 
 pub struct AzureOpenAiProvider {
     credential: Option<String>,
+    #[allow(dead_code)]
     resource_name: String,
+    #[allow(dead_code)]
     deployment_name: String,
     api_version: String,
     base_url: String,

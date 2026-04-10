@@ -3008,6 +3008,7 @@ async fn run_gateway_if_enabled(
 }
 
 #[cfg(not(feature = "gateway"))]
+#[allow(clippy::unused_async)]
 async fn run_gateway_if_enabled(
     _host: &str,
     _port: u16,
@@ -3277,6 +3278,7 @@ mod tests {
 }
 
 #[cfg(not(feature = "tui-onboarding"))]
+#[allow(clippy::unused_async)]
 async fn run_tui_if_enabled() -> anyhow::Result<()> {
     anyhow::bail!("TUI onboarding feature is not enabled. Rebuild with --features tui-onboarding")
 }

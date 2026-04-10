@@ -497,6 +497,7 @@ fn is_audio_file(file: &serde_json::Value) -> bool {
 /// Checks two sources:
 /// 1. Text-based: looks for `@bot_username` in the message body (case-insensitive).
 /// 2. Metadata-based: checks the post's `metadata.mentions` array for the bot user ID.
+#[cfg(test)]
 fn contains_bot_mention_mm(
     text: &str,
     bot_user_id: &str,

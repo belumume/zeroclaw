@@ -1,10 +1,9 @@
+#[allow(unused_imports)]
 pub use zeroclaw_misc::security::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::*;
-    use std::path::{Path, PathBuf};
 
     #[test]
     fn reexported_policy_and_pairing_types_are_usable() {

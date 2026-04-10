@@ -1,4 +1,3 @@
-#![allow(dead_code, unused_imports)]
 //! Channel implementations for messaging platform integrations.
 
 pub mod util;

@@ -450,7 +450,7 @@ struct ConverseOutputMessage {
 enum ResponseContentBlock {
     ToolUse(ResponseToolUseWrapper),
     Text(TextBlock),
-    Other(serde_json::Value),
+    Other(#[allow(dead_code)] serde_json::Value),
 }
 
 #[derive(Debug, Deserialize)]
@@ -549,16 +549,6 @@ impl BedrockProvider {
     fn canonical_uri(model_id: &str) -> String {
         let encoded = Self::encode_model_path(model_id);
         format!("/model/{encoded}/converse")
-    }
-
-    fn require_auth(&self) -> anyhow::Result<&BedrockAuth> {
-        self.auth.as_ref().ok_or_else(|| {
-            anyhow::anyhow!(
-                "AWS Bedrock credentials not set. Set BEDROCK_API_KEY for Bearer \
-                 token auth, or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY for \
-                 SigV4 auth, or run on an EC2 instance with an IAM role attached."
-            )
-        })
     }
 
     /// Resolve auth: use cached if available, otherwise try env vars then IMDS.

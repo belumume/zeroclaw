@@ -203,6 +203,7 @@ impl NotionChannel {
     }
 
     /// Write result text to the Result column.
+    #[allow(dead_code)] // WIP: will be wired into task completion flow
     async fn set_result(&self, page_id: &str, result_text: &str) -> Result<()> {
         let url = format!("{NOTION_API_BASE}/pages/{page_id}");
         let payload = serde_json::json!({

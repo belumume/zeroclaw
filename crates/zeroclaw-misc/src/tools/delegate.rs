@@ -204,6 +204,7 @@ impl DelegateTool {
     /// Wrap memory with namespace isolation if configured for the given agent.
     /// Returns the namespaced memory if memory_namespace is set, otherwise returns
     /// the original memory.
+    #[allow(dead_code)] // WIP: will be used when delegate agents support memory
     fn get_agent_memory(&self, agent_config: &DelegateAgentConfig) -> Option<Arc<dyn Memory>> {
         self.memory.as_ref().map(|mem| {
             if let Some(namespace) = &agent_config.memory_namespace {

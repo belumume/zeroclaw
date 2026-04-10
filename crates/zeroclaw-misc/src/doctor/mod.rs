@@ -56,6 +56,7 @@ impl DiagItem {
         }
     }
 
+    #[cfg(test)]
     fn icon(&self) -> &'static str {
         match self.severity {
             Severity::Ok => "✅",
