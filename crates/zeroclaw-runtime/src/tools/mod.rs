@@ -915,14 +915,14 @@ pub fn all_tools_with_runtime(
         };
 
         if plugin_path.exists() && config.plugins.enabled {
-            match crate::plugins::host::PluginHost::new(
+            match zeroclaw_plugins::host::PluginHost::new(
                 plugin_path.parent().unwrap_or(&plugin_path),
             ) {
                 Ok(host) => {
                     let tool_manifests = host.tool_plugins();
                     let count = tool_manifests.len();
                     for manifest in tool_manifests {
-                        tool_arcs.push(Arc::new(crate::plugins::wasm_tool::WasmTool::new(
+                        tool_arcs.push(Arc::new(zeroclaw_plugins::wasm_tool::WasmTool::new(
                             manifest.name.clone(),
                             manifest.description.clone().unwrap_or_default(),
                             manifest.name.clone(),

@@ -14,6 +14,7 @@ zeroclaw-providers = { path = "../zeroclaw-providers" }
 zeroclaw-memory = { path = "../zeroclaw-memory" }
 zeroclaw-channels = { path = "../zeroclaw-channels", default-features = false }
 zeroclaw-tools = { path = "../zeroclaw-tools" }
+zeroclaw-plugins = { path = "../zeroclaw-plugins", optional = true }
 zeroclaw-tool-call-parser = { path = "../zeroclaw-tool-call-parser" }
 anyhow = "1.0"
 async-trait = "0.1"
@@ -142,7 +143,7 @@ voice-wake = ["zeroclaw-channels/voice-wake"]
 browser-native = []
 rag-pdf = ["dep:pdf-extract"]
 probe = ["dep:probe-rs"]
-plugins-wasm = []
+plugins-wasm = ["dep:zeroclaw-plugins"]
 webauthn = []
 sandbox-bubblewrap = []
 

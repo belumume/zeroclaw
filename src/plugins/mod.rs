@@ -1,1 +1,1 @@
-pub use zeroclaw_runtime::plugins::*;
+pub use zeroclaw_plugins::*;

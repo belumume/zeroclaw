@@ -11928,6 +11928,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeroclaw-plugins"
+version = "0.7.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "ring",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "toml 1.1.2+spec-1.1.0",
+ "tracing",
+ "zeroclaw-api",
+]
+
+[[package]]
 name = "zeroclaw-providers"
 version = "0.7.0"
 dependencies = [
@@ -12068,6 +12085,7 @@ dependencies = [
  "zeroclaw-infra",
  "zeroclaw-macros",
  "zeroclaw-memory",
+ "zeroclaw-plugins",
  "zeroclaw-providers",
  "zeroclaw-tool-call-parser",
  "zeroclaw-tools",
@@ -12225,6 +12243,7 @@ dependencies = [
  "zeroclaw-infra",
  "zeroclaw-macros",
  "zeroclaw-memory",
+ "zeroclaw-plugins",
  "zeroclaw-providers",
  "zeroclaw-runtime",
  "zeroclaw-tool-call-parser",

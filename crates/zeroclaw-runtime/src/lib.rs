@@ -25,7 +25,6 @@ pub mod nodes;
 pub mod observability;
 pub mod onboard;
 pub mod peripherals;
-pub mod plugins;
 pub mod rag;
 pub mod routines;
 pub mod platform;

@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tools", "crates/zeroclaw-runtime", "crates/zeroclaw-tui", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
+members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tools", "crates/zeroclaw-runtime", "crates/zeroclaw-tui", "crates/zeroclaw-plugins", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
 resolver = "2"
 
 [workspace.package]
@@ -51,6 +51,7 @@ zeroclaw-channels = { path = "crates/zeroclaw-channels", default-features = fals
 zeroclaw-tools = { path = "crates/zeroclaw-tools", optional = true }
 zeroclaw-runtime = { path = "crates/zeroclaw-runtime", default-features = false, optional = true }
 zeroclaw-tui = { path = "crates/zeroclaw-tui", optional = true }
+zeroclaw-plugins = { path = "crates/zeroclaw-plugins", optional = true }
 zeroclaw-tool-call-parser = { path = "crates/zeroclaw-tool-call-parser" }
 # Internal proc macros
 zeroclaw-macros = { path = "crates/zeroclaw-macros" }
@@ -279,7 +280,7 @@ peripheral-rpi = ["zeroclaw-runtime/peripheral-rpi"]
 sandbox-landlock = ["zeroclaw-runtime/sandbox-landlock"]
 sandbox-bubblewrap = ["zeroclaw-runtime/sandbox-bubblewrap"]
 browser-native = ["zeroclaw-tools/browser-native"]
-plugins-wasm = ["zeroclaw-runtime/plugins-wasm"]
+plugins-wasm = ["dep:zeroclaw-plugins", "zeroclaw-runtime/plugins-wasm"]
 probe = ["zeroclaw-runtime/probe"]
 rag-pdf = ["zeroclaw-tools/rag-pdf"]
 webauthn = ["zeroclaw-runtime/webauthn"]
