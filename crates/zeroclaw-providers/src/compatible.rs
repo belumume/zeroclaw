@@ -1053,7 +1053,7 @@ fn sse_bytes_to_chunks(
         match response.error_for_status_ref() {
             Ok(_) => {}
             Err(e) => {
-                let _ = tx.send(Err(StreamError::Http(e))).await;
+                let _ = tx.send(Err(StreamError::Http(e.to_string()))).await;
                 return;
             }
         }
@@ -1115,7 +1115,7 @@ fn sse_bytes_to_chunks(
                     }
                 }
                 Err(e) => {
-                    let _ = tx.send(Err(StreamError::Http(e))).await;
+                    let _ = tx.send(Err(StreamError::Http(e.to_string()))).await;
                     return;
                 }
             }
@@ -1145,7 +1145,7 @@ fn sse_bytes_to_events(
         match response.error_for_status_ref() {
             Ok(_) => {}
             Err(e) => {
-                let _ = tx.send(Err(StreamError::Http(e))).await;
+                let _ = tx.send(Err(StreamError::Http(e.to_string()))).await;
                 return;
             }
         }
@@ -1259,7 +1259,7 @@ fn sse_bytes_to_events(
                     }
                 }
                 Err(e) => {
-                    let _ = tx.send(Err(StreamError::Http(e))).await;
+                    let _ = tx.send(Err(StreamError::Http(e.to_string()))).await;
                     return;
                 }
             }
@@ -2214,7 +2214,7 @@ impl Provider for OpenAiCompatibleProvider {
             let response = match req_builder.send().await {
                 Ok(r) => r,
                 Err(e) => {
-                    let _ = tx.send(Err(StreamError::Http(e))).await;
+                    let _ = tx.send(Err(StreamError::Http(e.to_string()))).await;
                     return;
                 }
             };
@@ -2312,7 +2312,7 @@ impl Provider for OpenAiCompatibleProvider {
             let response = match req_builder.send().await {
                 Ok(r) => r,
                 Err(e) => {
-                    let _ = tx.send(Err(StreamError::Http(e))).await;
+                    let _ = tx.send(Err(StreamError::Http(e.to_string()))).await;
                     return;
                 }
             };
@@ -2395,7 +2395,7 @@ impl Provider for OpenAiCompatibleProvider {
             let response = match req_builder.send().await {
                 Ok(r) => r,
                 Err(e) => {
-                    let _ = tx.send(Err(StreamError::Http(e))).await;
+                    let _ = tx.send(Err(StreamError::Http(e.to_string()))).await;
                     return;
                 }
             };

@@ -242,7 +242,7 @@ pub type StreamResult<T> = std::result::Result<T, StreamError>;
 #[derive(Debug, thiserror::Error)]
 pub enum StreamError {
     #[error("HTTP error: {0}")]
-    Http(reqwest::Error),
+    Http(String),
 
     #[error("JSON parse error: {0}")]
     Json(serde_json::Error),

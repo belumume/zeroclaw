@@ -163,7 +163,7 @@ impl McpServer {
         arguments: serde_json::Value,
     ) -> Result<serde_json::Value> {
         let mut inner = self.inner.lock().await;
-        let id = inner.next_id.fetch_add(1, Ordering::Relaxed) as u64;
+        let id = inner.next_id.fetch_add(1, Ordering::Relaxed);
         let req = JsonRpcRequest::new(
             id,
             "tools/call",

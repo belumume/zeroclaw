@@ -1047,7 +1047,7 @@ impl Provider for AnthropicProvider {
             let response = match req.send().await {
                 Ok(r) => r,
                 Err(e) => {
-                    let _ = tx.send(Err(StreamError::Http(e))).await;
+                    let _ = tx.send(Err(StreamError::Http(e.to_string()))).await;
                     return;
                 }
             };

@@ -927,6 +927,7 @@ async fn main() -> Result<()> {
     // Install default crypto provider for Rustls TLS.
     // This prevents the error: "could not automatically determine the process-level CryptoProvider"
     // when both aws-lc-rs and ring features are available (or neither is explicitly selected).
+    #[cfg(feature = "agent-runtime")]
     if let Err(e) = rustls::crypto::ring::default_provider().install_default() {
         eprintln!("Warning: Failed to install default crypto provider: {e:?}");
     }
