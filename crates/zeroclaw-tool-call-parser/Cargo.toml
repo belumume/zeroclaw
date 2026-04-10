@@ -1,8 +1,8 @@
 [package]
 name = "zeroclaw-tool-call-parser"
-version = "0.1.0"
-edition = "2024"
-license = "MIT OR Apache-2.0"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 description = "Tool call parsing for LLM responses — handles JSON, XML, GLM, MiniMax, Perl-style, and more."
 publish = false
 

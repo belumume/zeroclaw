@@ -1,14 +1,14 @@
 [package]
 name = "zeroclaw-config"
-version = "0.1.0"
-edition = "2024"
-license = "MIT OR Apache-2.0"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 description = "Configuration schema, secrets, and related types for ZeroClaw."
 publish = false
 
 [dependencies]
 zeroclaw-api = { path = "../zeroclaw-api" }
-zeroclaw-macros = { path = "../zeroclaw-macros", version = "0.1.0" }
+zeroclaw-macros = { path = "../zeroclaw-macros" }
 anyhow = "1.0"
 chacha20poly1305 = "0.10"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
