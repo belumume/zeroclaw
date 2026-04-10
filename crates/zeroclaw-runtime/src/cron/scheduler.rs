@@ -1083,7 +1083,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn persist_job_result_delivery_failure_non_best_effort_marks_error() {
+    async fn persist_job_result_delivery_stubbed_succeeds() {
+        // Delivery is stubbed (moved to zeroclaw-channels orchestrator).
+        // This test verifies the stub returns Ok, so persist_job_result succeeds.
         let tmp = TempDir::new().unwrap();
         let config = test_config(&tmp).await;
         let job = cron::add_agent_job(
@@ -1110,11 +1112,11 @@ mod tests {
         let finished = started + ChronoDuration::milliseconds(10);
 
         let success = persist_job_result(&config, &job, true, "ok", started, finished).await;
-        assert!(!success);
+        assert!(success);
 
         let updated = cron::get_job(&config, &job.id).unwrap();
         assert!(updated.enabled);
-        assert_eq!(updated.last_status.as_deref(), Some("error"));
+        assert_eq!(updated.last_status.as_deref(), Some("ok"));
 
         let runs = cron::list_runs(&config, &job.id, 10).unwrap();
         assert_eq!(runs.len(), 1);
@@ -1268,27 +1270,7 @@ mod tests {
         assert_eq!(overdue.len(), 3, "all_overdue_jobs must return all");
     }
 
-    #[test]
-    fn scan_and_redact_output_redacts_credentials() {
-        let leaked_output = "Deployment key: sk_test_FAKE1234567890abcdefgh"; // gitleaks:allow
-
-        let redacted = scan_and_redact_output("telegram", "123456", leaked_output);
-
-        assert!(
-            !redacted.as_str().contains("sk_test_FAKE1234567890abcdefgh"), // gitleaks:allow
-            "credentials must be redacted"
-        );
-        assert!(redacted.as_str().contains("[REDACTED"));
-    }
-
-    #[test]
-    fn scan_and_redact_output_preserves_clean_output() {
-        let clean_output = "Deployment completed successfully at 2024-03-15 10:00:00";
-
-        let redacted = scan_and_redact_output("telegram", "123456", clean_output);
-
-        assert_eq!(redacted.as_str(), clean_output);
-    }
+    // scan_and_redact_output tests moved to zeroclaw-channels orchestrator
 
     // ── Broadcast / EventBroadcast tests ─────────────────────────────
 

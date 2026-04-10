@@ -112,9 +112,8 @@ voice-wake = ["dep:cpal", "zeroclaw-config/voice-wake"]
 [dev-dependencies]
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "env-filter"] }
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
 tempfile = "3.26"
-
-
 toml = "1.0"
 wiremock = "0.6"
 tokio = { version = "1.50", features = ["rt-multi-thread", "macros"] }

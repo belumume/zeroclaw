@@ -13,7 +13,7 @@ zeroclaw-config = { path = "../zeroclaw-config", default-features = false }
 zeroclaw-infra = { path = "../zeroclaw-infra" }
 zeroclaw-memory = { path = "../zeroclaw-memory" }
 zeroclaw-providers = { path = "../zeroclaw-providers" }
-zeroclaw-channels = { path = "../zeroclaw-channels", default-features = false, features = ["channel-email"] }
+zeroclaw-channels = { path = "../zeroclaw-channels", features = ["channel-email", "channel-telegram"] }
 zeroclaw-runtime = { path = "../zeroclaw-runtime", default-features = false }
 zeroclaw-tools = { path = "../zeroclaw-tools" }
 zeroclaw-hardware = { path = "../zeroclaw-hardware" }
@@ -64,6 +64,12 @@ toml = "1.0"
 tracing = { version = "0.1", default-features = false }
 rustls-pemfile = "2"
 uuid = { version = "1.22", default-features = false, features = ["v4", "std"] }
+
+[dev-dependencies]
+rand = "0.10"
+rcgen = "0.13"
+tempfile = "3.26"
+tokio = { version = "1.50", features = ["rt-multi-thread", "macros"] }
 
 [features]
 default = []

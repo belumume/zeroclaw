@@ -17,9 +17,11 @@
 pub mod acp_server;
 pub mod cli;
 #[cfg(feature = "channel-matrix")]
+#[cfg(feature = "channel-matrix")]
 pub mod matrix;
 pub mod media_pipeline;
 pub mod mqtt;
+#[cfg(feature = "channel-telegram")]
 pub mod telegram;
 
 // Channel types imported directly from source crates (no shim files)
@@ -65,6 +67,7 @@ pub use crate::whatsapp_web::WhatsAppWebChannel;
 pub use cli::CliChannel;
 #[cfg(feature = "channel-matrix")]
 pub use matrix::MatrixChannel;
+#[cfg(feature = "channel-telegram")]
 pub use telegram::TelegramChannel;
 pub use zeroclaw_infra::debounce::MessageDebouncer;
 pub use zeroclaw_infra::session_backend::SessionBackend;
@@ -3879,6 +3882,7 @@ fn maybe_restart_managed_daemon_service() -> Result<bool> {
 /// Build a single channel instance by config section name (e.g. "telegram").
 fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Channel>> {
     match channel_id {
+        #[cfg(feature = "channel-telegram")]
         "telegram" => {
             let tg = config
                 .channels_config
@@ -4279,6 +4283,7 @@ fn collect_configured_channels(
     let _ = matrix_skip_context;
     let mut channels = Vec::new();
 
+    #[cfg(feature = "channel-telegram")]
     if let Some(ref tg) = config.channels_config.telegram {
         if tg.enabled {
             let ack = tg

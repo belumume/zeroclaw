@@ -166,7 +166,7 @@ impl Tool for NodeTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::gateway::nodes::{NodeCapability, NodeInfo, NodeRegistry};
+    use crate::nodes::{NodeCapability, NodeInfo, NodeRegistry};
 
     #[test]
     fn node_tool_name_format() {
@@ -236,7 +236,7 @@ mod tests {
             if let Some(invocation) = invoke_rx.recv().await {
                 let _ = invocation
                     .response_tx
-                    .send(crate::gateway::nodes::NodeInvocationResult {
+                    .send(crate::nodes::NodeInvocationResult {
                         success: true,
                         output: "echoed".to_string(),
                         error: None,
