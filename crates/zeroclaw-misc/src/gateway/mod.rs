@@ -302,10 +302,8 @@ fn client_key_from_request(
     headers: &HeaderMap,
     trust_forwarded_headers: bool,
 ) -> String {
-    if trust_forwarded_headers {
-        if let Some(ip) = forwarded_client_ip(headers) {
-            return ip.to_string();
-        }
+    if trust_forwarded_headers && let Some(ip) = forwarded_client_ip(headers) {
+        return ip.to_string();
     }
 
     peer_addr
@@ -678,12 +676,11 @@ pub async fn run_gateway(
         match SqliteSessionBackend::new(&config.workspace_dir) {
             Ok(b) => {
                 tracing::info!("Gateway session persistence enabled (SQLite)");
-                if config.gateway.session_ttl_hours > 0 {
-                    if let Ok(cleaned) = b.cleanup_stale(config.gateway.session_ttl_hours) {
-                        if cleaned > 0 {
-                            tracing::info!("Cleaned up {cleaned} stale gateway sessions");
-                        }
-                    }
+                if config.gateway.session_ttl_hours > 0
+                    && let Ok(cleaned) = b.cleanup_stale(config.gateway.session_ttl_hours)
+                    && cleaned > 0
+                {
+                    tracing::info!("Cleaned up {cleaned} stale gateway sessions");
                 }
                 Some(Arc::new(b))
             }
@@ -1413,16 +1410,15 @@ async fn handle_webhook(
         .and_then(|v| v.to_str().ok())
         .map(str::trim)
         .filter(|value| !value.is_empty())
+        && !state.idempotency_store.record_if_new(idempotency_key)
     {
-        if !state.idempotency_store.record_if_new(idempotency_key) {
-            tracing::info!("Webhook duplicate ignored (idempotency key: {idempotency_key})");
-            let body = serde_json::json!({
-                "status": "duplicate",
-                "idempotent": true,
-                "message": "Request already processed for this idempotency key"
-            });
-            return (StatusCode::OK, Json(body));
-        }
+        tracing::info!("Webhook duplicate ignored (idempotency key: {idempotency_key})");
+        let body = serde_json::json!({
+            "status": "duplicate",
+            "idempotent": true,
+            "message": "Request already processed for this idempotency key"
+        });
+        return (StatusCode::OK, Json(body));
     }
 
     let message = &webhook_body.message;

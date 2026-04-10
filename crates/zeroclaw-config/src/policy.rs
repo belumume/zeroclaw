@@ -28,6 +28,12 @@ pub struct ActionTracker {
     actions: Mutex<Vec<Instant>>,
 }
 
+impl Default for ActionTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ActionTracker {
     pub fn new() -> Self {
         Self {
@@ -111,9 +117,7 @@ impl PerSenderTracker {
     /// blocks and returns false when count > max.
     pub fn record_within(&self, key: &str, max: u32) -> bool {
         let mut buckets = self.buckets.lock();
-        let tracker = buckets
-            .entry(key.to_string())
-            .or_insert_with(ActionTracker::new);
+        let tracker = buckets.entry(key.to_string()).or_default();
         let count = tracker.record();
         count <= max as usize
     }
@@ -324,16 +328,16 @@ fn home_dir() -> Option<PathBuf> {
 }
 
 fn expand_user_path(path: &str) -> PathBuf {
-    if path == "~" {
-        if let Some(home) = home_dir() {
-            return home;
-        }
+    if path == "~"
+        && let Some(home) = home_dir()
+    {
+        return home;
     }
 
-    if let Some(stripped) = path.strip_prefix("~/") {
-        if let Some(home) = home_dir() {
-            return home.join(stripped);
-        }
+    if let Some(stripped) = path.strip_prefix("~/")
+        && let Some(home) = home_dir()
+    {
+        return home.join(stripped);
     }
 
     PathBuf::from(path)
@@ -1271,10 +1275,10 @@ impl SecurityPolicy {
             };
 
             // Cover inline forms like `cat</etc/passwd`.
-            if let Some(target) = redirection_target(strip_wrapping_quotes(executable)) {
-                if let Some(blocked) = forbidden_candidate(target) {
-                    return Some(blocked);
-                }
+            if let Some(target) = redirection_target(strip_wrapping_quotes(executable))
+                && let Some(blocked) = forbidden_candidate(target)
+            {
+                return Some(blocked);
             }
 
             for token in words {
@@ -1283,23 +1287,23 @@ impl SecurityPolicy {
                     continue;
                 }
 
-                if let Some(target) = redirection_target(candidate) {
-                    if let Some(blocked) = forbidden_candidate(target) {
-                        return Some(blocked);
-                    }
+                if let Some(target) = redirection_target(candidate)
+                    && let Some(blocked) = forbidden_candidate(target)
+                {
+                    return Some(blocked);
                 }
 
                 // Handle option assignment forms like `--file=/etc/passwd`.
                 if candidate.starts_with('-') {
-                    if let Some((_, value)) = candidate.split_once('=') {
-                        if let Some(blocked) = forbidden_candidate(value) {
-                            return Some(blocked);
-                        }
+                    if let Some((_, value)) = candidate.split_once('=')
+                        && let Some(blocked) = forbidden_candidate(value)
+                    {
+                        return Some(blocked);
                     }
-                    if let Some(value) = attached_short_option_value(candidate) {
-                        if let Some(blocked) = forbidden_candidate(value) {
-                            return Some(blocked);
-                        }
+                    if let Some(value) = attached_short_option_value(candidate)
+                        && let Some(blocked) = forbidden_candidate(value)
+                    {
+                        return Some(blocked);
                     }
                     continue;
                 }

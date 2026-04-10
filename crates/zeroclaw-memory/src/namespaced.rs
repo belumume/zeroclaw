@@ -92,10 +92,10 @@ impl Memory for NamespacedMemory {
 
     async fn forget(&self, key: &str) -> anyhow::Result<bool> {
         // First verify the entry is in our namespace before forgetting
-        if let Some(entry) = self.inner.get(key).await? {
-            if entry.namespace == self.namespace {
-                return self.inner.forget(key).await;
-            }
+        if let Some(entry) = self.inner.get(key).await?
+            && entry.namespace == self.namespace
+        {
+            return self.inner.forget(key).await;
         }
         Ok(false)
     }

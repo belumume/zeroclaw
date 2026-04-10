@@ -886,25 +886,23 @@ pub async fn run_tool_call_loop(
         }
 
         // Check if model switch was requested via model_switch tool
-        if let Some(ref callback) = model_switch_callback {
-            if let Ok(guard) = callback.lock() {
-                if let Some((new_provider, new_model)) = guard.as_ref() {
-                    if new_provider != provider_name || new_model != model {
-                        tracing::info!(
-                            "Model switch detected: {} {} -> {} {}",
-                            provider_name,
-                            model,
-                            new_provider,
-                            new_model
-                        );
-                        return Err(ModelSwitchRequested {
-                            provider: new_provider.clone(),
-                            model: new_model.clone(),
-                        }
-                        .into());
-                    }
-                }
+        if let Some(ref callback) = model_switch_callback
+            && let Ok(guard) = callback.lock()
+            && let Some((new_provider, new_model)) = guard.as_ref()
+            && (new_provider != provider_name || new_model != model)
+        {
+            tracing::info!(
+                "Model switch detected: {} {} -> {} {}",
+                provider_name,
+                model,
+                new_provider,
+                new_model
+            );
+            return Err(ModelSwitchRequested {
+                provider: new_provider.clone(),
+                model: new_model.clone(),
             }
+            .into());
         }
 
         // Rebuild tool_specs each iteration so newly activated deferred tools appear.
@@ -1419,14 +1417,14 @@ pub async fn run_tool_call_loop(
         // Native tool-call providers can return assistant text separately from
         // the structured call payload; relay it to draft-capable channels.
         if !display_text.is_empty() {
-            if !native_tool_calls.is_empty() {
-                if let Some(ref tx) = on_delta {
-                    let mut narration = display_text.clone();
-                    if !narration.ends_with('\n') {
-                        narration.push('\n');
-                    }
-                    let _ = tx.send(DraftEvent::Content(narration)).await;
+            if !native_tool_calls.is_empty()
+                && let Some(ref tx) = on_delta
+            {
+                let mut narration = display_text.clone();
+                if !narration.ends_with('\n') {
+                    narration.push('\n');
                 }
+                let _ = tx.send(DraftEvent::Content(narration)).await;
             }
             if !silent {
                 print!("{display_text}");
@@ -1509,60 +1507,60 @@ pub async fn run_tool_call_loop(
             );
 
             // ── Approval hook ────────────────────────────────
-            if let Some(mgr) = approval {
-                if mgr.needs_approval(&tool_name) {
-                    let request = ApprovalRequest {
-                        tool_name: tool_name.clone(),
-                        arguments: tool_args.clone(),
-                    };
+            if let Some(mgr) = approval
+                && mgr.needs_approval(&tool_name)
+            {
+                let request = ApprovalRequest {
+                    tool_name: tool_name.clone(),
+                    arguments: tool_args.clone(),
+                };
 
-                    // Interactive CLI: prompt the operator.
-                    // Non-interactive (channels): auto-deny since no operator
-                    // is present to approve.
-                    let decision = if mgr.is_non_interactive() {
-                        ApprovalResponse::No
-                    } else {
-                        mgr.prompt_cli(&request)
-                    };
+                // Interactive CLI: prompt the operator.
+                // Non-interactive (channels): auto-deny since no operator
+                // is present to approve.
+                let decision = if mgr.is_non_interactive() {
+                    ApprovalResponse::No
+                } else {
+                    mgr.prompt_cli(&request)
+                };
 
-                    mgr.record_decision(&tool_name, &tool_args, decision, channel_name);
+                mgr.record_decision(&tool_name, &tool_args, decision, channel_name);
 
-                    if decision == ApprovalResponse::No {
-                        let denied = "Denied by user.".to_string();
-                        runtime_trace::record_event(
-                            "tool_call_result",
-                            Some(channel_name),
-                            Some(provider_name),
-                            Some(model),
-                            Some(&turn_id),
-                            Some(false),
-                            Some(&denied),
-                            serde_json::json!({
-                                "iteration": iteration + 1,
-                                "tool": tool_name.clone(),
-                                "arguments": scrub_credentials(&tool_args.to_string()),
-                            }),
-                        );
-                        if let Some(ref tx) = on_delta {
-                            let _ = tx
-                                .send(DraftEvent::Progress(format!(
-                                    "\u{274c} {}: {}\n",
-                                    tool_name, denied
-                                )))
-                                .await;
-                        }
-                        ordered_results[idx] = Some((
-                            tool_name.clone(),
-                            call.tool_call_id.clone(),
-                            ToolExecutionOutcome {
-                                output: denied.clone(),
-                                success: false,
-                                error_reason: Some(denied),
-                                duration: Duration::ZERO,
-                            },
-                        ));
-                        continue;
+                if decision == ApprovalResponse::No {
+                    let denied = "Denied by user.".to_string();
+                    runtime_trace::record_event(
+                        "tool_call_result",
+                        Some(channel_name),
+                        Some(provider_name),
+                        Some(model),
+                        Some(&turn_id),
+                        Some(false),
+                        Some(&denied),
+                        serde_json::json!({
+                            "iteration": iteration + 1,
+                            "tool": tool_name.clone(),
+                            "arguments": scrub_credentials(&tool_args.to_string()),
+                        }),
+                    );
+                    if let Some(ref tx) = on_delta {
+                        let _ = tx
+                            .send(DraftEvent::Progress(format!(
+                                "\u{274c} {}: {}\n",
+                                tool_name, denied
+                            )))
+                            .await;
                     }
+                    ordered_results[idx] = Some((
+                        tool_name.clone(),
+                        call.tool_call_id.clone(),
+                        ToolExecutionOutcome {
+                            output: denied.clone(),
+                            success: false,
+                            error_reason: Some(denied),
+                            duration: Duration::ZERO,
+                        },
+                    ));
+                    continue;
                 }
             }
 
@@ -2683,10 +2681,10 @@ pub async fn run(
             if let Some(ref prefix) = thinking_params.system_prompt_prefix {
                 turn_system_prompt = format!("{prefix}\n\n{system_prompt}");
                 // Update the system message in history for this turn.
-                if let Some(sys_msg) = history.first_mut() {
-                    if sys_msg.role == "system" {
-                        sys_msg.content = turn_system_prompt.clone();
-                    }
+                if let Some(sys_msg) = history.first_mut()
+                    && sys_msg.role == "system"
+                {
+                    sys_msg.content = turn_system_prompt.clone();
                 }
             }
 
@@ -2944,12 +2942,11 @@ pub async fn run(
             trim_history(&mut history, config.agent.max_history_messages);
 
             // Restore base system prompt (remove per-turn thinking prefix).
-            if thinking_params.system_prompt_prefix.is_some() {
-                if let Some(sys_msg) = history.first_mut() {
-                    if sys_msg.role == "system" {
-                        sys_msg.content.clone_from(&base_system_prompt);
-                    }
-                }
+            if thinking_params.system_prompt_prefix.is_some()
+                && let Some(sys_msg) = history.first_mut()
+                && sys_msg.role == "system"
+            {
+                sys_msg.content.clone_from(&base_system_prompt);
             }
 
             if let Some(path) = session_state_file.as_deref() {

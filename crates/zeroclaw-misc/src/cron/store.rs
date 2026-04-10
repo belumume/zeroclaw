@@ -781,11 +781,7 @@ fn validate_decl(decl: &zeroclaw_config::schema::CronJobDecl) -> Result<()> {
 
     match decl.job_type.to_lowercase().as_str() {
         "shell" => {
-            if decl
-                .command
-                .as_deref()
-                .map_or(true, |c| c.trim().is_empty())
-            {
+            if decl.command.as_deref().is_none_or(|c| c.trim().is_empty()) {
                 anyhow::bail!(
                     "Declarative cron job '{}': shell job requires a non-empty 'command'",
                     decl.id
@@ -793,7 +789,7 @@ fn validate_decl(decl: &zeroclaw_config::schema::CronJobDecl) -> Result<()> {
             }
         }
         "agent" => {
-            if decl.prompt.as_deref().map_or(true, |p| p.trim().is_empty()) {
+            if decl.prompt.as_deref().is_none_or(|p| p.trim().is_empty()) {
                 anyhow::bail!(
                     "Declarative cron job '{}': agent job requires a non-empty 'prompt'",
                     decl.id

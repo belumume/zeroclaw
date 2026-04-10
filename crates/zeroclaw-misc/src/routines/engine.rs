@@ -149,23 +149,23 @@ impl RoutinesEngine {
             }
 
             // Check cooldown
-            if routine.cooldown_secs > 0 {
-                if let Some(last_fired) = self.cooldowns.get(&routine.name) {
-                    let elapsed = now.saturating_duration_since(*last_fired);
-                    let cooldown = Duration::from_secs(routine.cooldown_secs);
-                    if elapsed < cooldown {
-                        let remaining = cooldown.saturating_sub(elapsed).as_secs();
-                        debug!(
-                            routine = %routine.name,
-                            remaining_secs = remaining,
-                            "routine in cooldown"
-                        );
-                        results.push(RoutineDispatchResult::Cooldown {
-                            routine_name: routine.name.clone(),
-                            remaining_secs: remaining,
-                        });
-                        continue;
-                    }
+            if routine.cooldown_secs > 0
+                && let Some(last_fired) = self.cooldowns.get(&routine.name)
+            {
+                let elapsed = now.saturating_duration_since(*last_fired);
+                let cooldown = Duration::from_secs(routine.cooldown_secs);
+                if elapsed < cooldown {
+                    let remaining = cooldown.saturating_sub(elapsed).as_secs();
+                    debug!(
+                        routine = %routine.name,
+                        remaining_secs = remaining,
+                        "routine in cooldown"
+                    );
+                    results.push(RoutineDispatchResult::Cooldown {
+                        routine_name: routine.name.clone(),
+                        remaining_secs: remaining,
+                    });
+                    continue;
                 }
             }
 

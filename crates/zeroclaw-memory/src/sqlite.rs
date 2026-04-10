@@ -727,16 +727,14 @@ impl Memory for SqliteMemory {
 
                 for scored in &merged {
                     if let Some((key, content, cat, ts, sid, ns, imp, sup)) = entry_map.remove(&scored.id) {
-                        if let Some(s) = since_ref {
-                            if ts.as_str() < s {
+                        if let Some(s) = since_ref
+                            && ts.as_str() < s {
                                 continue;
                             }
-                        }
-                        if let Some(u) = until_ref {
-                            if ts.as_str() > u {
+                        if let Some(u) = until_ref
+                            && ts.as_str() > u {
                                 continue;
                             }
-                        }
                         let entry = MemoryEntry {
                             id: scored.id.clone(),
                             key,
@@ -749,11 +747,10 @@ impl Memory for SqliteMemory {
                             importance: imp,
                             superseded_by: sup,
                         };
-                        if let Some(filter_sid) = session_ref {
-                            if entry.session_id.as_deref() != Some(filter_sid) {
+                        if let Some(filter_sid) = session_ref
+                            && entry.session_id.as_deref() != Some(filter_sid) {
                                 continue;
                             }
-                        }
                         results.push(entry);
                     }
                 }
@@ -824,11 +821,10 @@ impl Memory for SqliteMemory {
                     })?;
                     for row in rows {
                         let entry = row?;
-                        if let Some(sid) = session_ref {
-                            if entry.session_id.as_deref() != Some(sid) {
+                        if let Some(sid) = session_ref
+                            && entry.session_id.as_deref() != Some(sid) {
                                 continue;
                             }
-                        }
                         results.push(entry);
                     }
                 }
@@ -913,11 +909,10 @@ impl Memory for SqliteMemory {
                 let rows = stmt.query_map(params![cat_str, DEFAULT_LIST_LIMIT], row_mapper)?;
                 for row in rows {
                     let entry = row?;
-                    if let Some(sid) = session_ref {
-                        if entry.session_id.as_deref() != Some(sid) {
+                    if let Some(sid) = session_ref
+                        && entry.session_id.as_deref() != Some(sid) {
                             continue;
                         }
-                    }
                     results.push(entry);
                 }
             } else {
@@ -928,11 +923,10 @@ impl Memory for SqliteMemory {
                 let rows = stmt.query_map(params![DEFAULT_LIST_LIMIT], row_mapper)?;
                 for row in rows {
                     let entry = row?;
-                    if let Some(sid) = session_ref {
-                        if entry.session_id.as_deref() != Some(sid) {
+                    if let Some(sid) = session_ref
+                        && entry.session_id.as_deref() != Some(sid) {
                             continue;
                         }
-                    }
                     results.push(entry);
                 }
             }
@@ -965,7 +959,7 @@ impl Memory for SqliteMemory {
                 params![namespace],
             )?;
             #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            Ok(affected as usize)
+            Ok(affected)
         })
         .await?
     }
@@ -981,7 +975,7 @@ impl Memory for SqliteMemory {
                 params![session_id],
             )?;
             #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
-            Ok(affected as usize)
+            Ok(affected)
         })
         .await?
     }

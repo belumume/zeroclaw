@@ -65,14 +65,12 @@ pub fn truncate_tool_message(msg_content: &str, max_chars: usize) -> String {
     }
     if let Ok(mut obj) =
         serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(msg_content)
+        && obj.contains_key("tool_call_id")
+        && let Some(serde_json::Value::String(inner)) = obj.get("content")
     {
-        if obj.contains_key("tool_call_id") {
-            if let Some(serde_json::Value::String(inner)) = obj.get("content") {
-                let truncated = truncate_tool_result(inner, max_chars);
-                obj.insert("content".to_string(), serde_json::Value::String(truncated));
-                return serde_json::to_string(&obj).unwrap_or_else(|_| msg_content.to_string());
-            }
-        }
+        let truncated = truncate_tool_result(inner, max_chars);
+        obj.insert("content".to_string(), serde_json::Value::String(truncated));
+        return serde_json::to_string(&obj).unwrap_or_else(|_| msg_content.to_string());
     }
     truncate_tool_result(msg_content, max_chars)
 }
@@ -133,7 +131,7 @@ pub fn estimate_history_tokens(history: &[ChatMessage]) -> usize {
 /// Preserves the system prompt (first message if role=system) and the most recent messages.
 pub fn trim_history(history: &mut Vec<ChatMessage>, max_history: usize) {
     // Nothing to trim if within limit
-    let has_system = history.first().map_or(false, |m| m.role == "system");
+    let has_system = history.first().is_some_and(|m| m.role == "system");
     let non_system_count = if has_system {
         history.len() - 1
     } else {

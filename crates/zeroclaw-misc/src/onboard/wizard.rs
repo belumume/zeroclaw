@@ -752,15 +752,12 @@ async fn run_quick_setup_with_home(
         style("Config saved:").white().bold(),
         style(config_path.display()).green()
     );
-    if cfg!(target_os = "macos") {
-        if let Ok(exe) = std::env::current_exe() {
-            if let Some(note) =
-                quick_setup_homebrew_service_note(&config_path, &workspace_dir, &exe)
-            {
-                println!();
-                println!("  {}", style(note).yellow());
-            }
-        }
+    if cfg!(target_os = "macos")
+        && let Ok(exe) = std::env::current_exe()
+        && let Some(note) = quick_setup_homebrew_service_note(&config_path, &workspace_dir, &exe)
+    {
+        println!();
+        println!("  {}", style(note).yellow());
     }
     println!();
     println!("  {}", style("Next steps:").white().bold());
@@ -1648,30 +1645,27 @@ fn resolve_live_models_endpoint(
     if matches!(
         canonical_provider_name(provider_name),
         "llamacpp" | "sglang" | "vllm" | "osaurus"
-    ) {
-        if let Some(url) = provider_api_url
-            .map(str::trim)
-            .filter(|url| !url.is_empty())
-        {
-            let normalized = url.trim_end_matches('/');
-            if normalized.ends_with("/models") {
-                return Some(normalized.to_string());
-            }
-            return Some(format!("{normalized}/models"));
+    ) && let Some(url) = provider_api_url
+        .map(str::trim)
+        .filter(|url| !url.is_empty())
+    {
+        let normalized = url.trim_end_matches('/');
+        if normalized.ends_with("/models") {
+            return Some(normalized.to_string());
         }
+        return Some(format!("{normalized}/models"));
     }
 
-    if canonical_provider_name(provider_name) == "openai-codex" {
-        if let Some(url) = provider_api_url
+    if canonical_provider_name(provider_name) == "openai-codex"
+        && let Some(url) = provider_api_url
             .map(str::trim)
             .filter(|url| !url.is_empty())
-        {
-            let normalized = url.trim_end_matches('/');
-            if normalized.ends_with("/models") {
-                return Some(normalized.to_string());
-            }
-            return Some(format!("{normalized}/models"));
+    {
+        let normalized = url.trim_end_matches('/');
+        if normalized.ends_with("/models") {
+            return Some(normalized.to_string());
         }
+        return Some(format!("{normalized}/models"));
     }
 
     models_endpoint_for_provider(provider_name).map(str::to_string)
@@ -1947,27 +1941,26 @@ pub async fn run_models_refresh(
         anyhow::bail!("Provider '{provider_name}' does not support live model discovery yet");
     }
 
-    if !force {
-        if let Some(cached) = load_cached_models_for_provider(
+    if !force
+        && let Some(cached) = load_cached_models_for_provider(
             &config.workspace_dir,
             &provider_name,
             MODEL_CACHE_TTL_SECS,
         )
         .await?
-        {
-            println!(
-                "Using cached model list for '{}' (updated {} ago):",
-                provider_name,
-                humanize_age(cached.age_secs)
-            );
-            print_model_preview(&cached.models);
-            println!();
-            println!(
-                "Tip: run `zeroclaw models refresh --force --provider {}` to fetch latest now.",
-                provider_name
-            );
-            return Ok(());
-        }
+    {
+        println!(
+            "Using cached model list for '{}' (updated {} ago):",
+            provider_name,
+            humanize_age(cached.age_secs)
+        );
+        print_model_preview(&cached.models);
+        println!();
+        println!(
+            "Tip: run `zeroclaw models refresh --force --provider {}` to fetch latest now.",
+            provider_name
+        );
+        return Ok(());
     }
 
     let api_key = config.api_key.clone().unwrap_or_default();
@@ -2963,25 +2956,24 @@ async fn setup_provider(workspace_dir: &Path) -> Result<(String, String, String,
                             style(error.to_string()).yellow()
                         ));
 
-                        if live_options.is_none() {
-                            if let Some(stale) =
+                        if live_options.is_none()
+                            && let Some(stale) =
                                 load_any_cached_models_for_provider(workspace_dir, provider_name)
                                     .await?
-                            {
-                                print_bullet(&format!(
-                                    "Loaded stale cache from {} ago.",
-                                    humanize_age(stale.age_secs)
-                                ));
+                        {
+                            print_bullet(&format!(
+                                "Loaded stale cache from {} ago.",
+                                humanize_age(stale.age_secs)
+                            ));
 
-                                live_options = Some(build_model_options(
-                                    stale
-                                        .models
-                                        .into_iter()
-                                        .take(LIVE_MODEL_MAX_OPTIONS)
-                                        .collect(),
-                                    "stale-cache",
-                                ));
-                            }
+                            live_options = Some(build_model_options(
+                                stale
+                                    .models
+                                    .into_iter()
+                                    .take(LIVE_MODEL_MAX_OPTIONS)
+                                    .collect(),
+                                "stale-cache",
+                            ));
                         }
                     }
                 }

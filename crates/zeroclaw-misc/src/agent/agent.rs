@@ -90,6 +90,12 @@ pub struct AgentBuilder {
     hook_runner: Option<Arc<crate::hooks::HookRunner>>,
 }
 
+impl Default for AgentBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AgentBuilder {
     pub fn new() -> Self {
         Self {
@@ -351,11 +357,11 @@ impl Agent {
     /// non-system messages from the seed. System messages in the seed are skipped
     /// to avoid duplicating the system prompt.
     pub fn seed_history(&mut self, messages: &[ChatMessage]) {
-        if self.history.is_empty() {
-            if let Ok(sys) = self.build_system_prompt() {
-                self.history
-                    .push(ConversationMessage::Chat(ChatMessage::system(sys)));
-            }
+        if self.history.is_empty()
+            && let Ok(sys) = self.build_system_prompt()
+        {
+            self.history
+                .push(ConversationMessage::Chat(ChatMessage::system(sys)));
         }
         for msg in messages {
             if msg.role != "system" {
@@ -765,39 +771,38 @@ impl Agent {
     fn classify_model(&self, user_message: &str) -> String {
         if let Some(decision) =
             super::classifier::classify_with_decision(&self.classification_config, user_message)
+            && self.available_hints.contains(&decision.hint)
         {
-            if self.available_hints.contains(&decision.hint) {
-                let resolved_model = self
-                    .route_model_by_hint
-                    .get(&decision.hint)
-                    .map(String::as_str)
-                    .unwrap_or("unknown");
-                tracing::info!(
-                    target: "query_classification",
-                    hint = decision.hint.as_str(),
-                    model = resolved_model,
-                    rule_priority = decision.priority,
-                    message_length = user_message.len(),
-                    "Classified message route"
-                );
-                return format!("hint:{}", decision.hint);
-            }
+            let resolved_model = self
+                .route_model_by_hint
+                .get(&decision.hint)
+                .map(String::as_str)
+                .unwrap_or("unknown");
+            tracing::info!(
+                target: "query_classification",
+                hint = decision.hint.as_str(),
+                model = resolved_model,
+                rule_priority = decision.priority,
+                message_length = user_message.len(),
+                "Classified message route"
+            );
+            return format!("hint:{}", decision.hint);
         }
 
         // Fallback: auto-classify by complexity when no rule matched.
         if let Some(ref ac) = self.config.auto_classify {
             let tier = super::eval::estimate_complexity(user_message);
-            if let Some(hint) = ac.hint_for(tier) {
-                if self.available_hints.contains(&hint.to_string()) {
-                    tracing::info!(
-                        target: "query_classification",
-                        hint = hint,
-                        complexity = ?tier,
-                        message_length = user_message.len(),
-                        "Auto-classified by complexity"
-                    );
-                    return format!("hint:{hint}");
-                }
+            if let Some(hint) = ac.hint_for(tier)
+                && self.available_hints.contains(&hint.to_string())
+            {
+                tracing::info!(
+                    target: "query_classification",
+                    hint = hint,
+                    complexity = ?tier,
+                    message_length = user_message.len(),
+                    "Auto-classified by complexity"
+                );
+                return format!("hint:{hint}");
             }
         }
 
@@ -1099,12 +1104,12 @@ impl Agent {
                 match item {
                     Ok(event) => match event {
                         zeroclaw_providers::traits::StreamEvent::TextDelta(chunk) => {
-                            if let Some(reasoning) = chunk.reasoning {
-                                if !reasoning.is_empty() {
-                                    let _ = event_tx
-                                        .send(TurnEvent::Thinking { delta: reasoning })
-                                        .await;
-                                }
+                            if let Some(reasoning) = chunk.reasoning
+                                && !reasoning.is_empty()
+                            {
+                                let _ = event_tx
+                                    .send(TurnEvent::Thinking { delta: reasoning })
+                                    .await;
                             }
                             if !chunk.delta.is_empty() {
                                 got_stream = true;

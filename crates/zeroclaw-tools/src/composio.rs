@@ -221,17 +221,17 @@ impl ComposioTool {
 
         let mut slug_candidates = self.build_v3_slug_candidates(action_name);
         let mut prime_error = None;
-        if slug_candidates.is_empty() {
-            if let Some(app) = app_hint.as_deref() {
-                match self.list_actions(Some(app)).await {
-                    Ok(_) => {
-                        slug_candidates = self.build_v3_slug_candidates(action_name);
-                    }
-                    Err(err) => {
-                        prime_error = Some(format!(
-                            "Failed to refresh action list for app '{app}': {err}"
-                        ));
-                    }
+        if slug_candidates.is_empty()
+            && let Some(app) = app_hint.as_deref()
+        {
+            match self.list_actions(Some(app)).await {
+                Ok(_) => {
+                    slug_candidates = self.build_v3_slug_candidates(action_name);
+                }
+                Err(err) => {
+                    prime_error = Some(format!(
+                        "Failed to refresh action list for app '{app}': {err}"
+                    ));
                 }
             }
         }

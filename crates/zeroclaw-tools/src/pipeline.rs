@@ -327,22 +327,22 @@ fn interpolate_string(s: &str, prior_results: &[StepResult]) -> String {
     let mut chars = s.char_indices().peekable();
 
     while let Some((i, c)) = chars.next() {
-        if c == '{' {
-            if let Some(&(_, '{')) = chars.peek() {
-                // Found `{{` — try to match `{{step[N].result}}`
-                let rest = &s[i..];
-                if let Some(end) = find_template_end(rest) {
-                    let template = &rest[2..end]; // strip {{ and }}
-                    if let Some(value) = resolve_template(template, prior_results) {
-                        // Strip any `{{` in the resolved value to prevent injection.
-                        result.push_str(&value.replace("{{", ""));
-                        // Skip past the closing `}}`
-                        let skip_to = i + end + 2;
-                        while chars.peek().is_some_and(|&(idx, _)| idx < skip_to) {
-                            chars.next();
-                        }
-                        continue;
+        if c == '{'
+            && let Some(&(_, '{')) = chars.peek()
+        {
+            // Found `{{` — try to match `{{step[N].result}}`
+            let rest = &s[i..];
+            if let Some(end) = find_template_end(rest) {
+                let template = &rest[2..end]; // strip {{ and }}
+                if let Some(value) = resolve_template(template, prior_results) {
+                    // Strip any `{{` in the resolved value to prevent injection.
+                    result.push_str(&value.replace("{{", ""));
+                    // Skip past the closing `}}`
+                    let skip_to = i + end + 2;
+                    while chars.peek().is_some_and(|&(idx, _)| idx < skip_to) {
+                        chars.next();
                     }
+                    continue;
                 }
             }
         }

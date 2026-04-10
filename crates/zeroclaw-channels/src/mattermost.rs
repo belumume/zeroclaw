@@ -135,7 +135,7 @@ impl MattermostChannel {
 
         if let Some(duration_ms) = audio_file.get("duration").and_then(|d| d.as_u64()) {
             let duration_secs = duration_ms / 1000;
-            if duration_secs > config.max_duration_secs as u64 {
+            if duration_secs > config.max_duration_secs {
                 tracing::debug!(
                     duration_secs,
                     max = config.max_duration_secs,
@@ -173,13 +173,11 @@ impl MattermostChannel {
             return None;
         }
 
-        if let Some(content_length) = response.content_length() {
-            if content_length > MAX_MATTERMOST_AUDIO_BYTES {
-                tracing::warn!(
-                    "Mattermost: audio file too large ({content_length} bytes): {file_id}"
-                );
-                return None;
-            }
+        if let Some(content_length) = response.content_length()
+            && content_length > MAX_MATTERMOST_AUDIO_BYTES
+        {
+            tracing::warn!("Mattermost: audio file too large ({content_length} bytes): {file_id}");
+            return None;
         }
 
         let bytes = match response.bytes().await {
@@ -332,10 +330,9 @@ impl Channel for MattermostChannel {
                         last_create_at_before_this_batch,
                         &channel_id,
                         effective_text.as_deref(),
-                    ) {
-                        if tx.send(channel_msg).await.is_err() {
-                            return Ok(());
-                        }
+                    ) && tx.send(channel_msg).await.is_err()
+                    {
+                        return Ok(());
                     }
                 }
             }
@@ -382,10 +379,9 @@ impl Channel for MattermostChannel {
                     .json(&body)
                     .send()
                     .await
+                    && !r.status().is_success()
                 {
-                    if !r.status().is_success() {
-                        tracing::debug!(status = %r.status(), "Mattermost typing indicator failed");
-                    }
+                    tracing::debug!(status = %r.status(), "Mattermost typing indicator failed");
                 }
 
                 // Mattermost typing events expire after ~6s; re-fire every 4s.
@@ -513,16 +509,14 @@ fn contains_bot_mention_mm(
     }
 
     // 2. Metadata-based: Mattermost may include a "metadata.mentions" array of user IDs.
-    if !bot_user_id.is_empty() {
-        if let Some(mentions) = post
+    if !bot_user_id.is_empty()
+        && let Some(mentions) = post
             .get("metadata")
             .and_then(|m| m.get("mentions"))
             .and_then(|m| m.as_array())
-        {
-            if mentions.iter().any(|m| m.as_str() == Some(bot_user_id)) {
-                return true;
-            }
-        }
+        && mentions.iter().any(|m| m.as_str() == Some(bot_user_id))
+    {
+        return true;
     }
 
     false

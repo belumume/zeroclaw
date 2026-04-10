@@ -224,10 +224,10 @@ pub fn load_skills_from_directory(skills_dir: &Path, allow_scripts: bool) -> Vec
             if let Ok(skill) = load_skill_toml(&manifest_path) {
                 skills.push(skill);
             }
-        } else if md_path.exists() {
-            if let Ok(skill) = load_skill_md(&md_path, &path) {
-                skills.push(skill);
-            }
+        } else if md_path.exists()
+            && let Ok(skill) = load_skill_md(&md_path, &path)
+        {
+            skills.push(skill);
         }
     }
 
@@ -287,10 +287,10 @@ fn load_open_skills_from_directory(skills_dir: &Path, allow_scripts: bool) -> Ve
             if let Ok(skill) = load_skill_toml(&manifest_path) {
                 skills.push(finalize_open_skill(skill));
             }
-        } else if md_path.exists() {
-            if let Ok(skill) = load_open_skill_md(&md_path) {
-                skills.push(skill);
-            }
+        } else if md_path.exists()
+            && let Ok(skill) = load_open_skill_md(&md_path)
+        {
+            skills.push(skill);
         }
     }
 
@@ -458,14 +458,14 @@ fn ensure_open_skills_repo(
 }
 
 fn clone_open_skills_repo(repo_dir: &Path) -> bool {
-    if let Some(parent) = repo_dir.parent() {
-        if let Err(err) = std::fs::create_dir_all(parent) {
-            tracing::warn!(
-                "failed to create open-skills parent directory {}: {err}",
-                parent.display()
-            );
-            return false;
-        }
+    if let Some(parent) = repo_dir.parent()
+        && let Err(err) = std::fs::create_dir_all(parent)
+    {
+        tracing::warn!(
+            "failed to create open-skills parent directory {}: {err}",
+            parent.display()
+        );
+        return false;
     }
 
     let output = Command::new("git")
@@ -745,10 +745,8 @@ fn resolve_skill_location(skill: &Skill, workspace_dir: &Path) -> PathBuf {
 
 fn render_skill_location(skill: &Skill, workspace_dir: &Path, prefer_relative: bool) -> String {
     let location = resolve_skill_location(skill, workspace_dir);
-    if prefer_relative {
-        if let Ok(relative) = location.strip_prefix(workspace_dir) {
-            return relative.display().to_string();
-        }
+    if prefer_relative && let Ok(relative) = location.strip_prefix(workspace_dir) {
+        return relative.display().to_string();
     }
     location.display().to_string()
 }

@@ -80,10 +80,9 @@ fn extract_ws_token<'a>(headers: &'a HeaderMap, query_token: Option<&'a str>) ->
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .and_then(|auth| auth.strip_prefix("Bearer "))
+        && !t.is_empty()
     {
-        if !t.is_empty() {
-            return Some(t);
-        }
+        return Some(t);
     }
 
     // 2. Sec-WebSocket-Protocol: bearer.<token>
@@ -96,17 +95,16 @@ fn extract_ws_token<'a>(headers: &'a HeaderMap, query_token: Option<&'a str>) ->
                 .map(|p| p.trim())
                 .find_map(|p| p.strip_prefix(BEARER_SUBPROTO_PREFIX))
         })
+        && !t.is_empty()
     {
-        if !t.is_empty() {
-            return Some(t);
-        }
+        return Some(t);
     }
 
     // 3. ?token= query parameter
-    if let Some(t) = query_token {
-        if !t.is_empty() {
-            return Some(t);
-        }
+    if let Some(t) = query_token
+        && !t.is_empty()
+    {
+        return Some(t);
     }
 
     None
@@ -135,9 +133,8 @@ pub async fn handle_ws_chat(
     let ws = if headers
         .get("sec-websocket-protocol")
         .and_then(|v| v.to_str().ok())
-        .map_or(false, |protos| {
-            protos.split(',').any(|p| p.trim() == WS_PROTOCOL)
-        }) {
+        .is_some_and(|protos| protos.split(',').any(|p| p.trim() == WS_PROTOCOL))
+    {
         ws.protocols([WS_PROTOCOL])
     } else {
         ws
@@ -201,11 +198,11 @@ async fn handle_socket(
             resumed = true;
         }
         // Set session name if provided (non-empty) on connect
-        if let Some(ref name) = session_name {
-            if !name.is_empty() {
-                let _ = backend.set_session_name(&session_key, name);
-                effective_name = Some(name.clone());
-            }
+        if let Some(ref name) = session_name
+            && !name.is_empty()
+        {
+            let _ = backend.set_session_name(&session_key, name);
+            effective_name = Some(name.clone());
         }
         // If no name was provided via query param, load the stored name
         if effective_name.is_none() {

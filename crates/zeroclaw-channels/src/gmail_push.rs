@@ -511,11 +511,11 @@ impl Channel for GmailPushChannel {
         info!("Gmail push channel started — registering watch subscription");
 
         // Register initial watch
-        if !self.config.webhook_url.is_empty() {
-            if let Err(e) = self.register_watch().await {
-                error!("Gmail watch registration failed: {e:#}");
-                // Non-fatal — external subscription management may be in use
-            }
+        if !self.config.webhook_url.is_empty()
+            && let Err(e) = self.register_watch().await
+        {
+            error!("Gmail watch registration failed: {e:#}");
+            // Non-fatal — external subscription management may be in use
         }
 
         // Renewal loop: Gmail watch subscriptions expire after 7 days.
@@ -577,10 +577,10 @@ pub fn extract_email_from_header(from: &str) -> String {
     if let Some(start) = from.find('<') {
         // Use rfind to find the matching '>' after '<', preventing panic
         // when malformed headers have '>' before '<'.
-        if let Some(end) = from.rfind('>') {
-            if end > start + 1 {
-                return from[start + 1..end].to_string();
-            }
+        if let Some(end) = from.rfind('>')
+            && end > start + 1
+        {
+            return from[start + 1..end].to_string();
         }
     }
     from.trim().to_string()
@@ -599,10 +599,10 @@ pub fn sanitize_header_value(value: &str) -> String {
 pub fn extract_body_text(msg: &GmailMessage) -> String {
     if let Some(ref payload) = msg.payload {
         // Single-part message
-        if payload.mime_type == "text/plain" {
-            if let Some(text) = decode_body(payload.body.as_ref()) {
-                return text;
-            }
+        if payload.mime_type == "text/plain"
+            && let Some(text) = decode_body(payload.body.as_ref())
+        {
+            return text;
         }
 
         // Multipart — walk parts
@@ -621,10 +621,10 @@ pub fn extract_body_text(msg: &GmailMessage) -> String {
 /// Recursively search MIME parts for a given content type.
 fn find_text_in_parts(parts: &[MessagePart], mime_type: &str) -> Option<String> {
     for part in parts {
-        if part.mime_type == mime_type {
-            if let Some(text) = decode_body(part.body.as_ref()) {
-                return Some(text);
-            }
+        if part.mime_type == mime_type
+            && let Some(text) = decode_body(part.body.as_ref())
+        {
+            return Some(text);
         }
         // Recurse into nested parts
         if let Some(text) = find_text_in_parts(&part.parts, mime_type) {

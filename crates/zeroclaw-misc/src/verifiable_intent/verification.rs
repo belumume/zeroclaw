@@ -295,38 +295,38 @@ fn check_payment_amount(
             ),
         );
     };
-    if let Some(actual_currency) = &fulfillment.currency {
-        if actual_currency != currency {
-            return ConstraintCheckResult::violation(
-                ct,
-                ViError::new(
-                    ViErrorKind::CurrencyMismatch,
-                    format!("expected {currency}, got {actual_currency}"),
-                ),
-            );
-        }
+    if let Some(actual_currency) = &fulfillment.currency
+        && actual_currency != currency
+    {
+        return ConstraintCheckResult::violation(
+            ct,
+            ViError::new(
+                ViErrorKind::CurrencyMismatch,
+                format!("expected {currency}, got {actual_currency}"),
+            ),
+        );
     }
-    if let Some(max_val) = max {
-        if actual_amount > max_val {
-            return ConstraintCheckResult::violation(
-                ct,
-                ViError::new(
-                    ViErrorKind::AmountOutOfRange,
-                    format!("amount {actual_amount} > max {max_val} {currency}"),
-                ),
-            );
-        }
+    if let Some(max_val) = max
+        && actual_amount > max_val
+    {
+        return ConstraintCheckResult::violation(
+            ct,
+            ViError::new(
+                ViErrorKind::AmountOutOfRange,
+                format!("amount {actual_amount} > max {max_val} {currency}"),
+            ),
+        );
     }
-    if let Some(min_val) = min {
-        if actual_amount < min_val {
-            return ConstraintCheckResult::violation(
-                ct,
-                ViError::new(
-                    ViErrorKind::AmountOutOfRange,
-                    format!("amount {actual_amount} < min {min_val} {currency}"),
-                ),
-            );
-        }
+    if let Some(min_val) = min
+        && actual_amount < min_val
+    {
+        return ConstraintCheckResult::violation(
+            ct,
+            ViError::new(
+                ViErrorKind::AmountOutOfRange,
+                format!("amount {actual_amount} < min {min_val} {currency}"),
+            ),
+        );
     }
     ConstraintCheckResult::ok(ct)
 }
@@ -346,16 +346,16 @@ fn check_payment_budget(
             ),
         );
     };
-    if let Some(actual_currency) = &fulfillment.currency {
-        if actual_currency != currency {
-            return ConstraintCheckResult::violation(
-                ct,
-                ViError::new(
-                    ViErrorKind::CurrencyMismatch,
-                    format!("expected {currency}, got {actual_currency}"),
-                ),
-            );
-        }
+    if let Some(actual_currency) = &fulfillment.currency
+        && actual_currency != currency
+    {
+        return ConstraintCheckResult::violation(
+            ct,
+            ViError::new(
+                ViErrorKind::CurrencyMismatch,
+                format!("expected {currency}, got {actual_currency}"),
+            ),
+        );
     }
     // Single-transaction check: amount must not exceed budget.
     // Cumulative tracking is the payment network's responsibility.

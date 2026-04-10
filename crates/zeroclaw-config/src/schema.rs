@@ -4784,29 +4784,29 @@ fn resolve_ws_proxy_url(
     }
 
     // Check the no_proxy list against the WebSocket target host.
-    if let Ok(parsed) = reqwest::Url::parse(ws_url) {
-        if let Some(host) = parsed.host_str() {
-            let no_proxy_entries = cfg.normalized_no_proxy();
-            if !no_proxy_entries.is_empty() {
-                let host_lower = host.to_ascii_lowercase();
-                let matches_no_proxy = no_proxy_entries.iter().any(|entry| {
-                    let entry = entry.trim().to_ascii_lowercase();
-                    if entry == "*" {
-                        return true;
-                    }
-                    if host_lower == entry {
-                        return true;
-                    }
-                    // Support ".example.com" matching "foo.example.com"
-                    if let Some(suffix) = entry.strip_prefix('.') {
-                        return host_lower.ends_with(suffix) || host_lower == suffix;
-                    }
-                    // Support "example.com" also matching "foo.example.com"
-                    host_lower.ends_with(&format!(".{entry}"))
-                });
-                if matches_no_proxy {
-                    return None;
+    if let Ok(parsed) = reqwest::Url::parse(ws_url)
+        && let Some(host) = parsed.host_str()
+    {
+        let no_proxy_entries = cfg.normalized_no_proxy();
+        if !no_proxy_entries.is_empty() {
+            let host_lower = host.to_ascii_lowercase();
+            let matches_no_proxy = no_proxy_entries.iter().any(|entry| {
+                let entry = entry.trim().to_ascii_lowercase();
+                if entry == "*" {
+                    return true;
                 }
+                if host_lower == entry {
+                    return true;
+                }
+                // Support ".example.com" matching "foo.example.com"
+                if let Some(suffix) = entry.strip_prefix('.') {
+                    return host_lower.ends_with(suffix) || host_lower == suffix;
+                }
+                // Support "example.com" also matching "foo.example.com"
+                host_lower.ends_with(&format!(".{entry}"))
+            });
+            if matches_no_proxy {
+                return None;
             }
         }
     }
@@ -6634,9 +6634,7 @@ impl ChannelsConfig {
         };
         for (key, value) in channels {
             let is_section = value.as_table().is_some();
-            let has_explicit_enabled = value
-                .as_table()
-                .map_or(false, |t| t.contains_key("enabled"));
+            let has_explicit_enabled = value.as_table().is_some_and(|t| t.contains_key("enabled"));
             if is_section && !has_explicit_enabled {
                 // Section exists without explicit `enabled` — backfill true
                 let prop_path = format!("channels.{}.enabled", key.replace('_', "-"));
@@ -9118,10 +9116,10 @@ struct ActiveWorkspaceState {
 }
 
 fn default_config_dir() -> Result<PathBuf> {
-    if let Ok(home) = std::env::var("HOME") {
-        if !home.is_empty() {
-            return Ok(PathBuf::from(home).join(".zeroclaw"));
-        }
+    if let Ok(home) = std::env::var("HOME")
+        && !home.is_empty()
+    {
+        return Ok(PathBuf::from(home).join(".zeroclaw"));
     }
 
     let home = UserDirs::new()
@@ -9372,16 +9370,16 @@ async fn resolve_runtime_config_dirs(
         }
     }
 
-    if let Ok(custom_workspace) = std::env::var("ZEROCLAW_WORKSPACE") {
-        if !custom_workspace.is_empty() {
-            let expanded = expand_tilde_path(&custom_workspace);
-            let (zeroclaw_dir, workspace_dir) = resolve_config_dir_for_workspace(&expanded);
-            return Ok((
-                zeroclaw_dir,
-                workspace_dir,
-                ConfigResolutionSource::EnvWorkspace,
-            ));
-        }
+    if let Ok(custom_workspace) = std::env::var("ZEROCLAW_WORKSPACE")
+        && !custom_workspace.is_empty()
+    {
+        let expanded = expand_tilde_path(&custom_workspace);
+        let (zeroclaw_dir, workspace_dir) = resolve_config_dir_for_workspace(&expanded);
+        return Ok((
+            zeroclaw_dir,
+            workspace_dir,
+            ConfigResolutionSource::EnvWorkspace,
+        ));
     }
 
     if let Some((zeroclaw_dir, workspace_dir)) =
@@ -9591,16 +9589,16 @@ impl Config {
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                if let Ok(meta) = fs::metadata(&config_path).await {
-                    if meta.permissions().mode() & 0o004 != 0 {
-                        tracing::warn!(
-                            "Config file {:?} is world-readable (mode {:o}). \
+                if let Ok(meta) = fs::metadata(&config_path).await
+                    && meta.permissions().mode() & 0o004 != 0
+                {
+                    tracing::warn!(
+                        "Config file {:?} is world-readable (mode {:o}). \
                              Consider restricting with: chmod 600 {:?}",
-                            config_path,
-                            meta.permissions().mode() & 0o777,
-                            config_path,
-                        );
-                    }
+                        config_path,
+                        meta.permissions().mode() & 0o777,
+                        config_path,
+                    );
                 }
             }
 
@@ -9668,9 +9666,11 @@ impl Config {
             );
             Ok(config)
         } else {
-            let mut config = Config::default();
-            config.config_path = config_path.clone();
-            config.workspace_dir = workspace_dir;
+            let mut config = Config {
+                config_path: config_path.clone(),
+                workspace_dir,
+                ..Config::default()
+            };
             config.save().await?;
 
             // Restrict permissions on newly created config file (may contain API keys)
@@ -9730,27 +9730,26 @@ impl Config {
             .as_deref()
             .map(str::trim)
             .is_none_or(|value| value.is_empty())
+            && let Some(base_url) = base_url.as_ref()
         {
-            if let Some(base_url) = base_url.as_ref() {
-                self.api_url = Some(base_url.clone());
-            }
+            self.api_url = Some(base_url.clone());
         }
 
         // Propagate api_path from the profile when not already set at top level.
-        if self.api_path.is_none() {
-            if let Some(ref path) = profile.api_path {
-                let trimmed = path.trim();
-                if !trimmed.is_empty() {
-                    self.api_path = Some(trimmed.to_string());
-                }
+        if self.api_path.is_none()
+            && let Some(ref path) = profile.api_path
+        {
+            let trimmed = path.trim();
+            if !trimmed.is_empty() {
+                self.api_path = Some(trimmed.to_string());
             }
         }
 
         // Propagate max_tokens from the profile when not already set at top level.
-        if self.provider_max_tokens.is_none() {
-            if let Some(max_tokens) = profile.max_tokens {
-                self.provider_max_tokens = Some(max_tokens);
-            }
+        if self.provider_max_tokens.is_none()
+            && let Some(max_tokens) = profile.max_tokens
+        {
+            self.provider_max_tokens = Some(max_tokens);
         }
 
         if profile.requires_openai_auth
@@ -9782,11 +9781,11 @@ impl Config {
             return;
         }
 
-        if let Some(profile_name) = profile_name {
-            if !profile_name.eq_ignore_ascii_case(&profile_key) {
-                self.default_provider = Some(profile_name.to_string());
-                return;
-            }
+        if let Some(profile_name) = profile_name
+            && !profile_name.eq_ignore_ascii_case(&profile_key)
+        {
+            self.default_provider = Some(profile_name.to_string());
+            return;
         }
 
         if let Some(base_url) = base_url {
@@ -9955,25 +9954,24 @@ impl Config {
                 );
             }
 
-            if let Some(base_url) = profile.base_url.as_deref().map(str::trim) {
-                if !base_url.is_empty() {
-                    let parsed = reqwest::Url::parse(base_url).with_context(|| {
-                        format!("model_providers.{profile_name}.base_url is not a valid URL")
-                    })?;
-                    if !matches!(parsed.scheme(), "http" | "https") {
-                        anyhow::bail!(
-                            "model_providers.{profile_name}.base_url must use http/https"
-                        );
-                    }
+            if let Some(base_url) = profile.base_url.as_deref().map(str::trim)
+                && !base_url.is_empty()
+            {
+                let parsed = reqwest::Url::parse(base_url).with_context(|| {
+                    format!("model_providers.{profile_name}.base_url is not a valid URL")
+                })?;
+                if !matches!(parsed.scheme(), "http" | "https") {
+                    anyhow::bail!("model_providers.{profile_name}.base_url must use http/https");
                 }
             }
 
-            if let Some(wire_api) = profile.wire_api.as_deref().map(str::trim) {
-                if !wire_api.is_empty() && normalize_wire_api(wire_api).is_none() {
-                    anyhow::bail!(
-                        "model_providers.{profile_name}.wire_api must be one of: responses, chat_completions"
-                    );
-                }
+            if let Some(wire_api) = profile.wire_api.as_deref().map(str::trim)
+                && !wire_api.is_empty()
+                && normalize_wire_api(wire_api).is_none()
+            {
+                anyhow::bail!(
+                    "model_providers.{profile_name}.wire_api must be one of: responses, chat_completions"
+                );
             }
         }
 
@@ -10035,7 +10033,7 @@ impl Config {
                     .microsoft365
                     .client_secret
                     .as_deref()
-                    .map_or(true, |s| s.trim().is_empty())
+                    .is_none_or(|s| s.trim().is_empty())
             {
                 anyhow::bail!(
                     "microsoft365.client_secret must not be empty when auth_flow is 'client_credentials'"
@@ -10076,7 +10074,7 @@ impl Config {
                     .microsoft365
                     .client_secret
                     .as_deref()
-                    .map_or(true, |s| s.trim().is_empty())
+                    .is_none_or(|s| s.trim().is_empty())
             {
                 anyhow::bail!(
                     "microsoft365.client_secret must not be empty when auth_flow is client_credentials"
@@ -10279,14 +10277,14 @@ impl Config {
         }
 
         // Pinggy tunnel region — validate allowed values (case-insensitive, auto-lowercased at runtime).
-        if let Some(ref pinggy) = self.tunnel.pinggy {
-            if let Some(ref region) = pinggy.region {
-                let r = region.trim().to_ascii_lowercase();
-                if !r.is_empty() && !matches!(r.as_str(), "us" | "eu" | "ap" | "br" | "au") {
-                    anyhow::bail!(
-                        "tunnel.pinggy.region must be one of: us, eu, ap, br, au (or omitted for auto)"
-                    );
-                }
+        if let Some(ref pinggy) = self.tunnel.pinggy
+            && let Some(ref region) = pinggy.region
+        {
+            let r = region.trim().to_ascii_lowercase();
+            if !r.is_empty() && !matches!(r.as_str(), "us" | "eu" | "ap" | "br" | "au") {
+                anyhow::bail!(
+                    "tunnel.pinggy.region must be one of: us, eu, ap, br, au (or omitted for auto)"
+                );
             }
         }
 
@@ -10373,15 +10371,15 @@ impl Config {
 
         // Per-agent delegate timeout overrides
         for (name, agent) in &self.agents {
-            if let Some(t) = agent.timeout_secs {
-                if t == 0 {
-                    anyhow::bail!("agents.{name}.timeout_secs must be greater than 0");
-                }
+            if let Some(t) = agent.timeout_secs
+                && t == 0
+            {
+                anyhow::bail!("agents.{name}.timeout_secs must be greater than 0");
             }
-            if let Some(t) = agent.agentic_timeout_secs {
-                if t == 0 {
-                    anyhow::bail!("agents.{name}.agentic_timeout_secs must be greater than 0");
-                }
+            if let Some(t) = agent.agentic_timeout_secs
+                && t == 0
+            {
+                anyhow::bail!("agents.{name}.agentic_timeout_secs must be greater than 0");
             }
         }
 
@@ -10391,27 +10389,25 @@ impl Config {
     /// Apply environment variable overrides to config
     pub fn apply_env_overrides(&mut self) {
         // API Key: ZEROCLAW_API_KEY or API_KEY (generic)
-        if let Ok(key) = std::env::var("ZEROCLAW_API_KEY").or_else(|_| std::env::var("API_KEY")) {
-            if !key.is_empty() {
-                self.api_key = Some(key);
-            }
+        if let Ok(key) = std::env::var("ZEROCLAW_API_KEY").or_else(|_| std::env::var("API_KEY"))
+            && !key.is_empty()
+        {
+            self.api_key = Some(key);
         }
         // API Key: GLM_API_KEY overrides when provider is a GLM/Zhipu variant.
-        if self.default_provider.as_deref().is_some_and(is_glm_alias) {
-            if let Ok(key) = std::env::var("GLM_API_KEY") {
-                if !key.is_empty() {
-                    self.api_key = Some(key);
-                }
-            }
+        if self.default_provider.as_deref().is_some_and(is_glm_alias)
+            && let Ok(key) = std::env::var("GLM_API_KEY")
+            && !key.is_empty()
+        {
+            self.api_key = Some(key);
         }
 
         // API Key: ZAI_API_KEY overrides when provider is a Z.AI variant.
-        if self.default_provider.as_deref().is_some_and(is_zai_alias) {
-            if let Ok(key) = std::env::var("ZAI_API_KEY") {
-                if !key.is_empty() {
-                    self.api_key = Some(key);
-                }
-            }
+        if self.default_provider.as_deref().is_some_and(is_zai_alias)
+            && let Ok(key) = std::env::var("ZAI_API_KEY")
+            && !key.is_empty()
+        {
+            self.api_key = Some(key);
         }
 
         // Provider override precedence:
@@ -10429,29 +10425,28 @@ impl Config {
                 self.default_provider = Some(provider);
             }
         } else if let Ok(provider) = std::env::var("PROVIDER") {
-            let should_apply_legacy_provider =
-                self.default_provider.as_deref().map_or(true, |configured| {
-                    configured.trim().eq_ignore_ascii_case("openrouter")
-                });
+            let should_apply_legacy_provider = self
+                .default_provider
+                .as_deref()
+                .is_none_or(|configured| configured.trim().eq_ignore_ascii_case("openrouter"));
             if should_apply_legacy_provider && !provider.is_empty() {
                 self.default_provider = Some(provider);
             }
         }
 
         // Model: ZEROCLAW_MODEL or MODEL
-        if let Ok(model) = std::env::var("ZEROCLAW_MODEL").or_else(|_| std::env::var("MODEL")) {
-            if !model.is_empty() {
-                self.default_model = Some(model);
-            }
+        if let Ok(model) = std::env::var("ZEROCLAW_MODEL").or_else(|_| std::env::var("MODEL"))
+            && !model.is_empty()
+        {
+            self.default_model = Some(model);
         }
 
         // Provider HTTP timeout: ZEROCLAW_PROVIDER_TIMEOUT_SECS
-        if let Ok(timeout_secs) = std::env::var("ZEROCLAW_PROVIDER_TIMEOUT_SECS") {
-            if let Ok(timeout_secs) = timeout_secs.parse::<u64>() {
-                if timeout_secs > 0 {
-                    self.provider_timeout_secs = timeout_secs;
-                }
-            }
+        if let Ok(timeout_secs) = std::env::var("ZEROCLAW_PROVIDER_TIMEOUT_SECS")
+            && let Ok(timeout_secs) = timeout_secs.parse::<u64>()
+            && timeout_secs > 0
+        {
+            self.provider_timeout_secs = timeout_secs;
         }
 
         // Extra provider headers: ZEROCLAW_EXTRA_HEADERS
@@ -10467,24 +10462,24 @@ impl Config {
         self.apply_named_model_provider_profile();
 
         // Workspace directory: ZEROCLAW_WORKSPACE
-        if let Ok(workspace) = std::env::var("ZEROCLAW_WORKSPACE") {
-            if !workspace.is_empty() {
-                let expanded = expand_tilde_path(&workspace);
-                let (_, workspace_dir) = resolve_config_dir_for_workspace(&expanded);
-                self.workspace_dir = workspace_dir;
-            }
+        if let Ok(workspace) = std::env::var("ZEROCLAW_WORKSPACE")
+            && !workspace.is_empty()
+        {
+            let expanded = expand_tilde_path(&workspace);
+            let (_, workspace_dir) = resolve_config_dir_for_workspace(&expanded);
+            self.workspace_dir = workspace_dir;
         }
 
         // Open-skills opt-in flag: ZEROCLAW_OPEN_SKILLS_ENABLED
-        if let Ok(flag) = std::env::var("ZEROCLAW_OPEN_SKILLS_ENABLED") {
-            if !flag.trim().is_empty() {
-                match flag.trim().to_ascii_lowercase().as_str() {
-                    "1" | "true" | "yes" | "on" => self.skills.open_skills_enabled = true,
-                    "0" | "false" | "no" | "off" => self.skills.open_skills_enabled = false,
-                    _ => tracing::warn!(
-                        "Ignoring invalid ZEROCLAW_OPEN_SKILLS_ENABLED (valid: 1|0|true|false|yes|no|on|off)"
-                    ),
-                }
+        if let Ok(flag) = std::env::var("ZEROCLAW_OPEN_SKILLS_ENABLED")
+            && !flag.trim().is_empty()
+        {
+            match flag.trim().to_ascii_lowercase().as_str() {
+                "1" | "true" | "yes" | "on" => self.skills.open_skills_enabled = true,
+                "0" | "false" | "no" | "off" => self.skills.open_skills_enabled = false,
+                _ => tracing::warn!(
+                    "Ignoring invalid ZEROCLAW_OPEN_SKILLS_ENABLED (valid: 1|0|true|false|yes|no|on|off)"
+                ),
             }
         }
 
@@ -10497,46 +10492,44 @@ impl Config {
         }
 
         // Skills script-file audit override: ZEROCLAW_SKILLS_ALLOW_SCRIPTS
-        if let Ok(flag) = std::env::var("ZEROCLAW_SKILLS_ALLOW_SCRIPTS") {
-            if !flag.trim().is_empty() {
-                match flag.trim().to_ascii_lowercase().as_str() {
-                    "1" | "true" | "yes" | "on" => self.skills.allow_scripts = true,
-                    "0" | "false" | "no" | "off" => self.skills.allow_scripts = false,
-                    _ => tracing::warn!(
-                        "Ignoring invalid ZEROCLAW_SKILLS_ALLOW_SCRIPTS (valid: 1|0|true|false|yes|no|on|off)"
-                    ),
-                }
+        if let Ok(flag) = std::env::var("ZEROCLAW_SKILLS_ALLOW_SCRIPTS")
+            && !flag.trim().is_empty()
+        {
+            match flag.trim().to_ascii_lowercase().as_str() {
+                "1" | "true" | "yes" | "on" => self.skills.allow_scripts = true,
+                "0" | "false" | "no" | "off" => self.skills.allow_scripts = false,
+                _ => tracing::warn!(
+                    "Ignoring invalid ZEROCLAW_SKILLS_ALLOW_SCRIPTS (valid: 1|0|true|false|yes|no|on|off)"
+                ),
             }
         }
 
         // Skills prompt mode override: ZEROCLAW_SKILLS_PROMPT_MODE
-        if let Ok(mode) = std::env::var("ZEROCLAW_SKILLS_PROMPT_MODE") {
-            if !mode.trim().is_empty() {
-                if let Some(parsed) = parse_skills_prompt_injection_mode(&mode) {
-                    self.skills.prompt_injection_mode = parsed;
-                } else {
-                    tracing::warn!(
-                        "Ignoring invalid ZEROCLAW_SKILLS_PROMPT_MODE (valid: full|compact)"
-                    );
-                }
+        if let Ok(mode) = std::env::var("ZEROCLAW_SKILLS_PROMPT_MODE")
+            && !mode.trim().is_empty()
+        {
+            if let Some(parsed) = parse_skills_prompt_injection_mode(&mode) {
+                self.skills.prompt_injection_mode = parsed;
+            } else {
+                tracing::warn!(
+                    "Ignoring invalid ZEROCLAW_SKILLS_PROMPT_MODE (valid: full|compact)"
+                );
             }
         }
 
         // Gateway port: ZEROCLAW_GATEWAY_PORT or PORT
         if let Ok(port_str) =
             std::env::var("ZEROCLAW_GATEWAY_PORT").or_else(|_| std::env::var("PORT"))
+            && let Ok(port) = port_str.parse::<u16>()
         {
-            if let Ok(port) = port_str.parse::<u16>() {
-                self.gateway.port = port;
-            }
+            self.gateway.port = port;
         }
 
         // Gateway host: ZEROCLAW_GATEWAY_HOST or HOST
         if let Ok(host) = std::env::var("ZEROCLAW_GATEWAY_HOST").or_else(|_| std::env::var("HOST"))
+            && !host.is_empty()
         {
-            if !host.is_empty() {
-                self.gateway.host = host;
-            }
+            self.gateway.host = host;
         }
 
         // Allow public bind: ZEROCLAW_ALLOW_PUBLIC_BIND
@@ -10633,23 +10626,19 @@ impl Config {
         // Web search max results: ZEROCLAW_WEB_SEARCH_MAX_RESULTS or WEB_SEARCH_MAX_RESULTS
         if let Ok(max_results) = std::env::var("ZEROCLAW_WEB_SEARCH_MAX_RESULTS")
             .or_else(|_| std::env::var("WEB_SEARCH_MAX_RESULTS"))
+            && let Ok(max_results) = max_results.parse::<usize>()
+            && (1..=10).contains(&max_results)
         {
-            if let Ok(max_results) = max_results.parse::<usize>() {
-                if (1..=10).contains(&max_results) {
-                    self.web_search.max_results = max_results;
-                }
-            }
+            self.web_search.max_results = max_results;
         }
 
         // Web search timeout: ZEROCLAW_WEB_SEARCH_TIMEOUT_SECS or WEB_SEARCH_TIMEOUT_SECS
         if let Ok(timeout_secs) = std::env::var("ZEROCLAW_WEB_SEARCH_TIMEOUT_SECS")
             .or_else(|_| std::env::var("WEB_SEARCH_TIMEOUT_SECS"))
+            && let Ok(timeout_secs) = timeout_secs.parse::<u64>()
+            && timeout_secs > 0
         {
-            if let Ok(timeout_secs) = timeout_secs.parse::<u64>() {
-                if timeout_secs > 0 {
-                    self.web_search.timeout_secs = timeout_secs;
-                }
-            }
+            self.web_search.timeout_secs = timeout_secs;
         }
 
         // Storage provider key (optional backend override): ZEROCLAW_STORAGE_PROVIDER
@@ -10669,12 +10658,11 @@ impl Config {
         }
 
         // Storage connect timeout: ZEROCLAW_STORAGE_CONNECT_TIMEOUT_SECS
-        if let Ok(timeout_secs) = std::env::var("ZEROCLAW_STORAGE_CONNECT_TIMEOUT_SECS") {
-            if let Ok(timeout_secs) = timeout_secs.parse::<u64>() {
-                if timeout_secs > 0 {
-                    self.storage.provider.config.connect_timeout_secs = Some(timeout_secs);
-                }
-            }
+        if let Ok(timeout_secs) = std::env::var("ZEROCLAW_STORAGE_CONNECT_TIMEOUT_SECS")
+            && let Ok(timeout_secs) = timeout_secs.parse::<u64>()
+            && timeout_secs > 0
+        {
+            self.storage.provider.config.connect_timeout_secs = Some(timeout_secs);
         }
         // Proxy enabled flag: ZEROCLAW_PROXY_ENABLED
         let explicit_proxy_enabled = std::env::var("ZEROCLAW_PROXY_ENABLED")

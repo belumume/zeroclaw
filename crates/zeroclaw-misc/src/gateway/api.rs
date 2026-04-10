@@ -835,10 +835,10 @@ fn restore_required_secret(value: &mut String, current: &str) {
 
 fn restore_vec_secrets(values: &mut [String], current: &[String]) {
     for (idx, value) in values.iter_mut().enumerate() {
-        if is_masked_secret(value) {
-            if let Some(existing) = current.get(idx) {
-                *value = existing.clone();
-            }
+        if is_masked_secret(value)
+            && let Some(existing) = current.get(idx)
+        {
+            *value = existing.clone();
         }
     }
 }

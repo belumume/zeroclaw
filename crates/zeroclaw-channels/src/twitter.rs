@@ -298,7 +298,7 @@ impl Channel for TwitterChannel {
                             }
 
                             // Track newest ID for pagination
-                            if since_id.as_deref().map_or(true, |s| tweet_id > s) {
+                            if since_id.as_deref().is_none_or(|s| tweet_id > s) {
                                 since_id = Some(tweet_id.to_string());
                             }
                         }

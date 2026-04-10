@@ -436,10 +436,10 @@ impl QQChannel {
 
         {
             let cache = self.token_cache.read().await;
-            if let Some((ref token, expiry)) = *cache {
-                if now < expiry {
-                    return Ok(token.clone());
-                }
+            if let Some((ref token, expiry)) = *cache
+                && now < expiry
+            {
+                return Ok(token.clone());
             }
         }
 
@@ -634,10 +634,10 @@ impl QQChannel {
             body["file_data"] = json!(d);
         }
         // QQ API uses file_name for File type to display the filename in chat
-        if file_type == QQMediaFileType::File {
-            if let Some(name) = file_name {
-                body["file_name"] = json!(name);
-            }
+        if file_type == QQMediaFileType::File
+            && let Some(name) = file_name
+        {
+            body["file_name"] = json!(name);
         }
 
         let resp = self

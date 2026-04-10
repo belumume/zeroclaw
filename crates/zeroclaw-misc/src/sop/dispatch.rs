@@ -326,18 +326,18 @@ pub async fn check_sop_cron_triggers(
         // fell in the window (e.g., scheduler delayed), we fire only once.
         // This is intentional — SOP triggers should not retroactively batch-fire.
         let mut upcoming = schedule.after(last_check);
-        if let Some(next) = upcoming.next() {
-            if next <= now {
-                // This expression fired in the window
-                let event = SopEvent {
-                    source: SopTriggerSource::Cron,
-                    topic: Some(expression.clone()),
-                    payload: None,
-                    timestamp: now_iso8601(),
-                };
-                let results = dispatch_sop_event(engine, audit, event).await;
-                all_results.extend(results);
-            }
+        if let Some(next) = upcoming.next()
+            && next <= now
+        {
+            // This expression fired in the window
+            let event = SopEvent {
+                source: SopTriggerSource::Cron,
+                topic: Some(expression.clone()),
+                payload: None,
+                timestamp: now_iso8601(),
+            };
+            let results = dispatch_sop_event(engine, audit, event).await;
+            all_results.extend(results);
         }
     }
 

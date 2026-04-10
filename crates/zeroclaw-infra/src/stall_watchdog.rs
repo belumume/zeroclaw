@@ -115,10 +115,10 @@ impl StallWatchdog {
 impl Drop for StallWatchdog {
     fn drop(&mut self) {
         // Best-effort cleanup — abort the task synchronously if it exists.
-        if let Ok(mut guard) = self.task.try_lock() {
-            if let Some(handle) = guard.take() {
-                handle.abort();
-            }
+        if let Ok(mut guard) = self.task.try_lock()
+            && let Some(handle) = guard.take()
+        {
+            handle.abort();
         }
     }
 }

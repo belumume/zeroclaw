@@ -61,10 +61,10 @@ fn resolve_transcription_api_key(config: &TranscriptionConfig) -> Result<String>
         if let Ok(key) = std::env::var("OPENAI_API_KEY") {
             return Ok(key);
         }
-    } else if config.api_url.contains("groq.com") {
-        if let Ok(key) = std::env::var("GROQ_API_KEY") {
-            return Ok(key);
-        }
+    } else if config.api_url.contains("groq.com")
+        && let Ok(key) = std::env::var("GROQ_API_KEY")
+    {
+        return Ok(key);
     }
 
     // 3. Fallback chain
@@ -740,28 +740,28 @@ impl TranscriptionManager {
             providers.insert("groq".to_string(), Box::new(groq));
         }
 
-        if let Some(ref openai_cfg) = config.openai {
-            if let Ok(p) = OpenAiWhisperProvider::from_config(openai_cfg) {
-                providers.insert("openai".to_string(), Box::new(p));
-            }
+        if let Some(ref openai_cfg) = config.openai
+            && let Ok(p) = OpenAiWhisperProvider::from_config(openai_cfg)
+        {
+            providers.insert("openai".to_string(), Box::new(p));
         }
 
-        if let Some(ref deepgram_cfg) = config.deepgram {
-            if let Ok(p) = DeepgramProvider::from_config(deepgram_cfg) {
-                providers.insert("deepgram".to_string(), Box::new(p));
-            }
+        if let Some(ref deepgram_cfg) = config.deepgram
+            && let Ok(p) = DeepgramProvider::from_config(deepgram_cfg)
+        {
+            providers.insert("deepgram".to_string(), Box::new(p));
         }
 
-        if let Some(ref assemblyai_cfg) = config.assemblyai {
-            if let Ok(p) = AssemblyAiProvider::from_config(assemblyai_cfg) {
-                providers.insert("assemblyai".to_string(), Box::new(p));
-            }
+        if let Some(ref assemblyai_cfg) = config.assemblyai
+            && let Ok(p) = AssemblyAiProvider::from_config(assemblyai_cfg)
+        {
+            providers.insert("assemblyai".to_string(), Box::new(p));
         }
 
-        if let Some(ref google_cfg) = config.google {
-            if let Ok(p) = GoogleSttProvider::from_config(google_cfg) {
-                providers.insert("google".to_string(), Box::new(p));
-            }
+        if let Some(ref google_cfg) = config.google
+            && let Ok(p) = GoogleSttProvider::from_config(google_cfg)
+        {
+            providers.insert("google".to_string(), Box::new(p));
         }
 
         if let Some(ref local_cfg) = config.local_whisper {

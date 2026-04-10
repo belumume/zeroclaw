@@ -466,13 +466,13 @@ fn resolve_qwen_oauth_context(credential_override: Option<&str>) -> QwenOauthPro
         .map(|value| value.eq_ignore_ascii_case(QWEN_OAUTH_PLACEHOLDER))
         .unwrap_or(false);
 
-    if let Some(explicit) = override_value {
-        if !placeholder_requested {
-            return QwenOauthProviderContext {
-                credential: Some(explicit.to_string()),
-                base_url: None,
-            };
-        }
+    if let Some(explicit) = override_value
+        && !placeholder_requested
+    {
+        return QwenOauthProviderContext {
+            credential: Some(explicit.to_string()),
+            base_url: None,
+        };
     }
 
     let mut cached = read_qwen_oauth_cached_credentials();
@@ -494,15 +494,13 @@ fn resolve_qwen_oauth_context(credential_override: Option<&str>) -> QwenOauthPro
                 .and_then(|credentials| credentials.access_token.as_deref())
                 .is_none_or(|value| value.trim().is_empty());
 
-        if should_refresh {
-            if let Some(refresh_token) = refresh_token.as_deref() {
-                match refresh_qwen_oauth_access_token(refresh_token) {
-                    Ok(refreshed) => {
-                        cached = Some(refreshed);
-                    }
-                    Err(error) => {
-                        tracing::warn!(error = %error, "Qwen OAuth refresh failed");
-                    }
+        if should_refresh && let Some(refresh_token) = refresh_token.as_deref() {
+            match refresh_qwen_oauth_access_token(refresh_token) {
+                Ok(refreshed) => {
+                    cached = Some(refreshed);
+                }
+                Err(error) => {
+                    tracing::warn!(error = %error, "Qwen OAuth refresh failed");
                 }
             }
         }
@@ -583,15 +581,15 @@ fn refresh_minimax_oauth_access_token(name: &str, refresh_token: &str) -> anyhow
     }
 
     if let Some(payload) = parsed {
-        if let Some(status_text) = payload.status.as_deref() {
-            if !status_text.eq_ignore_ascii_case("success") {
-                let detail = payload
-                    .base_resp
-                    .as_ref()
-                    .and_then(|base| base.status_msg.as_deref())
-                    .unwrap_or(status_text);
-                anyhow::bail!("MiniMax OAuth refresh failed: {detail}");
-            }
+        if let Some(status_text) = payload.status.as_deref()
+            && !status_text.eq_ignore_ascii_case("success")
+        {
+            let detail = payload
+                .base_resp
+                .as_ref()
+                .and_then(|base| base.status_msg.as_deref())
+                .unwrap_or(status_text);
+            anyhow::bail!("MiniMax OAuth refresh failed: {detail}");
         }
 
         if let Some(token) = payload
@@ -983,10 +981,10 @@ fn resolve_provider_credential(name: &str, credential_override: Option<&str>) ->
         }
     }
 
-    if is_minimax_alias(name) {
-        if let Some(credential) = resolve_minimax_oauth_refresh_token(name) {
-            return Some(credential);
-        }
+    if is_minimax_alias(name)
+        && let Some(credential) = resolve_minimax_oauth_refresh_token(name)
+    {
+        return Some(credential);
     }
 
     if minimax_oauth_placeholder_requested && is_minimax_alias(name) {
@@ -1156,15 +1154,16 @@ fn create_provider_with_url_and_options(
     if let Some(key_value) = key {
         let is_custom = name.starts_with("custom:") || name.starts_with("anthropic-custom:");
         let has_custom_url = api_url.map(str::trim).filter(|u| !u.is_empty()).is_some();
-        if !is_custom && !has_custom_url {
-            if let Some(likely_provider) = check_api_key_prefix(name, key_value) {
-                let visible = &key_value[..key_value.len().min(8)];
-                anyhow::bail!(
-                    "API key prefix mismatch: key \"{visible}...\" looks like a \
+        if !is_custom
+            && !has_custom_url
+            && let Some(likely_provider) = check_api_key_prefix(name, key_value)
+        {
+            let visible = &key_value[..key_value.len().min(8)];
+            anyhow::bail!(
+                "API key prefix mismatch: key \"{visible}...\" looks like a \
                      {likely_provider} key, but provider \"{name}\" is selected. \
                      Set the correct provider-specific env var or use `-p {likely_provider}`."
-                );
-            }
+            );
         }
     }
 

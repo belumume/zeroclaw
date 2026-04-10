@@ -172,10 +172,10 @@ impl Memory for MarkdownMemory {
             .map(chrono::DateTime::parse_from_rfc3339)
             .transpose()
             .map_err(|e| anyhow::anyhow!("invalid 'until' date (expected RFC 3339): {e}"))?;
-        if let (Some(s), Some(u)) = (&since_dt, &until_dt) {
-            if s >= u {
-                anyhow::bail!("'since' must be before 'until'");
-            }
+        if let (Some(s), Some(u)) = (&since_dt, &until_dt)
+            && s >= u
+        {
+            anyhow::bail!("'since' must be before 'until'");
         }
 
         let all = self.read_all_entries().await?;
@@ -185,19 +185,17 @@ impl Memory for MarkdownMemory {
         let mut scored: Vec<MemoryEntry> = all
             .into_iter()
             .filter_map(|mut entry| {
-                if let Some(ref s) = since_dt {
-                    if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(&entry.timestamp) {
-                        if ts < *s {
-                            return None;
-                        }
-                    }
+                if let Some(ref s) = since_dt
+                    && let Ok(ts) = chrono::DateTime::parse_from_rfc3339(&entry.timestamp)
+                    && ts < *s
+                {
+                    return None;
                 }
-                if let Some(ref u) = until_dt {
-                    if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(&entry.timestamp) {
-                        if ts > *u {
-                            return None;
-                        }
-                    }
+                if let Some(ref u) = until_dt
+                    && let Ok(ts) = chrono::DateTime::parse_from_rfc3339(&entry.timestamp)
+                    && ts > *u
+                {
+                    return None;
                 }
                 if keywords.is_empty() {
                     entry.score = Some(1.0);

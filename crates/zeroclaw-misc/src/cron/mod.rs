@@ -153,7 +153,6 @@ pub fn add_job(config: &Config, expression: &str, command: &str) -> Result<CronJ
 }
 
 #[allow(clippy::needless_pass_by_value)]
-
 pub fn add_once(config: &Config, delay: &str, command: &str) -> Result<CronJob> {
     add_once_validated(config, delay, command, false)
 }
@@ -209,7 +208,7 @@ pub fn parse_delay(input: &str) -> Result<chrono::Duration> {
     Ok(duration)
 }
 
-#[cfg(all(test, feature = "_root_tests"))] // Tests need root crate handle_command
+#[cfg(all(test, zeroclaw_root_crate))] // Tests need root crate handle_command
 mod tests {
     use super::*;
     use tempfile::TempDir;

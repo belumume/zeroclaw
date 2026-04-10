@@ -217,14 +217,14 @@ impl ResponseCache {
         }
 
         // Evict oldest entry if at capacity
-        if self.hot_max_entries > 0 && hot.len() >= self.hot_max_entries {
-            if let Some(oldest_key) = hot
+        if self.hot_max_entries > 0
+            && hot.len() >= self.hot_max_entries
+            && let Some(oldest_key) = hot
                 .iter()
                 .min_by_key(|(_, v)| v.accessed_at)
                 .map(|(k, _)| k.clone())
-            {
-                hot.remove(&oldest_key);
-            }
+        {
+            hot.remove(&oldest_key);
         }
 
         if self.hot_max_entries > 0 {

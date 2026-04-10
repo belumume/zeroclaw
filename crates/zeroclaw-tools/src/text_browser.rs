@@ -70,10 +70,9 @@ impl TextBrowserTool {
                 .arg(browser)
                 .output()
                 .await
+                && output.status.success()
             {
-                if output.status.success() {
-                    return Some((*browser).to_string());
-                }
+                return Some((*browser).to_string());
             }
         }
         None

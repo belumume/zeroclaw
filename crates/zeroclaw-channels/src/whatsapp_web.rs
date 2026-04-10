@@ -274,10 +274,10 @@ impl WhatsAppWebChannel {
         let mut candidates = Vec::new();
 
         let mut add_candidate = |candidate: Option<String>| {
-            if let Some(candidate) = candidate {
-                if !candidates.iter().any(|existing| existing == &candidate) {
-                    candidates.push(candidate);
-                }
+            if let Some(candidate) = candidate
+                && !candidates.iter().any(|existing| existing == &candidate)
+            {
+                candidates.push(candidate);
             }
         };
 
@@ -414,15 +414,15 @@ impl WhatsAppWebChannel {
         let manager = transcription_manager?;
 
         // Enforce duration limit
-        if let Some(seconds) = audio.seconds {
-            if u64::from(seconds) > config.max_duration_secs {
-                tracing::info!(
-                    "WhatsApp Web: skipping voice note ({}s exceeds {}s limit)",
-                    seconds,
-                    config.max_duration_secs
-                );
-                return None;
-            }
+        if let Some(seconds) = audio.seconds
+            && u64::from(seconds) > config.max_duration_secs
+        {
+            tracing::info!(
+                "WhatsApp Web: skipping voice note ({}s exceeds {}s limit)",
+                seconds,
+                config.max_duration_secs
+            );
+            return None;
         }
 
         // Download the encrypted audio
@@ -551,12 +551,11 @@ impl WhatsAppWebChannel {
         use wa_rs_core::proto_helpers::MessageExt;
         let base = msg.get_base_message();
 
-        if let Some(ref ext) = base.extended_text_message {
-            if let Some(ref ctx) = ext.context_info {
-                if !ctx.mentioned_jid.is_empty() {
-                    return ctx.mentioned_jid.clone();
-                }
-            }
+        if let Some(ref ext) = base.extended_text_message
+            && let Some(ref ctx) = ext.context_info
+            && !ctx.mentioned_jid.is_empty()
+        {
+            return ctx.mentioned_jid.clone();
         }
 
         Vec::new()
@@ -585,12 +584,12 @@ impl WhatsAppWebChannel {
                 || text[..pos]
                     .chars()
                     .next_back()
-                    .map_or(true, |ch| !ch.is_ascii_alphanumeric());
+                    .is_none_or(|ch| !ch.is_ascii_alphanumeric());
             // Trailing boundary: character after digits must not be a digit
             let trailing_ok = text[after_idx..]
                 .chars()
                 .next()
-                .map_or(true, |ch| !ch.is_ascii_digit());
+                .is_none_or(|ch| !ch.is_ascii_digit());
             if leading_ok && trailing_ok {
                 return true;
             }
@@ -614,11 +613,11 @@ impl WhatsAppWebChannel {
                 || remaining[..pos]
                     .chars()
                     .next_back()
-                    .map_or(true, |ch| !ch.is_ascii_alphanumeric());
+                    .is_none_or(|ch| !ch.is_ascii_alphanumeric());
             let trailing_ok = remaining[after..]
                 .chars()
                 .next()
-                .map_or(true, |ch| !ch.is_ascii_digit());
+                .is_none_or(|ch| !ch.is_ascii_digit());
             if leading_ok && trailing_ok {
                 result.push_str(&remaining[..pos]);
                 remaining = &remaining[after..];
@@ -969,10 +968,10 @@ impl Channel for WhatsAppWebChannel {
 
                     // Atomic check-and-remove: only one task gets the value
                     let to_voice = pending.lock().ok().and_then(|mut pv| {
-                        if let Some((_, ts)) = pv.get(&recipient) {
-                            if ts.elapsed().as_secs() >= 8 {
-                                return pv.remove(&recipient).map(|(text, _)| text);
-                            }
+                        if let Some((_, ts)) = pv.get(&recipient)
+                            && ts.elapsed().as_secs() >= 8
+                        {
+                            return pv.remove(&recipient).map(|(text, _)| text);
                         }
                         None
                     });

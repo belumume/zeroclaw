@@ -383,12 +383,11 @@ impl Channel for SignalChannel {
                         if !current_data.is_empty() {
                             match serde_json::from_str::<SseEnvelope>(&current_data) {
                                 Ok(sse) => {
-                                    if let Some(ref envelope) = sse.envelope {
-                                        if let Some(msg) = self.process_envelope(envelope) {
-                                            if tx.send(msg).await.is_err() {
-                                                return Ok(());
-                                            }
-                                        }
+                                    if let Some(ref envelope) = sse.envelope
+                                        && let Some(msg) = self.process_envelope(envelope)
+                                        && tx.send(msg).await.is_err()
+                                    {
+                                        return Ok(());
                                     }
                                 }
                                 Err(e) => {
@@ -410,10 +409,10 @@ impl Channel for SignalChannel {
             if !current_data.is_empty() {
                 match serde_json::from_str::<SseEnvelope>(&current_data) {
                     Ok(sse) => {
-                        if let Some(ref envelope) = sse.envelope {
-                            if let Some(msg) = self.process_envelope(envelope) {
-                                let _ = tx.send(msg).await;
-                            }
+                        if let Some(ref envelope) = sse.envelope
+                            && let Some(msg) = self.process_envelope(envelope)
+                        {
+                            let _ = tx.send(msg).await;
                         }
                     }
                     Err(e) => {

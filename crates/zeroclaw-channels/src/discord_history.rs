@@ -400,11 +400,10 @@ impl Channel for DiscordHistoryChannel {
                     // Guild filter
                     if let Some(ref gid) = guild_filter {
                         let msg_guild = d.get("guild_id").and_then(serde_json::Value::as_str);
-                        if let Some(g) = msg_guild {
-                            if g != gid {
+                        if let Some(g) = msg_guild
+                            && g != gid {
                                 continue;
                             }
-                        }
                     }
 
                     // Channel filter

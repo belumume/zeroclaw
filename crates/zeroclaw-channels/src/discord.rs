@@ -1113,11 +1113,10 @@ impl Channel for DiscordChannel {
                     if let Some(ref gid) = guild_filter {
                         let msg_guild = d.get("guild_id").and_then(serde_json::Value::as_str);
                         // DMs have no guild_id — let them through; for guild messages, enforce the filter
-                        if let Some(g) = msg_guild {
-                            if g != gid {
+                        if let Some(g) = msg_guild
+                            && g != gid {
                                 continue;
                             }
-                        }
                     }
 
                     let content = d.get("content").and_then(|c| c.as_str()).unwrap_or("");

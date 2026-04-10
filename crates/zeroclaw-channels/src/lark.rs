@@ -830,10 +830,10 @@ impl LarkChannel {
 
                     // CONTROL frame
                     if frame.method == 0 {
-                        if frame.header_value("type") == "pong" {
-                            if let Some(p) = &frame.payload {
-                                if let Ok(cfg) = serde_json::from_slice::<WsClientConfig>(p) {
-                                    if let Some(secs) = cfg.ping_interval {
+                        if frame.header_value("type") == "pong"
+                            && let Some(p) = &frame.payload
+                                && let Ok(cfg) = serde_json::from_slice::<WsClientConfig>(p)
+                                    && let Some(secs) = cfg.ping_interval {
                                         let secs = secs.max(10);
                                         if secs != ping_secs {
                                             ping_secs = secs;
@@ -841,9 +841,6 @@ impl LarkChannel {
                                             tracing::info!("Lark: ping_interval → {ping_secs}s");
                                         }
                                     }
-                                }
-                            }
-                        }
                         continue;
                     }
 
@@ -1052,10 +1049,10 @@ impl LarkChannel {
         // Check cache first
         {
             let cached = self.tenant_token.read().await;
-            if let Some(ref token) = *cached {
-                if Instant::now() < token.refresh_after {
-                    return Ok(token.value.clone());
-                }
+            if let Some(ref token) = *cached
+                && Instant::now() < token.refresh_after
+            {
+                return Ok(token.value.clone());
             }
         }
 
@@ -1142,11 +1139,11 @@ impl LarkChannel {
             return None;
         }
 
-        if let Some(cl) = resp.content_length() {
-            if cl > LARK_IMAGE_MAX_BYTES as u64 {
-                tracing::warn!("Lark: image too large for {image_key}: {cl} bytes exceeds limit");
-                return None;
-            }
+        if let Some(cl) = resp.content_length()
+            && cl > LARK_IMAGE_MAX_BYTES as u64
+        {
+            tracing::warn!("Lark: image too large for {image_key}: {cl} bytes exceeds limit");
+            return None;
         }
 
         let content_type = resp
@@ -1220,13 +1217,13 @@ impl LarkChannel {
             return None;
         }
 
-        if let Some(cl) = resp.content_length() {
-            if cl > LARK_FILE_MAX_BYTES as u64 {
-                tracing::warn!("Lark: file too large for {file_key}: {cl} bytes exceeds limit");
-                return Some(format!(
-                    "[ATTACHMENT:{file_name} | size={cl} bytes | too large to inline]"
-                ));
-            }
+        if let Some(cl) = resp.content_length()
+            && cl > LARK_FILE_MAX_BYTES as u64
+        {
+            tracing::warn!("Lark: file too large for {file_key}: {cl} bytes exceeds limit");
+            return Some(format!(
+                "[ATTACHMENT:{file_name} | size={cl} bytes | too large to inline]"
+            ));
         }
 
         let content_type = resp
@@ -1250,13 +1247,13 @@ impl LarkChannel {
         }
 
         // If the content is image-like, return as image marker
-        if content_type.starts_with("image/") && bytes.len() <= LARK_IMAGE_MAX_BYTES {
-            if let Some(mime) = lark_detect_image_mime(Some(&content_type), &bytes) {
-                if LARK_SUPPORTED_IMAGE_MIMES.contains(&mime.as_str()) {
-                    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
-                    return Some(format!("[IMAGE:data:{mime};base64,{encoded}]"));
-                }
-            }
+        if content_type.starts_with("image/")
+            && bytes.len() <= LARK_IMAGE_MAX_BYTES
+            && let Some(mime) = lark_detect_image_mime(Some(&content_type), &bytes)
+            && LARK_SUPPORTED_IMAGE_MIMES.contains(&mime.as_str())
+        {
+            let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+            return Some(format!("[IMAGE:data:{mime};base64,{encoded}]"));
         }
 
         // If the file looks like text, inline it
@@ -1862,7 +1859,7 @@ impl LarkChannel {
                 let token_ok = payload
                     .get("token")
                     .and_then(|t| t.as_str())
-                    .map_or(true, |t| t == state.verification_token);
+                    .is_none_or(|t| t == state.verification_token);
 
                 if !token_ok {
                     return (StatusCode::FORBIDDEN, "invalid token").into_response();
@@ -1874,22 +1871,21 @@ impl LarkChannel {
 
             // Parse event messages
             let messages = state.channel.parse_event_payload_async(&payload).await;
-            if !messages.is_empty() {
-                if let Some(message_id) = payload
+            if !messages.is_empty()
+                && let Some(message_id) = payload
                     .pointer("/event/message/message_id")
                     .and_then(|m| m.as_str())
-                {
-                    let ack_text = messages.first().map_or("", |msg| msg.content.as_str());
-                    let ack_emoji =
-                        random_lark_ack_reaction(payload.get("event"), ack_text).to_string();
-                    let reaction_channel = Arc::clone(&state.channel);
-                    let reaction_message_id = message_id.to_string();
-                    tokio::spawn(async move {
-                        reaction_channel
-                            .try_add_ack_reaction(&reaction_message_id, &ack_emoji)
-                            .await;
-                    });
-                }
+            {
+                let ack_text = messages.first().map_or("", |msg| msg.content.as_str());
+                let ack_emoji =
+                    random_lark_ack_reaction(payload.get("event"), ack_text).to_string();
+                let reaction_channel = Arc::clone(&state.channel);
+                let reaction_message_id = message_id.to_string();
+                tokio::spawn(async move {
+                    reaction_channel
+                        .try_add_ack_reaction(&reaction_message_id, &ack_emoji)
+                        .await;
+                });
             }
 
             for msg in messages {

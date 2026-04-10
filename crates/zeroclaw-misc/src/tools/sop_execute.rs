@@ -91,12 +91,11 @@ impl Tool for SopExecuteTool {
         };
 
         // Audit log (engine lock dropped, safe to await)
-        if let Some(ref audit) = self.audit {
-            if let Some(ref run) = run_snapshot {
-                if let Err(e) = audit.log_run_start(run).await {
-                    warn!("SOP audit log_run_start failed: {e}");
-                }
-            }
+        if let Some(ref audit) = self.audit
+            && let Some(ref run) = run_snapshot
+            && let Err(e) = audit.log_run_start(run).await
+        {
+            warn!("SOP audit log_run_start failed: {e}");
         }
 
         match action {

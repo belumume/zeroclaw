@@ -12,20 +12,15 @@ use ring::signature::{self, Ed25519KeyPair, KeyPair};
 use super::error::PluginError;
 
 /// Signature mode controls how unsigned/unverified plugins are handled.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SignatureMode {
     /// Reject plugins that are unsigned or fail verification.
     Strict,
     /// Warn but allow plugins that are unsigned or fail verification.
     Permissive,
     /// Do not check signatures at all.
+    #[default]
     Disabled,
-}
-
-impl Default for SignatureMode {
-    fn default() -> Self {
-        Self::Disabled
-    }
 }
 
 /// Result of verifying a plugin's signature.
@@ -65,7 +60,7 @@ fn b64u_decode(s: &str) -> Result<Vec<u8>, PluginError> {
 fn hex_decode(s: &str) -> Result<Vec<u8>, PluginError> {
     // Simple hex decoder
     let s = s.trim();
-    if s.len() % 2 != 0 {
+    if !s.len().is_multiple_of(2) {
         return Err(PluginError::SignatureInvalid(
             "hex string must have even length".into(),
         ));
@@ -103,7 +98,7 @@ pub fn canonical_manifest_bytes(manifest_toml: &str) -> Vec<u8> {
         lines.push(line);
     }
     // Remove trailing empty lines to normalize
-    while lines.last().map_or(false, |l| l.trim().is_empty()) {
+    while lines.last().is_some_and(|l| l.trim().is_empty()) {
         lines.pop();
     }
     let canonical = lines.join("\n");

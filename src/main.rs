@@ -2996,6 +2996,31 @@ async fn handle_auth_command(auth_command: AuthCommands, config: &Config) -> Res
     }
 }
 
+#[cfg(feature = "gateway")]
+async fn run_gateway_if_enabled(
+    host: &str,
+    port: u16,
+    config: zeroclaw::config::Config,
+    tx: Option<tokio::sync::broadcast::Sender<serde_json::Value>>,
+) -> anyhow::Result<()> {
+    Box::pin(gateway::run_gateway(host, port, config, tx)).await
+}
+
+#[cfg(not(feature = "gateway"))]
+async fn run_gateway_if_enabled(
+    _host: &str,
+    _port: u16,
+    _config: zeroclaw::config::Config,
+    _tx: Option<tokio::sync::broadcast::Sender<serde_json::Value>>,
+) -> anyhow::Result<()> {
+    anyhow::bail!("Gateway feature is not enabled. Rebuild with --features gateway")
+}
+
+#[cfg(feature = "tui-onboarding")]
+async fn run_tui_if_enabled() -> anyhow::Result<()> {
+    Box::pin(tui::run_tui_onboarding()).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3248,31 +3273,6 @@ mod tests {
 
         assert!((final_temperature - 0.7).abs() < f64::EPSILON);
     }
-}
-
-#[cfg(feature = "gateway")]
-async fn run_gateway_if_enabled(
-    host: &str,
-    port: u16,
-    config: zeroclaw::config::Config,
-    tx: Option<tokio::sync::broadcast::Sender<serde_json::Value>>,
-) -> anyhow::Result<()> {
-    gateway::run_gateway(host, port, config, tx).await
-}
-
-#[cfg(not(feature = "gateway"))]
-async fn run_gateway_if_enabled(
-    _host: &str,
-    _port: u16,
-    _config: zeroclaw::config::Config,
-    _tx: Option<tokio::sync::broadcast::Sender<serde_json::Value>>,
-) -> anyhow::Result<()> {
-    anyhow::bail!("Gateway feature is not enabled. Rebuild with --features gateway")
-}
-
-#[cfg(feature = "tui-onboarding")]
-async fn run_tui_if_enabled() -> anyhow::Result<()> {
-    tui::run_tui_onboarding().await
 }
 
 #[cfg(not(feature = "tui-onboarding"))]

@@ -67,7 +67,6 @@ pub struct IntegrationEntry {
 }
 
 /// Handle the `integrations` CLI command
-
 pub fn show_integration_info(config: &Config, name: &str) -> Result<()> {
     let entries = registry::all_integrations();
     let name_lower = name.to_lowercase();
@@ -174,7 +173,7 @@ pub fn show_integration_info(config: &Config, name: &str) -> Result<()> {
     Ok(())
 }
 
-#[cfg(all(test, feature = "_root_tests"))]
+#[cfg(all(test, zeroclaw_root_crate))]
 mod tests {
     use super::*;
 

@@ -78,10 +78,10 @@ impl RetrievalPipeline {
     /// Check the hot cache for a previous result.
     fn check_cache(&self, key: &str) -> Option<Vec<MemoryEntry>> {
         let cache = self.hot_cache.lock();
-        if let Some(cached) = cache.get(key) {
-            if cached.created_at.elapsed() < self.config.cache_ttl {
-                return Some(cached.entries.clone());
-            }
+        if let Some(cached) = cache.get(key)
+            && cached.created_at.elapsed() < self.config.cache_ttl
+        {
+            return Some(cached.entries.clone());
         }
         None
     }
@@ -146,16 +146,15 @@ impl RetrievalPipeline {
                     if !results.is_empty() {
                         // Check for FTS early-return: if top score exceeds threshold
                         // and we're in the FTS stage, we can skip further stages
-                        if stage == "fts" {
-                            if let Some(top_score) = results.first().and_then(|e| e.score) {
-                                if top_score >= self.config.fts_early_return_score {
-                                    tracing::debug!(
-                                        "retrieval pipeline: FTS early return (score={top_score:.3})"
-                                    );
-                                    self.store_in_cache(ck, results.clone());
-                                    return Ok(results);
-                                }
-                            }
+                        if stage == "fts"
+                            && let Some(top_score) = results.first().and_then(|e| e.score)
+                            && top_score >= self.config.fts_early_return_score
+                        {
+                            tracing::debug!(
+                                "retrieval pipeline: FTS early return (score={top_score:.3})"
+                            );
+                            self.store_in_cache(ck, results.clone());
+                            return Ok(results);
                         }
 
                         self.store_in_cache(ck, results.clone());

@@ -83,10 +83,10 @@ fn pattern_matches(output: &str, pattern: &str) -> bool {
         return true;
     }
     // Try regex first
-    if let Ok(re) = Regex::new(pattern) {
-        if re.is_match(output) {
-            return true;
-        }
+    if let Ok(re) = Regex::new(pattern)
+        && re.is_match(output)
+    {
+        return true;
     }
     // Fallback: substring match
     output.contains(pattern)

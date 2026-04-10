@@ -197,10 +197,9 @@ fn extract_node_ws_token<'a>(
         .get(header::AUTHORIZATION)
         .and_then(|v| v.to_str().ok())
         .and_then(|auth| auth.strip_prefix("Bearer "))
+        && !t.is_empty()
     {
-        if !t.is_empty() {
-            return Some(t);
-        }
+        return Some(t);
     }
 
     // 2. Sec-WebSocket-Protocol: bearer.<token>
@@ -213,17 +212,16 @@ fn extract_node_ws_token<'a>(
                 .map(|p| p.trim())
                 .find_map(|p| p.strip_prefix(BEARER_SUBPROTO_PREFIX))
         })
+        && !t.is_empty()
     {
-        if !t.is_empty() {
-            return Some(t);
-        }
+        return Some(t);
     }
 
     // 3. ?token= query parameter
-    if let Some(t) = query_token {
-        if !t.is_empty() {
-            return Some(t);
-        }
+    if let Some(t) = query_token
+        && !t.is_empty()
+    {
+        return Some(t);
     }
 
     None
@@ -265,9 +263,8 @@ pub async fn handle_ws_nodes(
     let ws = if headers
         .get("sec-websocket-protocol")
         .and_then(|v| v.to_str().ok())
-        .map_or(false, |protos| {
-            protos.split(',').any(|p| p.trim() == WS_NODE_PROTOCOL)
-        }) {
+        .is_some_and(|protos| protos.split(',').any(|p| p.trim() == WS_NODE_PROTOCOL))
+    {
         ws.protocols([WS_NODE_PROTOCOL])
     } else {
         ws

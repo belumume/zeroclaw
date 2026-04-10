@@ -4,6 +4,12 @@ use zeroclaw_api::runtime_traits::RuntimeAdapter;
 /// Native runtime — full access, runs on Mac/Linux/Windows/Docker/Raspberry Pi
 pub struct NativeRuntime;
 
+impl Default for NativeRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NativeRuntime {
     pub fn new() -> Self {
         Self

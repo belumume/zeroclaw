@@ -69,34 +69,29 @@ impl PluginHost {
             let path = entry.path();
             if path.is_dir() {
                 let manifest_path = path.join("manifest.toml");
-                if manifest_path.exists() {
-                    if let Ok(manifest) = self.load_manifest(&manifest_path) {
-                        // Verify plugin signature
-                        let manifest_toml =
-                            std::fs::read_to_string(&manifest_path).unwrap_or_default();
-                        match self.verify_plugin_signature(
-                            &manifest.name,
-                            &manifest_toml,
-                            &manifest,
-                        ) {
-                            Ok(verification) => {
-                                let wasm_path = path.join(&manifest.wasm_path);
-                                self.loaded.insert(
-                                    manifest.name.clone(),
-                                    LoadedPlugin {
-                                        manifest,
-                                        wasm_path,
-                                        verification,
-                                    },
-                                );
-                            }
-                            Err(e) => {
-                                tracing::warn!(
-                                    plugin = path.display().to_string(),
-                                    error = %e,
-                                    "skipping plugin due to signature verification failure"
-                                );
-                            }
+                if manifest_path.exists()
+                    && let Ok(manifest) = self.load_manifest(&manifest_path)
+                {
+                    // Verify plugin signature
+                    let manifest_toml = std::fs::read_to_string(&manifest_path).unwrap_or_default();
+                    match self.verify_plugin_signature(&manifest.name, &manifest_toml, &manifest) {
+                        Ok(verification) => {
+                            let wasm_path = path.join(&manifest.wasm_path);
+                            self.loaded.insert(
+                                manifest.name.clone(),
+                                LoadedPlugin {
+                                    manifest,
+                                    wasm_path,
+                                    verification,
+                                },
+                            );
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                plugin = path.display().to_string(),
+                                error = %e,
+                                "skipping plugin due to signature verification failure"
+                            );
                         }
                     }
                 }

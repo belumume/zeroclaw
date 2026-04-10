@@ -258,10 +258,9 @@ pub fn create_memory_with_storage_and_routes(
             backend_kind,
             MemoryBackendKind::Sqlite | MemoryBackendKind::Lucid
         )
+        && let Err(e) = snapshot::export_snapshot(workspace_dir)
     {
-        if let Err(e) = snapshot::export_snapshot(workspace_dir) {
-            tracing::warn!("memory snapshot skipped: {e}");
-        }
+        tracing::warn!("memory snapshot skipped: {e}");
     }
 
     // Auto-hydration: if brain.db is missing but MEMORY_SNAPSHOT.md exists,

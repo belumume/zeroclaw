@@ -94,17 +94,16 @@ impl Tool for CronRunTool {
             }
         };
 
-        if matches!(job.job_type, JobType::Shell) {
-            if let Err(reason) = self
+        if matches!(job.job_type, JobType::Shell)
+            && let Err(reason) = self
                 .security
                 .validate_command_execution(&job.command, approved)
-            {
-                return Ok(ToolResult {
-                    success: false,
-                    output: String::new(),
-                    error: Some(reason),
-                });
-            }
+        {
+            return Ok(ToolResult {
+                success: false,
+                output: String::new(),
+                error: Some(reason),
+            });
         }
 
         if !self.security.record_action() {

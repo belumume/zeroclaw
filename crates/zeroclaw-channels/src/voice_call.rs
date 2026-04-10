@@ -371,16 +371,16 @@ impl Channel for VoiceCallChannel {
         // For active calls, TTS the message to the caller
         if let Some(ref thread_ts) = message.thread_ts {
             let calls = self.active_calls.lock().await;
-            if let Some(record) = calls.get(thread_ts) {
-                if record.state == CallState::InProgress {
-                    debug!(
-                        call_id = thread_ts,
-                        "would TTS message to active call: {}", message.content
-                    );
-                    // TTS synthesis + streaming would be handled by the
-                    // telephony provider's media stream API in production.
-                    return Ok(());
-                }
+            if let Some(record) = calls.get(thread_ts)
+                && record.state == CallState::InProgress
+            {
+                debug!(
+                    call_id = thread_ts,
+                    "would TTS message to active call: {}", message.content
+                );
+                // TTS synthesis + streaming would be handled by the
+                // telephony provider's media stream API in production.
+                return Ok(());
             }
         }
 

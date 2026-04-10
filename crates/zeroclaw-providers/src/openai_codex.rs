@@ -333,10 +333,10 @@ fn extract_responses_text(response: &ResponsesResponse) -> Option<String> {
 
     for item in &response.output {
         for content in &item.content {
-            if content.kind.as_deref() == Some("output_text") {
-                if let Some(text) = first_nonempty(content.text.as_deref()) {
-                    return Some(text);
-                }
+            if content.kind.as_deref() == Some("output_text")
+                && let Some(text) = first_nonempty(content.text.as_deref())
+            {
+                return Some(text);
             }
         }
     }
@@ -481,11 +481,11 @@ fn append_utf8_stream_chunk(
     pending: &mut Vec<u8>,
     chunk: &[u8],
 ) -> anyhow::Result<()> {
-    if pending.is_empty() {
-        if let Ok(text) = std::str::from_utf8(chunk) {
-            body.push_str(text);
-            return Ok(());
-        }
+    if pending.is_empty()
+        && let Ok(text) = std::str::from_utf8(chunk)
+    {
+        body.push_str(text);
+        return Ok(());
     }
 
     if !chunk.is_empty() {

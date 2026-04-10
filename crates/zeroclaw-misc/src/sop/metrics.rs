@@ -199,13 +199,13 @@ impl SopMetricsCollector {
 
         for entry in &entries {
             if entry.key.starts_with("sop_run_") {
-                if let Ok(run) = serde_json::from_str::<SopRun>(&entry.content) {
-                    if matches!(
+                if let Ok(run) = serde_json::from_str::<SopRun>(&entry.content)
+                    && matches!(
                         run.status,
                         SopRunStatus::Completed | SopRunStatus::Failed | SopRunStatus::Cancelled
-                    ) {
-                        runs.insert(run.run_id.clone(), run);
-                    }
+                    )
+                {
+                    runs.insert(run.run_id.clone(), run);
                 }
             } else if entry.key.starts_with("sop_approval_") {
                 if let Ok(run) = serde_json::from_str::<SopRun>(&entry.content) {
@@ -214,13 +214,13 @@ impl SopMetricsCollector {
                         .entry(run.run_id.clone())
                         .or_insert(run.sop_name);
                 }
-            } else if entry.key.starts_with("sop_timeout_approve_") {
-                if let Ok(run) = serde_json::from_str::<SopRun>(&entry.content) {
-                    *timeout_counts.entry(run.run_id.clone()).or_default() += 1;
-                    approval_sop_names
-                        .entry(run.run_id.clone())
-                        .or_insert(run.sop_name);
-                }
+            } else if entry.key.starts_with("sop_timeout_approve_")
+                && let Ok(run) = serde_json::from_str::<SopRun>(&entry.content)
+            {
+                *timeout_counts.entry(run.run_id.clone()).or_default() += 1;
+                approval_sop_names
+                    .entry(run.run_id.clone())
+                    .or_insert(run.sop_name);
             }
         }
 

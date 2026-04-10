@@ -661,10 +661,10 @@ impl SlackChannel {
             return None;
         };
 
-        if let Some(entry) = cache.get(user_id) {
-            if now <= entry.expires_at {
-                return Some(entry.display_name.clone());
-            }
+        if let Some(entry) = cache.get(user_id)
+            && now <= entry.expires_at
+        {
+            return Some(entry.display_name.clone());
         }
 
         cache.remove(user_id);
@@ -1237,15 +1237,15 @@ impl SlackChannel {
 
         // Voice / audio transcription: if transcription is configured and the
         // file looks like an audio attachment, download and transcribe it.
-        if Self::is_audio_file(&file) {
-            if let Some(transcribed) = self.try_transcribe_audio_file(&file).await {
-                return Some(transcribed);
-            }
+        if Self::is_audio_file(&file)
+            && let Some(transcribed) = self.try_transcribe_audio_file(&file).await
+        {
+            return Some(transcribed);
         }
-        if Self::is_image_file(&file) {
-            if let Some(marker) = self.fetch_image_marker(&file).await {
-                return Some(marker);
-            }
+        if Self::is_image_file(&file)
+            && let Some(marker) = self.fetch_image_marker(&file).await
+        {
+            return Some(marker);
         }
 
         let mut snippet = Self::file_text_preview(&file);
@@ -1253,10 +1253,10 @@ impl SlackChannel {
             snippet = self.download_text_snippet(&file).await;
         }
 
-        if let Some(text) = snippet {
-            if !text.trim().is_empty() {
-                return Some(Self::format_snippet_attachment(&file, &text));
-            }
+        if let Some(text) = snippet
+            && !text.trim().is_empty()
+        {
+            return Some(Self::format_snippet_attachment(&file, &text));
         }
 
         Some(Self::format_attachment_summary(&file))
@@ -1726,14 +1726,13 @@ impl SlackChannel {
 
         if let Some(ext) = Self::file_extension(source_url)
             .or_else(|| Self::file_extension(&Self::slack_file_name(file)))
+            && let Some(mime) = Self::mime_from_extension(&ext)
         {
-            if let Some(mime) = Self::mime_from_extension(&ext) {
-                tracing::warn!(
-                    "Slack image MIME mismatch for {}: filename extension implies {}, but bytes do not match a supported image signature",
-                    redacted_source,
-                    mime
-                );
-            }
+            tracing::warn!(
+                "Slack image MIME mismatch for {}: filename extension implies {}, but bytes do not match a supported image signature",
+                redacted_source,
+                mime
+            );
         }
 
         None
@@ -2138,10 +2137,10 @@ impl SlackChannel {
     /// (voice memo, audio message, or uploaded audio file).
     fn is_audio_file(file: &serde_json::Value) -> bool {
         // Slack voice messages use subtype "slack_audio"
-        if let Some(subtype) = file.get("subtype").and_then(|v| v.as_str()) {
-            if subtype == "slack_audio" {
-                return true;
-            }
+        if let Some(subtype) = file.get("subtype").and_then(|v| v.as_str())
+            && subtype == "slack_audio"
+        {
+            return true;
         }
 
         if Self::slack_file_mime(file)
@@ -2155,10 +2154,9 @@ impl SlackChannel {
             .get("filetype")
             .and_then(|v| v.as_str())
             .map(|v| v.to_ascii_lowercase())
+            && Self::AUDIO_EXTENSIONS.contains(&ft.as_str())
         {
-            if Self::AUDIO_EXTENSIONS.contains(&ft.as_str()) {
-                return true;
-            }
+            return true;
         }
 
         Self::file_extension(&Self::slack_file_name(file))
@@ -2656,10 +2654,10 @@ impl SlackChannel {
 
                 // Handle interactive payloads (block_actions from /config UI).
                 if envelope_type == "interactive" {
-                    if let Some(msg) = Self::parse_block_action_as_command(&envelope, bot_user_id) {
-                        if tx.send(msg).await.is_err() {
-                            return Ok(());
-                        }
+                    if let Some(msg) = Self::parse_block_action_as_command(&envelope, bot_user_id)
+                        && tx.send(msg).await.is_err()
+                    {
+                        return Ok(());
                     }
                     continue;
                 }
@@ -2692,10 +2690,11 @@ impl SlackChannel {
                             .get("thread_ts")
                             .and_then(|v| v.as_str())
                             .unwrap_or_default();
-                        if !ch.is_empty() && !tts.is_empty() {
-                            if let Ok(mut map) = self.active_assistant_thread.lock() {
-                                map.insert(ch.to_string(), tts.to_string());
-                            }
+                        if !ch.is_empty()
+                            && !tts.is_empty()
+                            && let Ok(mut map) = self.active_assistant_thread.lock()
+                        {
+                            map.insert(ch.to_string(), tts.to_string());
                         }
                     }
                     continue;
@@ -2774,10 +2773,10 @@ impl SlackChannel {
                 if channel_id.is_empty() {
                     continue;
                 }
-                if let Some(ref configured_channels) = scoped_channels {
-                    if !configured_channels.iter().any(|id| id == &channel_id) {
-                        continue;
-                    }
+                if let Some(ref configured_channels) = scoped_channels
+                    && !configured_channels.iter().any(|id| id == &channel_id)
+                {
+                    continue;
                 }
 
                 let user = event
@@ -2843,10 +2842,10 @@ impl SlackChannel {
                 };
 
                 // Track thread context so start_typing can set assistant status.
-                if let Some(ref tts) = channel_msg.thread_ts {
-                    if let Ok(mut map) = self.active_assistant_thread.lock() {
-                        map.insert(channel_id.clone(), tts.clone());
-                    }
+                if let Some(ref tts) = channel_msg.thread_ts
+                    && let Ok(mut map) = self.active_assistant_thread.lock()
+                {
+                    map.insert(channel_id.clone(), tts.clone());
                 }
 
                 if tx.send(channel_msg).await.is_err() {
@@ -3462,14 +3461,14 @@ impl Channel for SlackChannel {
                 .await
             {
                 Ok(resp) => {
-                    if let Ok(resp_body) = resp.json::<serde_json::Value>().await {
-                        if resp_body.get("ok") != Some(&serde_json::Value::Bool(true)) {
-                            let err = resp_body
-                                .get("error")
-                                .and_then(|e| e.as_str())
-                                .unwrap_or("unknown");
-                            tracing::debug!("Slack chat.update (draft) failed: {err}");
-                        }
+                    if let Ok(resp_body) = resp.json::<serde_json::Value>().await
+                        && resp_body.get("ok") != Some(&serde_json::Value::Bool(true))
+                    {
+                        let err = resp_body
+                            .get("error")
+                            .and_then(|e| e.as_str())
+                            .unwrap_or("unknown");
+                        tracing::debug!("Slack chat.update (draft) failed: {err}");
                     }
                 }
                 Err(e) => {
@@ -3987,13 +3986,12 @@ impl Channel for SlackChannel {
             .json(&body)
             .send()
             .await
+            && !resp.status().is_success()
         {
-            if !resp.status().is_success() {
-                tracing::debug!(
-                    "assistant.threads.setStatus returned {}; ignoring",
-                    resp.status()
-                );
-            }
+            tracing::debug!(
+                "assistant.threads.setStatus returned {}; ignoring",
+                resp.status()
+            );
         }
 
         Ok(())

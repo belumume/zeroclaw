@@ -137,10 +137,10 @@ pub fn load_hardware_context_from_dir(hw_dir: &std::path::Path, aliases: &[&str]
 
     // 1. Global HARDWARE.md
     let global = hw_dir.join("HARDWARE.md");
-    if let Ok(content) = std::fs::read_to_string(&global) {
-        if !content.trim().is_empty() {
-            sections.push(content.trim().to_string());
-        }
+    if let Ok(content) = std::fs::read_to_string(&global)
+        && !content.trim().is_empty()
+    {
+        sections.push(content.trim().to_string());
     }
 
     // 2. Per-device profile
@@ -148,10 +148,10 @@ pub fn load_hardware_context_from_dir(hw_dir: &std::path::Path, aliases: &[&str]
     for alias in aliases {
         let path = devices_dir.join(format!("{alias}.md"));
         tracing::info!("loading device file: {:?}", path);
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            if !content.trim().is_empty() {
-                sections.push(content.trim().to_string());
-            }
+        if let Ok(content) = std::fs::read_to_string(&path)
+            && !content.trim().is_empty()
+        {
+            sections.push(content.trim().to_string());
         }
     }
 
@@ -165,10 +165,10 @@ pub fn load_hardware_context_from_dir(hw_dir: &std::path::Path, aliases: &[&str]
             .collect();
         skill_paths.sort();
         for path in skill_paths {
-            if let Ok(content) = std::fs::read_to_string(&path) {
-                if !content.trim().is_empty() {
-                    sections.push(content.trim().to_string());
-                }
+            if let Ok(content) = std::fs::read_to_string(&path)
+                && !content.trim().is_empty()
+            {
+                sections.push(content.trim().to_string());
             }
         }
     }

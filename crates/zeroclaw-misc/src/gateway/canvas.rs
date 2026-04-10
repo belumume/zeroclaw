@@ -201,9 +201,8 @@ pub async fn handle_ws_canvas(
     let ws = if headers
         .get("sec-websocket-protocol")
         .and_then(|v| v.to_str().ok())
-        .map_or(false, |protos| {
-            protos.split(',').any(|p| p.trim() == WS_CANVAS_PROTOCOL)
-        }) {
+        .is_some_and(|protos| protos.split(',').any(|p| p.trim() == WS_CANVAS_PROTOCOL))
+    {
         ws.protocols([WS_CANVAS_PROTOCOL])
     } else {
         ws

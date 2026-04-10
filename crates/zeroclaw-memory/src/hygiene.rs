@@ -67,10 +67,10 @@ pub fn run_if_due(config: &MemoryConfig, workspace_dir: &Path) -> Result<()> {
     };
 
     // Prune audit entries if audit is enabled.
-    if config.audit_enabled {
-        if let Err(e) = prune_audit_entries(workspace_dir, config.audit_retention_days) {
-            tracing::debug!("audit pruning skipped: {e}");
-        }
+    if config.audit_enabled
+        && let Err(e) = prune_audit_entries(workspace_dir, config.audit_retention_days)
+    {
+        tracing::debug!("audit pruning skipped: {e}");
     }
 
     write_state(workspace_dir, &report)?;

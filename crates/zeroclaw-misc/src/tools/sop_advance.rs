@@ -137,23 +137,23 @@ impl Tool for SopAdvanceTool {
 
         // Audit logging (engine lock dropped, safe to await)
         if let Some(ref audit) = self.audit {
-            if let Some(ref sr) = step_result_ok {
-                if let Err(e) = audit.log_step_result(run_id, sr).await {
-                    warn!("SOP audit log_step_result failed: {e}");
-                }
+            if let Some(ref sr) = step_result_ok
+                && let Err(e) = audit.log_step_result(run_id, sr).await
+            {
+                warn!("SOP audit log_step_result failed: {e}");
             }
-            if let Some(ref run) = finished_run {
-                if let Err(e) = audit.log_run_complete(run).await {
-                    warn!("SOP audit log_run_complete failed: {e}");
-                }
+            if let Some(ref run) = finished_run
+                && let Err(e) = audit.log_run_complete(run).await
+            {
+                warn!("SOP audit log_run_complete failed: {e}");
             }
         }
 
         // Metrics collector (independent of audit)
-        if let Some(ref collector) = self.collector {
-            if let Some(ref run) = finished_run {
-                collector.record_run_complete(run);
-            }
+        if let Some(ref collector) = self.collector
+            && let Some(ref run) = finished_run
+        {
+            collector.record_run_complete(run);
         }
 
         match action {

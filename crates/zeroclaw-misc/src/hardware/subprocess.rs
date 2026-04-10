@@ -143,15 +143,15 @@ impl Tool for SubprocessTool {
                 Ok::<(), std::io::Error>(())
             }
             .await;
-            if let Err(e) = write_result {
-                if e.kind() != std::io::ErrorKind::BrokenPipe {
-                    let _ = child.kill().await;
-                    return Err(anyhow::anyhow!(
-                        "failed to write args to plugin '{}' stdin: {}",
-                        self.manifest.tool.name,
-                        e
-                    ));
-                }
+            if let Err(e) = write_result
+                && e.kind() != std::io::ErrorKind::BrokenPipe
+            {
+                let _ = child.kill().await;
+                return Err(anyhow::anyhow!(
+                    "failed to write args to plugin '{}' stdin: {}",
+                    self.manifest.tool.name,
+                    e
+                ));
             }
             // stdin dropped here → child receives EOF
         }
@@ -263,23 +263,23 @@ impl Tool for SubprocessTool {
                     Ok(result) => {
                         // Non-zero exit overrides a parsed result: the plugin
                         // signalled failure even if it wrote a success line.
-                        if let Some(status) = child_status {
-                            if !status.success() {
-                                return Ok(ToolResult {
-                                    success: false,
-                                    output: String::new(),
-                                    error: Some(format!(
-                                        "plugin '{}' exited with {}{}",
-                                        self.manifest.tool.name,
-                                        status,
-                                        if stderr_msg.is_empty() {
-                                            String::new()
-                                        } else {
-                                            format!("; stderr: {}", stderr_msg)
-                                        }
-                                    )),
-                                });
-                            }
+                        if let Some(status) = child_status
+                            && !status.success()
+                        {
+                            return Ok(ToolResult {
+                                success: false,
+                                output: String::new(),
+                                error: Some(format!(
+                                    "plugin '{}' exited with {}{}",
+                                    self.manifest.tool.name,
+                                    status,
+                                    if stderr_msg.is_empty() {
+                                        String::new()
+                                    } else {
+                                        format!("; stderr: {}", stderr_msg)
+                                    }
+                                )),
+                            });
                         }
                         Ok(result)
                     }

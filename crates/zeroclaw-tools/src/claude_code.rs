@@ -223,10 +223,10 @@ impl Tool for ClaudeCodeTool {
         }
         for var in &self.config.env_passthrough {
             let trimmed = var.trim();
-            if !trimmed.is_empty() {
-                if let Ok(val) = std::env::var(trimmed) {
-                    cmd.env(trimmed, val);
-                }
+            if !trimmed.is_empty()
+                && let Ok(val) = std::env::var(trimmed)
+            {
+                cmd.env(trimmed, val);
             }
         }
 

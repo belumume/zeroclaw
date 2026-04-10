@@ -108,14 +108,12 @@ impl SopEngine {
         }
 
         // Cooldown: check most recent finished run for this SOP
-        if sop.cooldown_secs > 0 {
-            if let Some(last) = self.last_finished_run(sop_name) {
-                if let Some(ref completed_at) = last.completed_at {
-                    if !cooldown_elapsed(completed_at, sop.cooldown_secs) {
-                        return false;
-                    }
-                }
-            }
+        if sop.cooldown_secs > 0
+            && let Some(last) = self.last_finished_run(sop_name)
+            && let Some(ref completed_at) = last.completed_at
+            && !cooldown_elapsed(completed_at, sop.cooldown_secs)
+        {
+            return false;
         }
 
         true
@@ -125,9 +123,10 @@ impl SopEngine {
     /// Deterministic SOPs are automatically routed to `start_deterministic_run`.
     pub fn start_run(&mut self, sop_name: &str, event: SopEvent) -> Result<SopRunAction> {
         // Route deterministic SOPs to dedicated path
-        if self.get_sop(sop_name).map_or(false, |s| {
-            s.execution_mode == SopExecutionMode::Deterministic
-        }) {
+        if self
+            .get_sop(sop_name)
+            .is_some_and(|s| s.execution_mode == SopExecutionMode::Deterministic)
+        {
             return self.start_deterministic_run(sop_name, event);
         }
 
@@ -179,11 +178,11 @@ impl SopEngine {
         let action = resolve_step_action(&sop, &step, run_id.clone(), context);
 
         // If the action is WaitApproval, update run status and record timestamp
-        if matches!(action, SopRunAction::WaitApproval { .. }) {
-            if let Some(run) = self.active_runs.get_mut(&run_id) {
-                run.status = SopRunStatus::WaitingApproval;
-                run.waiting_since = Some(now_iso8601());
-            }
+        if matches!(action, SopRunAction::WaitApproval { .. })
+            && let Some(run) = self.active_runs.get_mut(&run_id)
+        {
+            run.status = SopRunStatus::WaitingApproval;
+            run.waiting_since = Some(now_iso8601());
         }
 
         Ok(action)
@@ -233,11 +232,11 @@ impl SopEngine {
         let action = resolve_step_action(&sop, &step, run_id_str.clone(), context);
 
         // If the action is WaitApproval, update run status and record timestamp
-        if matches!(action, SopRunAction::WaitApproval { .. }) {
-            if let Some(run) = self.active_runs.get_mut(&run_id_str) {
-                run.status = SopRunStatus::WaitingApproval;
-                run.waiting_since = Some(now_iso8601());
-            }
+        if matches!(action, SopRunAction::WaitApproval { .. })
+            && let Some(run) = self.active_runs.get_mut(&run_id_str)
+        {
+            run.status = SopRunStatus::WaitingApproval;
+            run.waiting_since = Some(now_iso8601());
         }
 
         Ok(action)
@@ -292,7 +291,7 @@ impl SopEngine {
     pub fn finished_runs(&self, sop_name: Option<&str>) -> Vec<&SopRun> {
         self.finished_runs
             .iter()
-            .filter(|r| sop_name.map_or(true, |name| r.sop_name == name))
+            .filter(|r| sop_name.is_none_or(|name| r.sop_name == name))
             .collect()
     }
 
@@ -549,10 +548,7 @@ impl SopEngine {
 
         // Write to SOP location directory, or system temp dir
         let temp_dir = std::env::temp_dir();
-        let dir = sop
-            .location
-            .as_deref()
-            .unwrap_or_else(|| temp_dir.as_path());
+        let dir = sop.location.as_deref().unwrap_or(temp_dir.as_path());
         let state_file = dir.join(format!("{run_id}.state.json"));
         let json = serde_json::to_string_pretty(&state)?;
         std::fs::write(&state_file, json)?;
@@ -587,16 +583,16 @@ impl SopEngine {
             .filter(|r| {
                 r.waiting_since
                     .as_deref()
-                    .map_or(false, |ts| cooldown_elapsed(ts, timeout_secs))
+                    .is_some_and(|ts| cooldown_elapsed(ts, timeout_secs))
             })
             .map(|r| {
-                let is_critical = self
-                    .sops
-                    .iter()
-                    .find(|s| s.name == r.sop_name)
-                    .map_or(false, |s| {
-                        matches!(s.priority, SopPriority::Critical | SopPriority::High)
-                    });
+                let is_critical =
+                    self.sops
+                        .iter()
+                        .find(|s| s.name == r.sop_name)
+                        .is_some_and(|s| {
+                            matches!(s.priority, SopPriority::Critical | SopPriority::High)
+                        });
                 (r.run_id.clone(), is_critical)
             })
             .collect();
@@ -680,7 +676,7 @@ fn trigger_matches(trigger: &SopTrigger, event: &SopEvent) -> bool {
             let topic_match = event
                 .topic
                 .as_deref()
-                .map_or(false, |t| mqtt_topic_matches(topic, t));
+                .is_some_and(|t| mqtt_topic_matches(topic, t));
             if !topic_match {
                 return false;
             }
@@ -692,7 +688,7 @@ fn trigger_matches(trigger: &SopTrigger, event: &SopEvent) -> bool {
         }
 
         (SopTrigger::Webhook { path }, SopTriggerSource::Webhook) => {
-            event.topic.as_deref().map_or(false, |t| t == path)
+            event.topic.as_deref().is_some_and(|t| t == path)
         }
 
         (
@@ -703,7 +699,7 @@ fn trigger_matches(trigger: &SopTrigger, event: &SopEvent) -> bool {
             },
             SopTriggerSource::Peripheral,
         ) => {
-            let topic_match = event.topic.as_deref().map_or(false, |t| {
+            let topic_match = event.topic.as_deref().is_some_and(|t| {
                 let expected = format!("{board}/{signal}");
                 t == expected
             });
@@ -718,7 +714,7 @@ fn trigger_matches(trigger: &SopTrigger, event: &SopEvent) -> bool {
         }
 
         (SopTrigger::Cron { expression }, SopTriggerSource::Cron) => {
-            event.topic.as_deref().map_or(false, |t| t == expression)
+            event.topic.as_deref().is_some_and(|t| t == expression)
         }
 
         (SopTrigger::Manual, SopTriggerSource::Manual) => true,

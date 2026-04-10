@@ -425,32 +425,31 @@ impl ModelRoutingConfigTool {
         // before the channel hot-reload picks up the change.
         if let (Some(provider_name), Some(model_name)) =
             (cfg.default_provider.clone(), cfg.default_model.clone())
+            && let Err(probe_err) = self.probe_model(&provider_name, &model_name).await
         {
-            if let Err(probe_err) = self.probe_model(&provider_name, &model_name).await {
-                if zeroclaw_providers::reliable::is_non_retryable(&probe_err) {
-                    let reverted_model = previous_model.as_deref().unwrap_or("(none)").to_string();
+            if zeroclaw_providers::reliable::is_non_retryable(&probe_err) {
+                let reverted_model = previous_model.as_deref().unwrap_or("(none)").to_string();
 
-                    // Rollback to previous config.
-                    cfg.default_provider = previous_provider;
-                    cfg.default_model = previous_model;
-                    cfg.default_temperature = previous_temperature;
-                    cfg.save().await?;
+                // Rollback to previous config.
+                cfg.default_provider = previous_provider;
+                cfg.default_model = previous_model;
+                cfg.default_temperature = previous_temperature;
+                cfg.save().await?;
 
-                    return Ok(ToolResult {
-                        success: false,
-                        output: format!(
-                            "Model '{model_name}' is not available: {probe_err}. Reverted to '{reverted_model}'.",
-                        ),
-                        error: None,
-                    });
-                }
-                // Retryable errors (e.g. transient network issues) — keep the
-                // new config and let the resilient wrapper handle retries.
-                tracing::warn!(
-                    model = %model_name,
-                    "Model probe returned retryable error (keeping new config): {probe_err}"
-                );
+                return Ok(ToolResult {
+                    success: false,
+                    output: format!(
+                        "Model '{model_name}' is not available: {probe_err}. Reverted to '{reverted_model}'.",
+                    ),
+                    error: None,
+                });
             }
+            // Retryable errors (e.g. transient network issues) — keep the
+            // new config and let the resilient wrapper handle retries.
+            tracing::warn!(
+                model = %model_name,
+                "Model probe returned retryable error (keeping new config): {probe_err}"
+            );
         }
 
         Ok(ToolResult {

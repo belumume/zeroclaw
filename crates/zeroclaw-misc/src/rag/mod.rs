@@ -76,10 +76,10 @@ pub fn parse_pin_aliases(content: &str) -> PinAliases {
                 {
                     continue;
                 }
-                if let Ok(pin) = pin_str.parse::<u32>() {
-                    if !alias.is_empty() {
-                        aliases.insert(alias, pin);
-                    }
+                if let Ok(pin) = pin_str.parse::<u32>()
+                    && !alias.is_empty()
+                {
+                    aliases.insert(alias, pin);
                 }
             }
             continue;
@@ -87,10 +87,10 @@ pub fn parse_pin_aliases(content: &str) -> PinAliases {
         // Key: value
         if let Some((k, v)) = line.split_once(':').or_else(|| line.split_once('=')) {
             let alias = k.trim().to_lowercase().replace(' ', "_");
-            if let Ok(pin) = v.trim().parse::<u32>() {
-                if !alias.is_empty() {
-                    aliases.insert(alias, pin);
-                }
+            if let Ok(pin) = v.trim().parse::<u32>()
+                && !alias.is_empty()
+            {
+                aliases.insert(alias, pin);
             }
         }
     }
@@ -194,10 +194,10 @@ impl HardwareRag {
 
             // Parse pin aliases from full content
             let aliases = parse_pin_aliases(&content);
-            if let Some(ref b) = board {
-                if !aliases.is_empty() {
-                    pin_aliases.insert(b.clone(), aliases);
-                }
+            if let Some(ref b) = board
+                && !aliases.is_empty()
+            {
+                pin_aliases.insert(b.clone(), aliases);
             }
 
             for chunk in chunker::chunk_markdown(&content, max_tokens) {
@@ -272,7 +272,7 @@ impl HardwareRag {
             }
 
             if score > 0.0 {
-                let board_match = chunk.board.as_ref().map_or(false, |b| boards.contains(b));
+                let board_match = chunk.board.as_ref().is_some_and(|b| boards.contains(b));
                 if board_match {
                     score += 2.0;
                 }

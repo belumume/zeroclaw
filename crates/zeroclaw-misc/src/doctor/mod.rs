@@ -570,19 +570,17 @@ fn check_config_semantics(config: &Config, items: &mut Vec<DiagItem>) {
         .strip_prefix("hint:")
         .map(str::trim)
         .filter(|value| !value.is_empty())
-    {
-        if !config
+        && !config
             .embedding_routes
             .iter()
             .any(|route| route.hint.trim() == hint)
-        {
-            items.push(DiagItem::warn(
+    {
+        items.push(DiagItem::warn(
                 cat,
                 format!(
                     "memory.embedding_model uses hint \"{hint}\" but no matching [[embedding_routes]] entry exists"
                 ),
             ));
-        }
     }
 
     // Channel: at least one configured

@@ -26,6 +26,12 @@ pub struct CloudPatternsTool {
     patterns: Vec<CloudPattern>,
 }
 
+impl Default for CloudPatternsTool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CloudPatternsTool {
     pub fn new() -> Self {
         Self {

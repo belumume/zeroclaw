@@ -32,10 +32,11 @@ pub async fn check_and_resolve_conflicts(
         if !matches!(candidate.category, MemoryCategory::Core) {
             continue;
         }
-        if let Some(score) = candidate.score {
-            if score > threshold && candidate.content != content {
-                superseded.push(candidate.id.clone());
-            }
+        if let Some(score) = candidate.score
+            && score > threshold
+            && candidate.content != content
+        {
+            superseded.push(candidate.id.clone());
         }
     }
 

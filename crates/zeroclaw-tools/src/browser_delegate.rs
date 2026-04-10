@@ -208,14 +208,14 @@ impl Tool for BrowserDelegateTool {
             .filter(|u| !u.is_empty());
 
         // Validate URL if provided
-        if let Some(url) = url {
-            if let Err(e) = self.validate_url(url) {
-                return Ok(ToolResult {
-                    success: false,
-                    output: String::new(),
-                    error: Some(format!("URL validation failed: {e}")),
-                });
-            }
+        if let Some(url) = url
+            && let Err(e) = self.validate_url(url)
+        {
+            return Ok(ToolResult {
+                success: false,
+                output: String::new(),
+                error: Some(format!("URL validation failed: {e}")),
+            });
         }
 
         // Scan task text for embedded URLs and validate against domain policy.

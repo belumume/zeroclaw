@@ -91,7 +91,7 @@ pub fn load_playbooks(dir: &Path) -> Vec<Playbook> {
     if let Ok(entries) = std::fs::read_dir(dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map_or(false, |ext| ext == "json") {
+            if path.extension().is_some_and(|ext| ext == "json") {
                 match std::fs::read_to_string(&path) {
                     Ok(contents) => match serde_json::from_str::<Playbook>(&contents) {
                         Ok(pb) => playbooks.push(pb),

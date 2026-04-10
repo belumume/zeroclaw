@@ -263,15 +263,15 @@ impl AnthropicProvider {
 
     /// Apply cache control to the last message content block
     fn apply_cache_to_last_message(messages: &mut [NativeMessage]) {
-        if let Some(last_msg) = messages.last_mut() {
-            if let Some(last_content) = last_msg.content.last_mut() {
-                match last_content {
-                    NativeContentOut::Text { cache_control, .. }
-                    | NativeContentOut::ToolResult { cache_control, .. } => {
-                        *cache_control = Some(CacheControl::ephemeral());
-                    }
-                    NativeContentOut::ToolUse { .. } | NativeContentOut::Image { .. } => {}
+        if let Some(last_msg) = messages.last_mut()
+            && let Some(last_content) = last_msg.content.last_mut()
+        {
+            match last_content {
+                NativeContentOut::Text { cache_control, .. }
+                | NativeContentOut::ToolResult { cache_control, .. } => {
+                    *cache_control = Some(CacheControl::ephemeral());
                 }
+                NativeContentOut::ToolUse { .. } | NativeContentOut::Image { .. } => {}
             }
         }
     }
@@ -526,10 +526,10 @@ impl AnthropicProvider {
         for block in response.content {
             match block.kind.as_str() {
                 "text" => {
-                    if let Some(text) = block.text.map(|t| t.trim().to_string()) {
-                        if !text.is_empty() {
-                            text_parts.push(text);
-                        }
+                    if let Some(text) = block.text.map(|t| t.trim().to_string())
+                        && !text.is_empty()
+                    {
+                        text_parts.push(text);
                     }
                 }
                 "tool_use" => {
@@ -670,17 +670,16 @@ impl AnthropicProvider {
                             .unwrap_or_default();
                         match delta_type {
                             "text_delta" => {
-                                if let Some(text) = delta.get("text").and_then(|t| t.as_str()) {
-                                    if !text.is_empty()
-                                        && tx
-                                            .send(Ok(StreamEvent::TextDelta(StreamChunk::delta(
-                                                text.to_string(),
-                                            ))))
-                                            .await
-                                            .is_err()
-                                    {
-                                        return;
-                                    }
+                                if let Some(text) = delta.get("text").and_then(|t| t.as_str())
+                                    && !text.is_empty()
+                                    && tx
+                                        .send(Ok(StreamEvent::TextDelta(StreamChunk::delta(
+                                            text.to_string(),
+                                        ))))
+                                        .await
+                                        .is_err()
+                                {
+                                    return;
                                 }
                             }
                             "input_json_delta" => {

@@ -324,11 +324,11 @@ impl JiraTool {
         let mut statuses_results = vec![json!([]); keys.len()];
 
         for (i, key) in keys.iter().enumerate() {
-            if set.len() >= STATUS_CONCURRENCY {
-                if let Some(Ok((idx, result))) = set.join_next().await {
-                    statuses_results[idx] =
-                        result.map_err(|e| anyhow::anyhow!("Jira statuses failed: {e}"))?;
-                }
+            if set.len() >= STATUS_CONCURRENCY
+                && let Some(Ok((idx, result))) = set.join_next().await
+            {
+                statuses_results[idx] =
+                    result.map_err(|e| anyhow::anyhow!("Jira statuses failed: {e}"))?;
             }
 
             let client = self.http.clone();

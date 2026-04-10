@@ -135,7 +135,7 @@ impl Tool for SopStatusTool {
         let active: Vec<_> = engine
             .active_runs()
             .values()
-            .filter(|r| sop_name.map_or(true, |name| r.sop_name == name))
+            .filter(|r| sop_name.is_none_or(|name| r.sop_name == name))
             .collect();
 
         if active.is_empty() {

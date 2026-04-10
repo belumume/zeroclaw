@@ -279,37 +279,36 @@ async fn run_heartbeat_worker(config: Config) -> Result<()> {
             loop {
                 tokio::time::sleep(check_interval).await;
                 let last_tick = dm_metrics.lock().last_tick_at;
-                if let Some(last) = last_tick {
-                    if chrono::Utc::now() - last > timeout {
-                        let alert = format!(
-                            "⚠️ Heartbeat dead-man's switch: no tick in {deadman_timeout} minutes"
-                        );
-                        let (channel, target) =
-                            if let Some(ch) = &dm_config.heartbeat.deadman_channel {
-                                let to = dm_config
-                                    .heartbeat
-                                    .deadman_to
-                                    .as_deref()
-                                    .or(dm_config.heartbeat.to.as_deref())
-                                    .unwrap_or_default();
-                                (ch.clone(), to.to_string())
-                            } else if let Some((ch, to)) = &dm_delivery {
-                                (ch.clone(), to.clone())
-                            } else {
-                                continue;
-                            };
-                        let delivery_fut = crate::cron::scheduler::deliver_announcement(
-                            &dm_config, &channel, &target, &alert,
-                        );
-                        match tokio::time::timeout(Duration::from_secs(30), delivery_fut).await {
-                            Ok(Err(e)) => {
-                                tracing::warn!("Deadman alert delivery failed: {e}");
-                            }
-                            Err(_) => {
-                                tracing::warn!("Deadman alert delivery timed out (30s)");
-                            }
-                            Ok(Ok(())) => {}
+                if let Some(last) = last_tick
+                    && chrono::Utc::now() - last > timeout
+                {
+                    let alert = format!(
+                        "⚠️ Heartbeat dead-man's switch: no tick in {deadman_timeout} minutes"
+                    );
+                    let (channel, target) = if let Some(ch) = &dm_config.heartbeat.deadman_channel {
+                        let to = dm_config
+                            .heartbeat
+                            .deadman_to
+                            .as_deref()
+                            .or(dm_config.heartbeat.to.as_deref())
+                            .unwrap_or_default();
+                        (ch.clone(), to.to_string())
+                    } else if let Some((ch, to)) = &dm_delivery {
+                        (ch.clone(), to.clone())
+                    } else {
+                        continue;
+                    };
+                    let delivery_fut = crate::cron::scheduler::deliver_announcement(
+                        &dm_config, &channel, &target, &alert,
+                    );
+                    match tokio::time::timeout(Duration::from_secs(30), delivery_fut).await {
+                        Ok(Err(e)) => {
+                            tracing::warn!("Deadman alert delivery failed: {e}");
                         }
+                        Err(_) => {
+                            tracing::warn!("Deadman alert delivery timed out (30s)");
+                        }
+                        Ok(Ok(())) => {}
                     }
                 }
             }
@@ -522,28 +521,29 @@ async fn run_heartbeat_worker(config: Config) -> Result<()> {
                         config.heartbeat.max_run_history,
                     );
                     // Consolidate heartbeat output to memory for cross-session awareness.
-                    if config.memory.auto_save && output.chars().count() >= 50 {
-                        if let Some(ref mem) = heartbeat_memory {
-                            let key = format!("heartbeat_{}", uuid::Uuid::new_v4());
-                            let summary = if output.len() > 500 {
-                                // Find a valid UTF-8 char boundary at or before 500.
-                                let mut end = 500;
-                                while end > 0 && !output.is_char_boundary(end) {
-                                    end -= 1;
-                                }
-                                &output[..end]
-                            } else {
-                                &output
-                            };
-                            let _ = mem
-                                .store(
-                                    &key,
-                                    &format!("Heartbeat task '{}': {}", task.text, summary),
-                                    zeroclaw_memory::MemoryCategory::Daily,
-                                    None,
-                                )
-                                .await;
-                        }
+                    if config.memory.auto_save
+                        && output.chars().count() >= 50
+                        && let Some(ref mem) = heartbeat_memory
+                    {
+                        let key = format!("heartbeat_{}", uuid::Uuid::new_v4());
+                        let summary = if output.len() > 500 {
+                            // Find a valid UTF-8 char boundary at or before 500.
+                            let mut end = 500;
+                            while end > 0 && !output.is_char_boundary(end) {
+                                end -= 1;
+                            }
+                            &output[..end]
+                        } else {
+                            &output
+                        };
+                        let _ = mem
+                            .store(
+                                &key,
+                                &format!("Heartbeat task '{}': {}", task.text, summary),
+                                zeroclaw_memory::MemoryCategory::Daily,
+                                None,
+                            )
+                            .await;
                     }
 
                     let announcement = if output.trim().is_empty() {

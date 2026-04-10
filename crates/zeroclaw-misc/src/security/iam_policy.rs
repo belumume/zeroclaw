@@ -131,18 +131,17 @@ impl IamPolicy {
 
         for role in &identity.roles {
             let key = role.trim().to_ascii_lowercase();
-            if let Some(compiled) = self.role_map.get(&key) {
-                if compiled.all_tools
-                    || compiled.allowed_tools.iter().any(|t| t == &normalized_tool)
-                {
-                    tracing::info!(
-                        user_id = %crate::security::redact(&identity.user_id),
-                        role = %key,
-                        tool = %normalized_tool,
-                        "IAM policy: tool access ALLOWED"
-                    );
-                    return PolicyDecision::Allow;
-                }
+            if let Some(compiled) = self.role_map.get(&key)
+                && (compiled.all_tools
+                    || compiled.allowed_tools.iter().any(|t| t == &normalized_tool))
+            {
+                tracing::info!(
+                    user_id = %crate::security::redact(&identity.user_id),
+                    role = %key,
+                    tool = %normalized_tool,
+                    "IAM policy: tool access ALLOWED"
+                );
+                return PolicyDecision::Allow;
             }
         }
 
@@ -174,21 +173,20 @@ impl IamPolicy {
 
         for role in &identity.roles {
             let key = role.trim().to_ascii_lowercase();
-            if let Some(compiled) = self.role_map.get(&key) {
-                if compiled.all_workspaces
+            if let Some(compiled) = self.role_map.get(&key)
+                && (compiled.all_workspaces
                     || compiled
                         .allowed_workspaces
                         .iter()
-                        .any(|w| w == &normalized_ws)
-                {
-                    tracing::info!(
-                        user_id = %crate::security::redact(&identity.user_id),
-                        role = %key,
-                        workspace = %normalized_ws,
-                        "IAM policy: workspace access ALLOWED"
-                    );
-                    return PolicyDecision::Allow;
-                }
+                        .any(|w| w == &normalized_ws))
+            {
+                tracing::info!(
+                    user_id = %crate::security::redact(&identity.user_id),
+                    role = %key,
+                    workspace = %normalized_ws,
+                    "IAM policy: workspace access ALLOWED"
+                );
+                return PolicyDecision::Allow;
             }
         }
 

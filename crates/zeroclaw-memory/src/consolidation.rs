@@ -98,38 +98,38 @@ pub async fn consolidate_turn(
         .await?;
 
     // Phase 2: Write memory update to Core category (if present).
-    if let Some(ref update) = result.memory_update {
-        if !update.trim().is_empty() {
-            let mem_key = format!("core_{}", uuid::Uuid::new_v4());
+    if let Some(ref update) = result.memory_update
+        && !update.trim().is_empty()
+    {
+        let mem_key = format!("core_{}", uuid::Uuid::new_v4());
 
-            // Compute importance score heuristically.
-            let imp = importance::compute_importance(update, &MemoryCategory::Core);
+        // Compute importance score heuristically.
+        let imp = importance::compute_importance(update, &MemoryCategory::Core);
 
-            // Check for conflicts with existing Core memories.
-            if let Err(e) = conflict::check_and_resolve_conflicts(
-                memory,
+        // Check for conflicts with existing Core memories.
+        if let Err(e) = conflict::check_and_resolve_conflicts(
+            memory,
+            &mem_key,
+            update,
+            &MemoryCategory::Core,
+            0.85,
+        )
+        .await
+        {
+            tracing::debug!("conflict check skipped: {e}");
+        }
+
+        // Store with importance metadata.
+        memory
+            .store_with_metadata(
                 &mem_key,
                 update,
-                &MemoryCategory::Core,
-                0.85,
+                MemoryCategory::Core,
+                None,
+                None,
+                Some(imp),
             )
-            .await
-            {
-                tracing::debug!("conflict check skipped: {e}");
-            }
-
-            // Store with importance metadata.
-            memory
-                .store_with_metadata(
-                    &mem_key,
-                    update,
-                    MemoryCategory::Core,
-                    None,
-                    None,
-                    Some(imp),
-                )
-                .await?;
-        }
+            .await?;
     }
 
     Ok(())

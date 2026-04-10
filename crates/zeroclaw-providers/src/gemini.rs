@@ -165,17 +165,17 @@ fn build_parts(content: &str) -> Vec<Part> {
         parts.push(Part::text(trimmed));
     }
     for uri in &image_refs {
-        if let Some(rest) = uri.strip_prefix("data:") {
-            if let Some(semi_pos) = rest.find(';') {
-                let mime = &rest[..semi_pos];
-                if let Some(b64) = rest[semi_pos + 1..].strip_prefix("base64,") {
-                    parts.push(Part::Inline {
-                        inline_data: InlineData {
-                            mime_type: mime.to_string(),
-                            data: b64.to_string(),
-                        },
-                    });
-                }
+        if let Some(rest) = uri.strip_prefix("data:")
+            && let Some(semi_pos) = rest.find(';')
+        {
+            let mime = &rest[..semi_pos];
+            if let Some(b64) = rest[semi_pos + 1..].strip_prefix("base64,") {
+                parts.push(Part::Inline {
+                    inline_data: InlineData {
+                        mime_type: mime.to_string(),
+                        data: b64.to_string(),
+                    },
+                });
             }
         }
     }
@@ -736,7 +736,7 @@ impl GeminiProvider {
         // Refresh if expiry is unknown, already expired, or within 60s of expiry.
         let needs_refresh = guard
             .expiry_millis
-            .map_or(true, |exp| exp <= now_millis.saturating_add(60_000));
+            .is_none_or(|exp| exp <= now_millis.saturating_add(60_000));
 
         if needs_refresh {
             if let Some(ref refresh_token) = guard.refresh_token {

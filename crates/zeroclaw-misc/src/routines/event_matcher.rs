@@ -68,11 +68,11 @@ pub fn matches_any(patterns: &[EventPattern], event: &RoutineEvent) -> bool {
 }
 
 fn glob_match(pattern: &str, text: &str) -> bool {
-    glob::Pattern::new(pattern).map_or(false, |g| g.matches(text))
+    glob::Pattern::new(pattern).is_ok_and(|g| g.matches(text))
 }
 
 fn regex_match(pattern: &str, text: &str) -> bool {
-    regex::Regex::new(pattern).map_or(false, |re| re.is_match(text))
+    regex::Regex::new(pattern).is_ok_and(|re| re.is_match(text))
 }
 
 #[cfg(test)]

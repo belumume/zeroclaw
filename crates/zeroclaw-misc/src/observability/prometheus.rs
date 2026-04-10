@@ -45,6 +45,12 @@ pub struct PrometheusObserver {
     deploy_failure_count: std::sync::atomic::AtomicU64,
 }
 
+impl Default for PrometheusObserver {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PrometheusObserver {
     pub fn new() -> Self {
         let registry = Registry::new();

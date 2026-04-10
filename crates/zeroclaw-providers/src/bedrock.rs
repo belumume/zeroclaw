@@ -466,6 +466,12 @@ pub struct BedrockProvider {
     max_tokens: u32,
 }
 
+impl Default for BedrockProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BedrockProvider {
     pub fn new() -> Self {
         // Bearer token takes precedence over SigV4 credentials.
@@ -663,16 +669,15 @@ impl BedrockProvider {
                     // Merge consecutive tool results into a single user message.
                     // Bedrock requires all toolResult blocks for a multi-tool-call
                     // turn to appear in one user message.
-                    if let Some(last) = converse_messages.last_mut() {
-                        if last.role == "user"
-                            && last
-                                .content
-                                .iter()
-                                .all(|b| matches!(b, ContentBlock::ToolResult(_)))
-                        {
-                            last.content.extend(tool_result_msg.content);
-                            continue;
-                        }
+                    if let Some(last) = converse_messages.last_mut()
+                        && last.role == "user"
+                        && last
+                            .content
+                            .iter()
+                            .all(|b| matches!(b, ContentBlock::ToolResult(_)))
+                    {
+                        last.content.extend(tool_result_msg.content);
+                        continue;
                     }
                     converse_messages.push(tool_result_msg);
                 }
@@ -789,27 +794,27 @@ impl BedrockProvider {
                 remaining = &after[end + 1..];
 
                 // Only handle data URIs (base64 encoded images)
-                if let Some(rest) = src.strip_prefix("data:") {
-                    if let Some(semi) = rest.find(';') {
-                        let mime = &rest[..semi];
-                        let after_semi = &rest[semi + 1..];
-                        if let Some(b64) = after_semi.strip_prefix("base64,") {
-                            let format = match mime {
-                                "image/png" => "png",
-                                "image/gif" => "gif",
-                                "image/webp" => "webp",
-                                _ => "jpeg",
-                            };
-                            blocks.push(ContentBlock::Image(ImageWrapper {
-                                image: ImageBlock {
-                                    format: format.to_string(),
-                                    source: ImageSource {
-                                        bytes: b64.to_string(),
-                                    },
+                if let Some(rest) = src.strip_prefix("data:")
+                    && let Some(semi) = rest.find(';')
+                {
+                    let mime = &rest[..semi];
+                    let after_semi = &rest[semi + 1..];
+                    if let Some(b64) = after_semi.strip_prefix("base64,") {
+                        let format = match mime {
+                            "image/png" => "png",
+                            "image/gif" => "gif",
+                            "image/webp" => "webp",
+                            _ => "jpeg",
+                        };
+                        blocks.push(ContentBlock::Image(ImageWrapper {
+                            image: ImageBlock {
+                                format: format.to_string(),
+                                source: ImageSource {
+                                    bytes: b64.to_string(),
                                 },
-                            }));
-                            continue;
-                        }
+                            },
+                        }));
+                        continue;
                     }
                 }
                 // Non-data-uri image: just include as text reference
@@ -936,27 +941,27 @@ impl BedrockProvider {
             cached_input_tokens: None,
         });
 
-        if let Some(output) = response.output {
-            if let Some(message) = output.message {
-                for block in message.content {
-                    match block {
-                        ResponseContentBlock::Text(tb) => {
-                            let trimmed = tb.text.trim().to_string();
-                            if !trimmed.is_empty() {
-                                text_parts.push(trimmed);
-                            }
+        if let Some(output) = response.output
+            && let Some(message) = output.message
+        {
+            for block in message.content {
+                match block {
+                    ResponseContentBlock::Text(tb) => {
+                        let trimmed = tb.text.trim().to_string();
+                        if !trimmed.is_empty() {
+                            text_parts.push(trimmed);
                         }
-                        ResponseContentBlock::ToolUse(wrapper) => {
-                            if !wrapper.tool_use.name.is_empty() {
-                                tool_calls.push(ProviderToolCall {
-                                    id: wrapper.tool_use.tool_use_id,
-                                    name: wrapper.tool_use.name,
-                                    arguments: wrapper.tool_use.input.to_string(),
-                                });
-                            }
-                        }
-                        ResponseContentBlock::Other(_) => {}
                     }
+                    ResponseContentBlock::ToolUse(wrapper) => {
+                        if !wrapper.tool_use.name.is_empty() {
+                            tool_calls.push(ProviderToolCall {
+                                id: wrapper.tool_use.tool_use_id,
+                                name: wrapper.tool_use.name,
+                                arguments: wrapper.tool_use.input.to_string(),
+                            });
+                        }
+                    }
+                    ResponseContentBlock::Other(_) => {}
                 }
             }
         }
@@ -984,30 +989,25 @@ impl BedrockProvider {
         let payload = serde_json::to_vec(request_body)?;
 
         // Debug: log image blocks in payload (truncated)
-        if let Ok(debug_val) = serde_json::from_slice::<serde_json::Value>(&payload) {
-            if let Some(msgs) = debug_val.get("messages").and_then(|m| m.as_array()) {
-                for msg in msgs {
-                    if let Some(content) = msg.get("content").and_then(|c| c.as_array()) {
-                        for block in content {
-                            if block.get("image").is_some() {
-                                let mut b = block.clone();
-                                if let Some(img) = b.get_mut("image") {
-                                    if let Some(src) = img.get_mut("source") {
-                                        if let Some(bytes) = src.get_mut("bytes") {
-                                            if let Some(s) = bytes.as_str() {
-                                                *bytes = serde_json::json!(format!(
-                                                    "<base64 {} chars>",
-                                                    s.len()
-                                                ));
-                                            }
-                                        }
-                                    }
-                                }
-                                tracing::info!(
-                                    "Bedrock image block: {}",
-                                    serde_json::to_string(&b).unwrap_or_default()
-                                );
+        if let Ok(debug_val) = serde_json::from_slice::<serde_json::Value>(&payload)
+            && let Some(msgs) = debug_val.get("messages").and_then(|m| m.as_array())
+        {
+            for msg in msgs {
+                if let Some(content) = msg.get("content").and_then(|c| c.as_array()) {
+                    for block in content {
+                        if block.get("image").is_some() {
+                            let mut b = block.clone();
+                            if let Some(img) = b.get_mut("image")
+                                && let Some(src) = img.get_mut("source")
+                                && let Some(bytes) = src.get_mut("bytes")
+                                && let Some(s) = bytes.as_str()
+                            {
+                                *bytes = serde_json::json!(format!("<base64 {} chars>", s.len()));
                             }
+                            tracing::info!(
+                                "Bedrock image block: {}",
+                                serde_json::to_string(&b).unwrap_or_default()
+                            );
                         }
                     }
                 }
@@ -1182,14 +1182,14 @@ impl Provider for BedrockProvider {
         });
 
         // Apply cachePoint to last message if conversation is long.
-        if Self::should_cache_conversation(request.messages) {
-            if let Some(last_msg) = converse_messages.last_mut() {
-                last_msg
-                    .content
-                    .push(ContentBlock::CachePointBlock(CachePointWrapper {
-                        cache_point: CachePoint::default_cache(),
-                    }));
-            }
+        if Self::should_cache_conversation(request.messages)
+            && let Some(last_msg) = converse_messages.last_mut()
+        {
+            last_msg
+                .content
+                .push(ContentBlock::CachePointBlock(CachePointWrapper {
+                    cache_point: CachePoint::default_cache(),
+                }));
         }
 
         let tool_config = Self::convert_tools_to_converse(request.tools);

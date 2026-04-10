@@ -328,10 +328,10 @@ pub fn extract_account_id_from_jwt(token: &str) -> Option<String> {
         "sub",
         "https://api.openai.com/account_id",
     ] {
-        if let Some(value) = claims.get(key).and_then(|v| v.as_str()) {
-            if !value.trim().is_empty() {
-                return Some(value.to_string());
-            }
+        if let Some(value) = claims.get(key).and_then(|v| v.as_str())
+            && !value.trim().is_empty()
+        {
+            return Some(value.to_string());
         }
     }
 

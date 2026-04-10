@@ -20,6 +20,12 @@ pub struct HookRunner {
     handlers: Vec<Box<dyn HookHandler>>,
 }
 
+impl Default for HookRunner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HookRunner {
     /// Create an empty runner with no handlers.
     pub fn new() -> Self {

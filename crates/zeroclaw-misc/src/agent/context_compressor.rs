@@ -59,16 +59,13 @@ pub fn parse_context_limit_from_error(msg: &str) -> Option<usize> {
     ];
     let lower = msg.to_lowercase();
     for pattern in re_patterns {
-        if let Ok(re) = regex::Regex::new(pattern) {
-            if let Some(caps) = re.captures(&lower) {
-                if let Some(m) = caps.get(1) {
-                    if let Ok(limit) = m.as_str().parse::<usize>() {
-                        if (1024..=10_000_000).contains(&limit) {
-                            return Some(limit);
-                        }
-                    }
-                }
-            }
+        if let Ok(re) = regex::Regex::new(pattern)
+            && let Some(caps) = re.captures(&lower)
+            && let Some(m) = caps.get(1)
+            && let Ok(limit) = m.as_str().parse::<usize>()
+            && (1024..=10_000_000).contains(&limit)
+        {
+            return Some(limit);
         }
     }
     None
@@ -437,7 +434,7 @@ fn repair_tool_pairs(messages: &mut Vec<ChatMessage>) {
 
     // Also check for tool results at the very start (after system prompt) that
     // are orphaned because their assistant message was compressed.
-    let start = if messages.first().map_or(false, |m| m.role == "system") {
+    let start = if messages.first().is_some_and(|m| m.role == "system") {
         1
     } else {
         0

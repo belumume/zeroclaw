@@ -129,10 +129,10 @@ impl ClaudeCodeProvider {
             cmd.arg("--model").arg(model);
         }
 
-        if let Some(sp) = system_prompt {
-            if !sp.is_empty() {
-                cmd.arg("--append-system-prompt").arg(sp);
-            }
+        if let Some(sp) = system_prompt
+            && !sp.is_empty()
+        {
+            cmd.arg("--append-system-prompt").arg(sp);
         }
 
         // Read prompt from stdin to avoid exposing sensitive content in process args.
@@ -187,23 +187,21 @@ impl ClaudeCodeProvider {
         let raw = String::from_utf8(output.stdout)
             .map_err(|err| anyhow::anyhow!("Claude Code produced non-UTF-8 output: {err}"))?;
 
-        if agent_mode {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&raw) {
-                let text = json
-                    .get("result")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .trim()
-                    .to_string();
+        if agent_mode && let Ok(json) = serde_json::from_str::<serde_json::Value>(&raw) {
+            let text = json
+                .get("result")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
 
-                let usage = json.get("usage").map(|u| TokenUsage {
-                    input_tokens: u.get("input_tokens").and_then(|v| v.as_u64()),
-                    output_tokens: u.get("output_tokens").and_then(|v| v.as_u64()),
-                    cached_input_tokens: u.get("cache_read_input_tokens").and_then(|v| v.as_u64()),
-                });
+            let usage = json.get("usage").map(|u| TokenUsage {
+                input_tokens: u.get("input_tokens").and_then(|v| v.as_u64()),
+                output_tokens: u.get("output_tokens").and_then(|v| v.as_u64()),
+                cached_input_tokens: u.get("cache_read_input_tokens").and_then(|v| v.as_u64()),
+            });
 
-                return Ok((text, usage));
-            }
+            return Ok((text, usage));
         }
 
         Ok((raw.trim().to_string(), None))

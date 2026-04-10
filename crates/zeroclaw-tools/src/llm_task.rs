@@ -223,10 +223,10 @@ fn validate_json_response(response: &str, schema: &serde_json::Value) -> Result<
     // Check required fields
     if let Some(required) = schema.get("required").and_then(|v| v.as_array()) {
         for req in required {
-            if let Some(field_name) = req.as_str() {
-                if parsed.get(field_name).is_none() {
-                    return Err(format!("Missing required field: {field_name}"));
-                }
+            if let Some(field_name) = req.as_str()
+                && parsed.get(field_name).is_none()
+            {
+                return Err(format!("Missing required field: {field_name}"));
             }
         }
     }
@@ -234,16 +234,15 @@ fn validate_json_response(response: &str, schema: &serde_json::Value) -> Result<
     // Check property types
     if let Some(properties) = schema.get("properties").and_then(|v| v.as_object()) {
         for (prop_name, prop_schema) in properties {
-            if let Some(value) = parsed.get(prop_name) {
-                if let Some(expected_type) = prop_schema.get("type").and_then(|t| t.as_str()) {
-                    if !type_matches(value, expected_type) {
-                        return Err(format!(
-                            "Field '{prop_name}' has wrong type: expected {expected_type}, \
+            if let Some(value) = parsed.get(prop_name)
+                && let Some(expected_type) = prop_schema.get("type").and_then(|t| t.as_str())
+                && !type_matches(value, expected_type)
+            {
+                return Err(format!(
+                    "Field '{prop_name}' has wrong type: expected {expected_type}, \
                              got {}",
-                            json_type_name(value)
-                        ));
-                    }
-                }
+                    json_type_name(value)
+                ));
             }
         }
     }

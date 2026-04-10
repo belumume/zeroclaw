@@ -920,18 +920,17 @@ impl DelegateTool {
 
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) == Some("json") {
-                if let Ok(content) = tokio::fs::read_to_string(&path).await {
-                    if let Ok(result) = serde_json::from_str::<BackgroundDelegateResult>(&content) {
-                        results.push(json!({
-                            "task_id": result.task_id,
-                            "agent": result.agent,
-                            "status": result.status,
-                            "started_at": result.started_at,
-                            "finished_at": result.finished_at,
-                        }));
-                    }
-                }
+            if path.extension().and_then(|e| e.to_str()) == Some("json")
+                && let Ok(content) = tokio::fs::read_to_string(&path).await
+                && let Ok(result) = serde_json::from_str::<BackgroundDelegateResult>(&content)
+            {
+                results.push(json!({
+                    "task_id": result.task_id,
+                    "agent": result.agent,
+                    "status": result.status,
+                    "started_at": result.started_at,
+                    "finished_at": result.finished_at,
+                }));
             }
         }
 

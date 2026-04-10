@@ -85,10 +85,10 @@ impl GitHubScout {
             reqwest::header::USER_AGENT,
             "ZeroClaw-SkillForge/0.1".parse().expect("valid header"),
         );
-        if let Some(ref t) = token {
-            if let Ok(val) = format!("Bearer {t}").parse() {
-                headers.insert(reqwest::header::AUTHORIZATION, val);
-            }
+        if let Some(ref t) = token
+            && let Ok(val) = format!("Bearer {t}").parse()
+        {
+            headers.insert(reqwest::header::AUTHORIZATION, val);
         }
 
         let client = reqwest::Client::builder()

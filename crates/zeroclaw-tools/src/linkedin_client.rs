@@ -225,16 +225,16 @@ impl LinkedInClient {
 
         // Add scheduled publish options if a future timestamp is provided.
         // The timestamp must be ISO 8601 / RFC 3339, e.g. "2026-03-17T08:00:00Z".
-        if let Some(ts) = scheduled_at {
-            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts) {
-                let epoch_ms = dt.timestamp_millis();
-                body.as_object_mut().unwrap().insert(
-                    "scheduledPublishOptions".to_string(),
-                    json!({ "scheduledPublishTime": epoch_ms }),
-                );
-                // Scheduled posts use DRAFT lifecycle
-                body["lifecycleState"] = json!("DRAFT");
-            }
+        if let Some(ts) = scheduled_at
+            && let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts)
+        {
+            let epoch_ms = dt.timestamp_millis();
+            body.as_object_mut().unwrap().insert(
+                "scheduledPublishOptions".to_string(),
+                json!({ "scheduledPublishTime": epoch_ms }),
+            );
+            // Scheduled posts use DRAFT lifecycle
+            body["lifecycleState"] = json!("DRAFT");
         }
 
         if let Some(url) = article_url {
@@ -242,7 +242,7 @@ impl LinkedInClient {
                 "source": url,
                 "title": article_title.unwrap_or(""),
             });
-            if article_title.is_none() || article_title.map_or(false, |t| t.is_empty()) {
+            if article_title.is_none() || article_title.is_some_and(|t| t.is_empty()) {
                 article.as_object_mut().unwrap().remove("title");
             }
             body.as_object_mut().unwrap().insert(
@@ -653,14 +653,14 @@ impl LinkedInClient {
             }
         });
 
-        if let Some(ts) = scheduled_at {
-            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts) {
-                let epoch_ms = dt.timestamp_millis();
-                body.as_object_mut().unwrap().insert(
-                    "scheduledPublishOptions".to_string(),
-                    json!({ "scheduledPublishTime": epoch_ms }),
-                );
-            }
+        if let Some(ts) = scheduled_at
+            && let Ok(dt) = chrono::DateTime::parse_from_rfc3339(ts)
+        {
+            let epoch_ms = dt.timestamp_millis();
+            body.as_object_mut().unwrap().insert(
+                "scheduledPublishOptions".to_string(),
+                json!({ "scheduledPublishTime": epoch_ms }),
+            );
         }
 
         let url = format!("{LINKEDIN_API_BASE}/rest/posts");
@@ -706,7 +706,7 @@ impl LinkedInClient {
                     .unwrap_or(trimmed);
                 check
                     .split_once('=')
-                    .map_or(false, |(key, _)| key.trim() == "LINKEDIN_ACCESS_TOKEN")
+                    .is_some_and(|(key, _)| key.trim() == "LINKEDIN_ACCESS_TOKEN")
             };
 
             if is_token_line {
@@ -836,12 +836,12 @@ impl ImageGenerator {
                 continue;
             }
             let line = line.strip_prefix("export ").map(str::trim).unwrap_or(line);
-            if let Some((key, value)) = line.split_once('=') {
-                if key.trim() == var_name {
-                    let val = LinkedInClient::parse_env_value(value);
-                    if !val.is_empty() {
-                        return Ok(val);
-                    }
+            if let Some((key, value)) = line.split_once('=')
+                && key.trim() == var_name
+            {
+                let val = LinkedInClient::parse_env_value(value);
+                if !val.is_empty() {
+                    return Ok(val);
                 }
             }
         }

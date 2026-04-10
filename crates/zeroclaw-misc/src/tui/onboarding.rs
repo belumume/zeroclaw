@@ -417,13 +417,12 @@ impl App {
 
         // 6. Try admin POST endpoint (works for truly local gateways)
         let new_url = format!("http://127.0.0.1:{}/admin/paircode/new", self.gateway_port);
-        if let Ok(resp) = client.post(&new_url).timeout(timeout).send().await {
-            if let Ok(json) = resp.json::<serde_json::Value>().await {
-                if let Some(code) = json.get("pairing_code").and_then(|v| v.as_str()) {
-                    self.pairing_code = code.to_string();
-                    return;
-                }
-            }
+        if let Ok(resp) = client.post(&new_url).timeout(timeout).send().await
+            && let Ok(json) = resp.json::<serde_json::Value>().await
+            && let Some(code) = json.get("pairing_code").and_then(|v| v.as_str())
+        {
+            self.pairing_code = code.to_string();
+            return;
         }
 
         // 7. Gateway not reachable — show instructions instead of a fake code

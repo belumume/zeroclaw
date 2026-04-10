@@ -77,10 +77,11 @@ impl WebSearchTool {
     /// absent.
     fn resolve_brave_api_key(&self) -> anyhow::Result<String> {
         // Fast path: boot-time key is present and usable (not an encrypted blob).
-        if let Some(ref key) = self.boot_brave_api_key {
-            if !key.is_empty() && !zeroclaw_config::secrets::SecretStore::is_encrypted(key) {
-                return Ok(key.clone());
-            }
+        if let Some(ref key) = self.boot_brave_api_key
+            && !key.is_empty()
+            && !zeroclaw_config::secrets::SecretStore::is_encrypted(key)
+        {
+            return Ok(key.clone());
         }
 
         // Slow path: re-read config.toml to pick up keys set/rotated after boot.
@@ -262,10 +263,10 @@ impl WebSearchTool {
     /// Resolve the SearXNG instance URL from the boot-time config or by
     /// re-reading `config.toml` at runtime.
     fn resolve_searxng_instance_url(&self) -> anyhow::Result<String> {
-        if let Some(ref url) = self.searxng_instance_url {
-            if !url.is_empty() {
-                return Ok(url.clone());
-            }
+        if let Some(ref url) = self.searxng_instance_url
+            && !url.is_empty()
+        {
+            return Ok(url.clone());
         }
 
         // Slow path: re-read config.toml to pick up values set after boot.

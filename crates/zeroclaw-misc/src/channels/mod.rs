@@ -674,13 +674,13 @@ fn normalize_cached_channel_turns(turns: Vec<ChatMessage>) -> Vec<ChatMessage> {
             // Interrupted channel turns can produce consecutive user messages
             // (no assistant persisted yet). Merge instead of dropping.
             (false, "user") | (true, "assistant") => {
-                if let Some(last_turn) = normalized.last_mut() {
-                    if !turn.content.is_empty() {
-                        if !last_turn.content.is_empty() {
-                            last_turn.content.push_str("\n\n");
-                        }
-                        last_turn.content.push_str(&turn.content);
+                if let Some(last_turn) = normalized.last_mut()
+                    && !turn.content.is_empty()
+                {
+                    if !last_turn.content.is_empty() {
+                        last_turn.content.push_str("\n\n");
                     }
+                    last_turn.content.push_str(&turn.content);
                 }
             }
             _ => {}
@@ -864,14 +864,14 @@ fn decrypt_optional_secret_for_runtime_reload(
     value: &mut Option<String>,
     field_name: &str,
 ) -> Result<()> {
-    if let Some(raw) = value.clone() {
-        if crate::security::SecretStore::is_encrypted(&raw) {
-            *value = Some(
-                store
-                    .decrypt(&raw)
-                    .with_context(|| format!("Failed to decrypt {field_name}"))?,
-            );
-        }
+    if let Some(raw) = value.clone()
+        && crate::security::SecretStore::is_encrypted(&raw)
+    {
+        *value = Some(
+            store
+                .decrypt(&raw)
+                .with_context(|| format!("Failed to decrypt {field_name}"))?,
+        );
     }
     Ok(())
 }
@@ -928,10 +928,10 @@ async fn maybe_apply_runtime_config_update(ctx: &ChannelRuntimeContext) -> Resul
         let store = runtime_config_store()
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        if let Some(state) = store.get(&config_path) {
-            if state.last_applied_stamp == Some(stamp) {
-                return Ok(());
-            }
+        if let Some(state) = store.get(&config_path)
+            && state.last_applied_stamp == Some(stamp)
+        {
+            return Ok(());
         }
     }
 
@@ -1050,26 +1050,26 @@ fn replace_available_skills_section(base_prompt: &str, refreshed_skills: &str) -
     const SKILLS_END: &str = "</available_skills>";
     const WORKSPACE_HEADER: &str = "## Workspace\n\n";
 
-    if let Some(start) = base_prompt.find(SKILLS_HEADER) {
-        if let Some(rel_end) = base_prompt[start..].find(SKILLS_END) {
-            let end = start + rel_end + SKILLS_END.len();
-            let tail = base_prompt[end..]
-                .strip_prefix("\n\n")
-                .unwrap_or(&base_prompt[end..]);
+    if let Some(start) = base_prompt.find(SKILLS_HEADER)
+        && let Some(rel_end) = base_prompt[start..].find(SKILLS_END)
+    {
+        let end = start + rel_end + SKILLS_END.len();
+        let tail = base_prompt[end..]
+            .strip_prefix("\n\n")
+            .unwrap_or(&base_prompt[end..]);
 
-            let mut refreshed = String::with_capacity(
-                base_prompt.len().saturating_sub(end.saturating_sub(start))
-                    + refreshed_skills.len()
-                    + 2,
-            );
-            refreshed.push_str(&base_prompt[..start]);
-            if !refreshed_skills.is_empty() {
-                refreshed.push_str(refreshed_skills);
-                refreshed.push_str("\n\n");
-            }
-            refreshed.push_str(tail);
-            return refreshed;
+        let mut refreshed = String::with_capacity(
+            base_prompt.len().saturating_sub(end.saturating_sub(start))
+                + refreshed_skills.len()
+                + 2,
+        );
+        refreshed.push_str(&base_prompt[..start]);
+        if !refreshed_skills.is_empty() {
+            refreshed.push_str(refreshed_skills);
+            refreshed.push_str("\n\n");
         }
+        refreshed.push_str(tail);
+        return refreshed;
     }
 
     if refreshed_skills.is_empty() {
@@ -1162,10 +1162,10 @@ fn proactive_trim_turns(turns: &mut Vec<ChatMessage>, budget: usize) -> usize {
 
 fn append_sender_turn(ctx: &ChannelRuntimeContext, sender_key: &str, turn: ChatMessage) {
     // Persist to JSONL before adding to in-memory history.
-    if let Some(ref store) = ctx.session_store {
-        if let Err(e) = store.append(sender_key, &turn) {
-            tracing::warn!("Failed to persist session turn: {e}");
-        }
+    if let Some(ref store) = ctx.session_store
+        && let Err(e) = store.append(sender_key, &turn)
+    {
+        tracing::warn!("Failed to persist session turn: {e}");
     }
 
     // Use the user-configured max_history_messages (fall back to
@@ -1301,10 +1301,10 @@ fn rollback_orphan_user_turn(
 
     // Also remove the orphan turn from the persisted JSONL session store so
     // it doesn't resurface after a daemon restart (fixes #3674).
-    if let Some(ref store) = ctx.session_store {
-        if let Err(e) = store.remove_last(sender_key) {
-            tracing::warn!("Failed to rollback session store entry: {e}");
-        }
+    if let Some(ref store) = ctx.session_store
+        && let Err(e) = store.remove_last(sender_key)
+    {
+        tracing::warn!("Failed to rollback session store entry: {e}");
     }
 
     true
@@ -1808,10 +1808,10 @@ async fn handle_runtime_command_if_needed(
         }
         ChannelRuntimeCommand::NewSession => {
             clear_sender_history(ctx, &sender_key);
-            if let Some(ref store) = ctx.session_store {
-                if let Err(e) = store.delete_session(&sender_key) {
-                    tracing::warn!("Failed to delete persisted session for {sender_key}: {e}");
-                }
+            if let Some(ref store) = ctx.session_store
+                && let Err(e) = store.delete_session(&sender_key)
+            {
+                tracing::warn!("Failed to delete persisted session for {sender_key}: {e}");
             }
             mark_sender_for_new_session(ctx, &sender_key);
             "Conversation history cleared. Starting fresh.".to_string()
@@ -2223,20 +2223,19 @@ fn sanitize_tool_json_value(
 
     let object = value.as_object()?;
 
-    if let Some(tool_calls) = object.get("tool_calls").and_then(|value| value.as_array()) {
-        if !tool_calls.is_empty()
-            && tool_calls
-                .iter()
-                .all(|call| is_tool_call_payload(call, known_tool_names))
-        {
-            let content = object
-                .get("content")
-                .and_then(|value| value.as_str())
-                .unwrap_or("")
-                .trim()
-                .to_string();
-            return Some((content, true));
-        }
+    if let Some(tool_calls) = object.get("tool_calls").and_then(|value| value.as_array())
+        && !tool_calls.is_empty()
+        && tool_calls
+            .iter()
+            .all(|call| is_tool_call_payload(call, known_tool_names))
+    {
+        let content = object
+            .get("content")
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        return Some((content, true));
     }
 
     if is_tool_result_payload(object, saw_tool_call_payload) {
@@ -2277,19 +2276,18 @@ fn strip_isolated_tool_json_artifacts(message: &str, known_tool_names: &HashSet<
             let consumed = stream.byte_offset();
             if consumed > 0 {
                 let end = start + consumed;
-                if is_line_isolated_json_segment(message, start, end) {
-                    if let Some((replacement, marks_tool_call)) =
+                if is_line_isolated_json_segment(message, start, end)
+                    && let Some((replacement, marks_tool_call)) =
                         sanitize_tool_json_value(&value, known_tool_names, saw_tool_call_payload)
-                    {
-                        if marks_tool_call {
-                            saw_tool_call_payload = true;
-                        }
-                        if !replacement.trim().is_empty() {
-                            cleaned.push_str(replacement.trim());
-                        }
-                        cursor = end;
-                        continue;
+                {
+                    if marks_tool_call {
+                        saw_tool_call_payload = true;
                     }
+                    if !replacement.trim().is_empty() {
+                        cleaned.push_str(replacement.trim());
+                    }
+                    cursor = end;
+                    continue;
                 }
             }
         }
@@ -2524,26 +2522,24 @@ async fn process_channel_message(
 
     // ── Query classification: override route when a rule matches ──
     if let Some(hint) = crate::agent::classifier::classify(&ctx.query_classification, &msg.content)
-    {
-        if let Some(matched_route) = ctx
+        && let Some(matched_route) = ctx
             .model_routes
             .iter()
             .find(|r| r.hint.eq_ignore_ascii_case(&hint))
-        {
-            tracing::info!(
-                target: "query_classification",
-                hint = hint.as_str(),
-                provider = matched_route.provider.as_str(),
-                model = matched_route.model.as_str(),
-                channel = %msg.channel,
-                "Channel message classified — overriding route"
-            );
-            route = ChannelRouteSelection {
-                provider: matched_route.provider.clone(),
-                model: matched_route.model.clone(),
-                api_key: matched_route.api_key.clone(),
-            };
-        }
+    {
+        tracing::info!(
+            target: "query_classification",
+            hint = hint.as_str(),
+            provider = matched_route.provider.as_str(),
+            model = matched_route.model.as_str(),
+            channel = %msg.channel,
+            "Channel message classified — overriding route"
+        );
+        route = ChannelRouteSelection {
+            provider: matched_route.provider.clone(),
+            model: matched_route.model.clone(),
+            api_key: matched_route.api_key.clone(),
+        };
     }
 
     let runtime_defaults = runtime_defaults_snapshot(ctx.as_ref());
@@ -2907,15 +2903,13 @@ async fn process_channel_message(
     };
 
     // React with 👀 to acknowledge the incoming message
-    if ctx.ack_reactions {
-        if let Some(channel) = target_channel.as_ref() {
-            if let Err(e) = channel
-                .add_reaction(&msg.reply_target, &msg.id, "\u{1F440}")
-                .await
-            {
-                tracing::debug!("Failed to add reaction: {e}");
-            }
-        }
+    if ctx.ack_reactions
+        && let Some(channel) = target_channel.as_ref()
+        && let Err(e) = channel
+            .add_reaction(&msg.reply_target, &msg.id, "\u{1F440}")
+            .await
+    {
+        tracing::debug!("Failed to add reaction: {e}");
     }
 
     // Skip typing only for Partial mode — the draft message itself provides
@@ -3040,43 +3034,43 @@ async fn process_channel_message(
             };
 
             // Handle model switch: re-create the provider and retry
-            if let LlmExecutionResult::Completed(Ok(Err(ref e))) = loop_result {
-                if let Some((new_provider, new_model)) = is_model_switch_requested(e) {
-                    tracing::info!(
-                        "Model switch requested, switching from {} {} to {} {}",
-                        route.provider,
-                        route.model,
-                        new_provider,
-                        new_model
-                    );
+            if let LlmExecutionResult::Completed(Ok(Err(ref e))) = loop_result
+                && let Some((new_provider, new_model)) = is_model_switch_requested(e)
+            {
+                tracing::info!(
+                    "Model switch requested, switching from {} {} to {} {}",
+                    route.provider,
+                    route.model,
+                    new_provider,
+                    new_model
+                );
 
-                    match create_resilient_provider_nonblocking(
-                        &new_provider,
-                        ctx.api_key.clone(),
-                        ctx.api_url.clone(),
-                        ctx.reliability.as_ref().clone(),
-                        ctx.provider_runtime_options.clone(),
-                    )
-                    .await
-                    {
-                        Ok(new_prov) => {
-                            active_provider = Arc::from(new_prov);
-                            route.provider = new_provider;
-                            route.model = new_model;
-                            clear_model_switch_request();
+                match create_resilient_provider_nonblocking(
+                    &new_provider,
+                    ctx.api_key.clone(),
+                    ctx.api_url.clone(),
+                    ctx.reliability.as_ref().clone(),
+                    ctx.provider_runtime_options.clone(),
+                )
+                .await
+                {
+                    Ok(new_prov) => {
+                        active_provider = Arc::from(new_prov);
+                        route.provider = new_provider;
+                        route.model = new_model;
+                        clear_model_switch_request();
 
-                            ctx.observer.record_event(&ObserverEvent::AgentStart {
-                                provider: route.provider.clone(),
-                                model: route.model.clone(),
-                            });
+                        ctx.observer.record_event(&ObserverEvent::AgentStart {
+                            provider: route.provider.clone(),
+                            model: route.model.clone(),
+                        });
 
-                            continue;
-                        }
-                        Err(err) => {
-                            tracing::error!("Failed to create provider after model switch: {err}");
-                            clear_model_switch_request();
-                            // Fall through with the original error
-                        }
+                        continue;
+                    }
+                    Err(err) => {
+                        tracing::error!("Failed to create provider after model switch: {err}");
+                        clear_model_switch_request();
+                        // Fall through with the original error
                     }
                 }
             }
@@ -3147,10 +3141,9 @@ async fn process_channel_message(
             );
             if let (Some(channel), Some(draft_id)) =
                 (target_channel.as_ref(), draft_message_id.as_deref())
+                && let Err(err) = channel.cancel_draft(&msg.reply_target, draft_id).await
             {
-                if let Err(err) = channel.cancel_draft(&msg.reply_target, draft_id).await {
-                    tracing::debug!("Failed to cancel draft on {}: {err}", channel.name());
-                }
+                tracing::debug!("Failed to cancel draft on {}: {err}", channel.name());
             }
         }
         LlmExecutionResult::Completed(Ok(Ok(response))) => {
@@ -3364,10 +3357,9 @@ async fn process_channel_message(
                 );
                 if let (Some(channel), Some(draft_id)) =
                     (target_channel.as_ref(), draft_message_id.as_deref())
+                    && let Err(err) = channel.cancel_draft(&msg.reply_target, draft_id).await
                 {
-                    if let Err(err) = channel.cancel_draft(&msg.reply_target, draft_id).await {
-                        tracing::debug!("Failed to cancel draft on {}: {err}", channel.name());
-                    }
+                    tracing::debug!("Failed to cancel draft on {}: {err}", channel.name());
                 }
             } else if is_context_window_overflow_error(&e) {
                 let compacted = compact_sender_history(ctx.as_ref(), &history_key);
@@ -3520,15 +3512,15 @@ async fn process_channel_message(
     }
 
     // Swap 👀 → ✅ (or ⚠️ on error) to signal processing is complete
-    if ctx.ack_reactions {
-        if let Some(channel) = target_channel.as_ref() {
-            let _ = channel
-                .remove_reaction(&msg.reply_target, &msg.id, "\u{1F440}")
-                .await;
-            let _ = channel
-                .add_reaction(&msg.reply_target, &msg.id, reaction_done_emoji)
-                .await;
-        }
+    if ctx.ack_reactions
+        && let Some(channel) = target_channel.as_ref()
+    {
+        let _ = channel
+            .remove_reaction(&msg.reply_target, &msg.id, "\u{1F440}")
+            .await;
+        let _ = channel
+            .add_reaction(&msg.reply_target, &msg.id, reaction_done_emoji)
+            .await;
     }
 }
 
@@ -3548,7 +3540,7 @@ async fn dispatch_worker(
     let sender_scope_key = interruption_scope_key(&msg);
     let cancellation_token = CancellationToken::new();
     let completion = Arc::new(InFlightTaskCompletion::new());
-    let task_id = task_sequence.fetch_add(1, Ordering::Relaxed) as u64;
+    let task_id = task_sequence.fetch_add(1, Ordering::Relaxed);
 
     let register_in_flight = msg.channel != "cli";
 
@@ -3565,16 +3557,14 @@ async fn dispatch_worker(
             )
         };
 
-        if interrupt_enabled {
-            if let Some(previous) = previous {
-                tracing::info!(
-                    channel = %msg.channel,
-                    sender = %msg.sender,
-                    "Interrupting previous in-flight request for sender"
-                );
-                previous.cancellation.cancel();
-                previous.completion.wait().await;
-            }
+        if interrupt_enabled && let Some(previous) = previous {
+            tracing::info!(
+                channel = %msg.channel,
+                sender = %msg.sender,
+                "Interrupting previous in-flight request for sender"
+            );
+            previous.cancellation.cancel();
+            previous.completion.wait().await;
         }
     }
 
@@ -4202,21 +4192,20 @@ fn maybe_restart_managed_daemon_service() -> Result<bool> {
     if cfg!(target_os = "linux") {
         // OpenRC (system-wide) takes precedence over systemd (user-level)
         let openrc_init_script = PathBuf::from("/etc/init.d/zeroclaw");
-        if openrc_init_script.exists() {
-            if let Ok(status_output) = Command::new("rc-service").args(OPENRC_STATUS_ARGS).output()
-            {
-                // rc-service exits 0 if running, non-zero otherwise
-                if status_output.status.success() {
-                    let restart_output = Command::new("rc-service")
-                        .args(OPENRC_RESTART_ARGS)
-                        .output()
-                        .context("Failed to restart OpenRC daemon service")?;
-                    if !restart_output.status.success() {
-                        let stderr = String::from_utf8_lossy(&restart_output.stderr);
-                        anyhow::bail!("rc-service restart failed: {}", stderr.trim());
-                    }
-                    return Ok(true);
+        if openrc_init_script.exists()
+            && let Ok(status_output) = Command::new("rc-service").args(OPENRC_STATUS_ARGS).output()
+        {
+            // rc-service exits 0 if running, non-zero otherwise
+            if status_output.status.success() {
+                let restart_output = Command::new("rc-service")
+                    .args(OPENRC_RESTART_ARGS)
+                    .output()
+                    .context("Failed to restart OpenRC daemon service")?;
+                if !restart_output.status.success() {
+                    let stderr = String::from_utf8_lossy(&restart_output.stderr);
+                    anyhow::bail!("rc-service restart failed: {}", stderr.trim());
                 }
+                return Ok(true);
             }
         }
 
@@ -5005,13 +4994,13 @@ fn collect_configured_channels(
     }
 
     #[cfg(feature = "channel-email")]
-    if let Some(ref gp_cfg) = config.channels_config.gmail_push {
-        if gp_cfg.enabled {
-            channels.push(ConfiguredChannel {
-                display_name: "Gmail Push",
-                channel: Arc::new(GmailPushChannel::new(gp_cfg.clone())),
-            });
-        }
+    if let Some(ref gp_cfg) = config.channels_config.gmail_push
+        && gp_cfg.enabled
+    {
+        channels.push(ConfiguredChannel {
+            display_name: "Gmail Push",
+            channel: Arc::new(GmailPushChannel::new(gp_cfg.clone())),
+        });
     }
 
     if let Some(ref irc) = config.channels_config.irc {

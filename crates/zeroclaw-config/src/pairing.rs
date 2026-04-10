@@ -112,36 +112,36 @@ impl PairingGuard {
             }
 
             // Check brute force lockout for this specific client
-            if let Some(state) = map.get(&client_id) {
-                if let Some(until) = state.lockout_until {
-                    if now < until {
-                        let remaining = (until - now).as_secs();
-                        return Err(remaining.max(1));
-                    }
-                    // Lockout expired — reset inline
-                    map.remove(&client_id);
+            if let Some(state) = map.get(&client_id)
+                && let Some(until) = state.lockout_until
+            {
+                if now < until {
+                    let remaining = (until - now).as_secs();
+                    return Err(remaining.max(1));
                 }
+                // Lockout expired — reset inline
+                map.remove(&client_id);
             }
         }
 
         {
             let mut pairing_code = self.pairing_code.lock();
-            if let Some(ref expected) = *pairing_code {
-                if constant_time_eq(code.trim(), expected.trim()) {
-                    // Reset failed attempts for this client on success
-                    {
-                        let mut guard = self.failed_attempts.lock();
-                        guard.0.remove(&client_id);
-                    }
-                    let token = generate_token();
-                    let mut tokens = self.paired_tokens.lock();
-                    tokens.insert(hash_token(&token));
-
-                    // Consume the pairing code so it cannot be reused
-                    *pairing_code = None;
-
-                    return Ok(Some(token));
+            if let Some(ref expected) = *pairing_code
+                && constant_time_eq(code.trim(), expected.trim())
+            {
+                // Reset failed attempts for this client on success
+                {
+                    let mut guard = self.failed_attempts.lock();
+                    guard.0.remove(&client_id);
                 }
+                let token = generate_token();
+                let mut tokens = self.paired_tokens.lock();
+                tokens.insert(hash_token(&token));
+
+                // Consume the pairing code so it cannot be reused
+                *pairing_code = None;
+
+                return Ok(Some(token));
             }
         }
 

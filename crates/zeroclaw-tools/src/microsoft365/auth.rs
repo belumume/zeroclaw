@@ -69,10 +69,10 @@ impl TokenCache {
         // Fast path: cached and not expired.
         {
             let guard = self.inner.read();
-            if let Some(ref state) = *guard {
-                if !state.is_expired() {
-                    return Ok(state.access_token.clone());
-                }
+            if let Some(ref state) = *guard
+                && !state.is_expired()
+            {
+                return Ok(state.access_token.clone());
             }
         }
 
@@ -84,10 +84,10 @@ impl TokenCache {
         // while we were waiting.
         {
             let guard = self.inner.read();
-            if let Some(ref state) = *guard {
-                if !state.is_expired() {
-                    return Ok(state.access_token.clone());
-                }
+            if let Some(ref state) = *guard
+                && !state.is_expired()
+            {
+                return Ok(state.access_token.clone());
             }
         }
 
@@ -319,10 +319,10 @@ impl TokenCache {
     }
 
     fn persist_to_disk(&self, state: &CachedTokenState) {
-        if let Ok(json) = serde_json::to_string_pretty(state) {
-            if let Err(e) = std::fs::write(&self.cache_path, json) {
-                tracing::warn!("ms365: failed to persist token cache: {e}");
-            }
+        if let Ok(json) = serde_json::to_string_pretty(state)
+            && let Err(e) = std::fs::write(&self.cache_path, json)
+        {
+            tracing::warn!("ms365: failed to persist token cache: {e}");
         }
     }
 }

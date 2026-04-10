@@ -717,14 +717,14 @@ pub fn all_tools_with_runtime(
         tool_arcs.push(Arc::new(SopStatusTool::new(Arc::clone(&sop_engine))));
     }
 
-    if let Some(key) = composio_key {
-        if !key.is_empty() {
-            tool_arcs.push(Arc::new(ComposioTool::new(
-                key,
-                composio_entity_id,
-                security.clone(),
-            )));
-        }
+    if let Some(key) = composio_key
+        && !key.is_empty()
+    {
+        tool_arcs.push(Arc::new(ComposioTool::new(
+            key,
+            composio_entity_id,
+            security.clone(),
+        )));
     }
 
     // Emoji reaction tool — always registered; channel map populated later by start_channels.
@@ -763,7 +763,7 @@ pub fn all_tools_with_runtime(
                 && ms_cfg
                     .client_secret
                     .as_deref()
-                    .map_or(true, |s| s.trim().is_empty())
+                    .is_none_or(|s| s.trim().is_empty())
             {
                 tracing::error!(
                     "microsoft365: client_credentials auth_flow requires a non-empty client_secret"

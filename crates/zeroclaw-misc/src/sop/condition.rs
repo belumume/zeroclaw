@@ -133,11 +133,11 @@ fn resolve_json_path<'a>(value: &'a Value, segments: &[&str]) -> Option<&'a Valu
             continue;
         }
         // Try array index
-        if let Ok(idx) = seg.parse::<usize>() {
-            if let Some(next) = current.get(idx) {
-                current = next;
-                continue;
-            }
+        if let Ok(idx) = seg.parse::<usize>()
+            && let Some(next) = current.get(idx)
+        {
+            current = next;
+            continue;
         }
         return None;
     }
@@ -173,10 +173,10 @@ impl Op {
 /// Compare a JSON value against a string comparand using the given operator.
 fn compare_values(extracted: &Value, op: Op, comparand: &str) -> bool {
     // Try numeric comparison first
-    if let Some(lhs) = value_as_f64(extracted) {
-        if let Ok(rhs) = comparand.parse::<f64>() {
-            return apply_op_f64(lhs, op, rhs);
-        }
+    if let Some(lhs) = value_as_f64(extracted)
+        && let Ok(rhs) = comparand.parse::<f64>()
+    {
+        return apply_op_f64(lhs, op, rhs);
     }
 
     // Fall back to string comparison

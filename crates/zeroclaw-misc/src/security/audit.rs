@@ -475,26 +475,26 @@ pub fn verify_chain(log_path: &Path) -> Result<u64> {
         }
 
         // Verify signature if present and key is available
-        if let Some(ref signature) = entry.signature {
-            if let Some(ref key_bytes) = signing_key {
-                use hmac::{Hmac, Mac};
-                use sha2::Sha256;
+        if let Some(ref signature) = entry.signature
+            && let Some(ref key_bytes) = signing_key
+        {
+            use hmac::{Hmac, Mac};
+            use sha2::Sha256;
 
-                let mut mac = Hmac::<Sha256>::new_from_slice(key_bytes)
-                    .map_err(|_| anyhow::anyhow!("Invalid HMAC key length during verification"))?;
-                mac.update(entry.entry_hash.as_bytes());
-                let expected_sig = hex::encode(mac.finalize().into_bytes());
+            let mut mac = Hmac::<Sha256>::new_from_slice(key_bytes)
+                .map_err(|_| anyhow::anyhow!("Invalid HMAC key length during verification"))?;
+            mac.update(entry.entry_hash.as_bytes());
+            let expected_sig = hex::encode(mac.finalize().into_bytes());
 
-                if signature != &expected_sig {
-                    bail!(
-                        "signature verification failed at line {} (sequence {}): signature mismatch",
-                        line_idx + 1,
-                        entry.sequence
-                    );
-                }
+            if signature != &expected_sig {
+                bail!(
+                    "signature verification failed at line {} (sequence {}): signature mismatch",
+                    line_idx + 1,
+                    entry.sequence
+                );
             }
-            // If signature present but key not available, skip verification (backward compat)
         }
+        // If signature present but key not available, skip verification (backward compat)
 
         expected_prev_hash = entry.entry_hash.clone();
         expected_sequence += 1;

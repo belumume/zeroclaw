@@ -81,19 +81,18 @@ impl Tool for SopApproveTool {
         };
 
         // Audit logging (engine lock dropped, safe to await)
-        if let Some(ref audit) = self.audit {
-            if let Some(ref run) = run_snapshot {
-                if let Err(e) = audit.log_approval(run, run.current_step).await {
-                    warn!("SOP audit log after approve failed: {e}");
-                }
-            }
+        if let Some(ref audit) = self.audit
+            && let Some(ref run) = run_snapshot
+            && let Err(e) = audit.log_approval(run, run.current_step).await
+        {
+            warn!("SOP audit log after approve failed: {e}");
         }
 
         // Metrics collector (independent of audit)
-        if let Some(ref collector) = self.collector {
-            if let Some(ref run) = run_snapshot {
-                collector.record_approval(&run.sop_name, &run.run_id);
-            }
+        if let Some(ref collector) = self.collector
+            && let Some(ref run) = run_snapshot
+        {
+            collector.record_approval(&run.sop_name, &run.run_id);
         }
 
         match result {

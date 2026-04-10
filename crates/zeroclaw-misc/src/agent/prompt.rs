@@ -96,16 +96,15 @@ impl PromptSection for IdentitySection {
     fn build(&self, ctx: &PromptContext<'_>) -> Result<String> {
         let mut prompt = String::from("## Project Context\n\n");
         let mut has_aieos = false;
-        if let Some(config) = ctx.identity_config {
-            if identity::is_aieos_configured(config) {
-                if let Ok(Some(aieos)) = identity::load_aieos_identity(config, ctx.workspace_dir) {
-                    let rendered = identity::aieos_to_system_prompt(&aieos);
-                    if !rendered.is_empty() {
-                        prompt.push_str(&rendered);
-                        prompt.push_str("\n\n");
-                        has_aieos = true;
-                    }
-                }
+        if let Some(config) = ctx.identity_config
+            && identity::is_aieos_configured(config)
+            && let Ok(Some(aieos)) = identity::load_aieos_identity(config, ctx.workspace_dir)
+        {
+            let rendered = identity::aieos_to_system_prompt(&aieos);
+            if !rendered.is_empty() {
+                prompt.push_str(&rendered);
+                prompt.push_str("\n\n");
+                has_aieos = true;
             }
         }
 

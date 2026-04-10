@@ -143,10 +143,10 @@ pub fn start(config: &Config, init_system: InitSystem) -> Result<()> {
         // Ensure the Homebrew var directory exists before launchd tries to use it.
         // The plist may reference this path for WorkingDirectory and log files.
         let exe = std::env::current_exe().ok();
-        if let Some(ref exe_path) = exe {
-            if let Some(var_dir) = detect_homebrew_var_dir(exe_path) {
-                let _ = fs::create_dir_all(&var_dir);
-            }
+        if let Some(ref exe_path) = exe
+            && let Some(var_dir) = detect_homebrew_var_dir(exe_path)
+        {
+            let _ = fs::create_dir_all(&var_dir);
         }
         let plist = macos_service_file()?;
         run_checked(Command::new("launchctl").arg("load").arg("-w").arg(&plist))?;
@@ -595,7 +595,7 @@ fn detect_homebrew_var_dir(exe: &Path) -> Option<PathBuf> {
         let mut ancestor = exe.to_path_buf();
         while let Some(parent) = ancestor.parent() {
             ancestor = parent.to_path_buf();
-            if ancestor.file_name().map_or(false, |n| n == "Cellar") {
+            if ancestor.file_name().is_some_and(|n| n == "Cellar") {
                 // prefix is one level above Cellar
                 return ancestor.parent().map(|p| p.join("var").join("zeroclaw"));
             }
@@ -832,10 +832,10 @@ fn check_zeroclaw_user() -> Result<()> {
 
 fn ensure_zeroclaw_user() -> Result<()> {
     let output = Command::new("getent").args(["passwd", "zeroclaw"]).output();
-    if let Ok(output) = output {
-        if output.status.success() {
-            return check_zeroclaw_user();
-        }
+    if let Ok(output) = output
+        && output.status.success()
+    {
+        return check_zeroclaw_user();
     }
 
     let is_alpine = Path::new("/etc/alpine-release").exists();
@@ -978,15 +978,14 @@ fn resolve_invoking_user_config_dir() -> Option<PathBuf> {
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty() && value != "root");
 
-    if let Some(user) = sudo_user {
-        if let Ok(output) = Command::new("getent").args(["passwd", &user]).output() {
-            if output.status.success() {
-                let entry = String::from_utf8_lossy(&output.stdout);
-                let fields: Vec<&str> = entry.trim().split(':').collect();
-                if fields.len() >= 6 {
-                    return Some(PathBuf::from(fields[5]).join(".zeroclaw"));
-                }
-            }
+    if let Some(user) = sudo_user
+        && let Ok(output) = Command::new("getent").args(["passwd", &user]).output()
+        && output.status.success()
+    {
+        let entry = String::from_utf8_lossy(&output.stdout);
+        let fields: Vec<&str> = entry.trim().split(':').collect();
+        if fields.len() >= 6 {
+            return Some(PathBuf::from(fields[5]).join(".zeroclaw"));
         }
     }
 
@@ -1386,7 +1385,7 @@ pub fn xml_escape(raw: &str) -> String {
         .replace('\'', "&apos;")
 }
 
-#[cfg(all(test, feature = "_root_tests"))]
+#[cfg(all(test, zeroclaw_root_crate))]
 mod tests {
     use super::*;
 

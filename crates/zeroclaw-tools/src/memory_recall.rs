@@ -71,41 +71,40 @@ impl Tool for MemoryRecallTool {
         }
 
         // Validate date strings
-        if let Some(s) = since {
-            if chrono::DateTime::parse_from_rfc3339(s).is_err() {
-                return Ok(ToolResult {
-                    success: false,
-                    output: String::new(),
-                    error: Some(format!(
-                        "Invalid 'since' date: {s}. Expected RFC 3339 format, e.g. 2025-03-01T00:00:00Z"
-                    )),
-                });
-            }
+        if let Some(s) = since
+            && chrono::DateTime::parse_from_rfc3339(s).is_err()
+        {
+            return Ok(ToolResult {
+                success: false,
+                output: String::new(),
+                error: Some(format!(
+                    "Invalid 'since' date: {s}. Expected RFC 3339 format, e.g. 2025-03-01T00:00:00Z"
+                )),
+            });
         }
-        if let Some(u) = until {
-            if chrono::DateTime::parse_from_rfc3339(u).is_err() {
-                return Ok(ToolResult {
-                    success: false,
-                    output: String::new(),
-                    error: Some(format!(
-                        "Invalid 'until' date: {u}. Expected RFC 3339 format, e.g. 2025-03-01T00:00:00Z"
-                    )),
-                });
-            }
+        if let Some(u) = until
+            && chrono::DateTime::parse_from_rfc3339(u).is_err()
+        {
+            return Ok(ToolResult {
+                success: false,
+                output: String::new(),
+                error: Some(format!(
+                    "Invalid 'until' date: {u}. Expected RFC 3339 format, e.g. 2025-03-01T00:00:00Z"
+                )),
+            });
         }
-        if let (Some(s), Some(u)) = (since, until) {
-            if let (Ok(s_dt), Ok(u_dt)) = (
+        if let (Some(s), Some(u)) = (since, until)
+            && let (Ok(s_dt), Ok(u_dt)) = (
                 chrono::DateTime::parse_from_rfc3339(s),
                 chrono::DateTime::parse_from_rfc3339(u),
-            ) {
-                if s_dt >= u_dt {
-                    return Ok(ToolResult {
-                        success: false,
-                        output: String::new(),
-                        error: Some("'since' must be before 'until'".into()),
-                    });
-                }
-            }
+            )
+            && s_dt >= u_dt
+        {
+            return Ok(ToolResult {
+                success: false,
+                output: String::new(),
+                error: Some("'since' must be before 'until'".into()),
+            });
         }
 
         #[allow(clippy::cast_possible_truncation)]

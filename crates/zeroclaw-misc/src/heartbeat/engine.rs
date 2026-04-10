@@ -282,17 +282,17 @@ impl HeartbeatEngine {
     ///
     /// Format: `[priority|status] task text` or just `task text`.
     fn parse_task_line(text: &str) -> HeartbeatTask {
-        if let Some(rest) = text.strip_prefix('[') {
-            if let Some((meta, task_text)) = rest.split_once(']') {
-                let task_text = task_text.trim();
-                if !task_text.is_empty() {
-                    let (priority, status) = Self::parse_meta(meta);
-                    return HeartbeatTask {
-                        text: task_text.to_string(),
-                        priority,
-                        status,
-                    };
-                }
+        if let Some(rest) = text.strip_prefix('[')
+            && let Some((meta, task_text)) = rest.split_once(']')
+        {
+            let task_text = task_text.trim();
+            if !task_text.is_empty() {
+                let (priority, status) = Self::parse_meta(meta);
+                return HeartbeatTask {
+                    text: task_text.to_string(),
+                    priority,
+                    status,
+                };
             }
         }
         // No metadata — default to medium/active
