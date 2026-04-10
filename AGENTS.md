@@ -48,7 +48,7 @@ Every workspace crate carries a stability tier per the Microkernel Architecture 
 | `zeroclaw-tool-call-parser` | Beta | Stable at v0.8.0 |
 | `zeroclaw-channels` | Experimental | Plugin migration at v1.0.0 |
 | `zeroclaw-tools` | Experimental | Plugin migration at v1.0.0 |
-| `zeroclaw-misc` | Experimental | Decomposition at v0.8.0 |
+| `zeroclaw-runtime` | Experimental | Decomposition at v0.8.0 |
 | `zeroclaw-macros` | Beta | Tightly coupled to config schema |
 | Gateway (in misc) | Experimental | Separate binary at v0.9.0 |
 

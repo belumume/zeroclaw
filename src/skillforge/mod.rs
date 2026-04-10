@@ -1,4 +1,4 @@
-pub use zeroclaw_misc::skillforge::*;
+pub use zeroclaw_runtime::skillforge::*;
 
 #[cfg(test)]
 mod tests {

@@ -1,1 +1,1 @@
-pub use zeroclaw_misc::verifiable_intent::*;
+pub use zeroclaw_runtime::verifiable_intent::*;

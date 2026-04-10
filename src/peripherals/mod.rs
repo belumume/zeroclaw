@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-pub use zeroclaw_misc::peripherals::*;
+pub use zeroclaw_runtime::peripherals::*;
 
 use crate::config::{Config, PeripheralBoardConfig};
 use anyhow::Result;

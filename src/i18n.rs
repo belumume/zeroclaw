@@ -1,1 +1,1 @@
-pub use zeroclaw_misc::i18n::*;
+pub use zeroclaw_runtime::i18n::*;

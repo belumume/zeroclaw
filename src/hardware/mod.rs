@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-pub use zeroclaw_misc::hardware::*;
+pub use zeroclaw_runtime::hardware::*;
 
 use crate::config::Config;
 use anyhow::Result;

@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-pub use zeroclaw_misc::health::*;
+pub use zeroclaw_runtime::health::*;
 
 #[cfg(test)]
 mod tests {

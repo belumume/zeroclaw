@@ -1,4 +1,4 @@
-pub use zeroclaw_misc::migration::*;
+pub use zeroclaw_runtime::migration::*;
 
 use crate::config::Config;
 use crate::memory::{self, Memory, MemoryCategory};

@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tools", "crates/zeroclaw-misc", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
+members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tools", "crates/zeroclaw-runtime", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
 resolver = "2"
 
 [workspace.package]
@@ -49,7 +49,7 @@ zeroclaw-providers = { path = "crates/zeroclaw-providers" }
 zeroclaw-memory = { path = "crates/zeroclaw-memory" }
 zeroclaw-channels = { path = "crates/zeroclaw-channels", default-features = false, optional = true }
 zeroclaw-tools = { path = "crates/zeroclaw-tools", optional = true }
-zeroclaw-misc = { path = "crates/zeroclaw-misc", default-features = false, optional = true }
+zeroclaw-runtime = { path = "crates/zeroclaw-runtime", default-features = false, optional = true }
 zeroclaw-tool-call-parser = { path = "crates/zeroclaw-tool-call-parser" }
 # Internal proc macros
 zeroclaw-macros = { path = "crates/zeroclaw-macros" }
@@ -212,7 +212,7 @@ default = [
 # The full agent runtime — agent loop, channels, tools, gateway, TUI, all subsystems.
 # Without this, you get the kernel: config + providers + memory + CLI chat.
 agent-runtime = [
-    "dep:zeroclaw-misc", "dep:zeroclaw-channels", "dep:zeroclaw-tools",
+    "dep:zeroclaw-runtime", "dep:zeroclaw-channels", "dep:zeroclaw-tools",
     "dep:rusqlite",
     "dep:ring", "dep:lru", "dep:chrono-tz", "dep:cron", "dep:glob", "dep:which",
     "dep:ratatui", "dep:crossterm",
@@ -234,54 +234,54 @@ agent-runtime = [
 ]
 
 # Major subsystems — each forwards to exactly ONE crate
-gateway = ["zeroclaw-misc/gateway"]
-tui-onboarding = ["zeroclaw-misc/tui-onboarding"]
+gateway = ["zeroclaw-runtime/gateway"]
+tui-onboarding = ["zeroclaw-runtime/tui-onboarding"]
 schema-export = ["zeroclaw-config/schema-export"]
 
-# Channels — each forwards to zeroclaw-misc (which forwards to zeroclaw-channels)
-channel-email = ["zeroclaw-misc/channel-email"]
-channel-telegram = ["zeroclaw-misc/channel-telegram"]
-channel-lark = ["zeroclaw-misc/channel-lark"]
-channel-nostr = ["zeroclaw-misc/channel-nostr"]
-channel-matrix = ["zeroclaw-misc/channel-matrix"]
-channel-discord = ["zeroclaw-misc/channel-discord"]
-channel-slack = ["zeroclaw-misc/channel-slack"]
-channel-signal = ["zeroclaw-misc/channel-signal"]
-channel-mattermost = ["zeroclaw-misc/channel-mattermost"]
-channel-irc = ["zeroclaw-misc/channel-irc"]
-channel-imessage = ["zeroclaw-misc/channel-imessage"]
-channel-dingtalk = ["zeroclaw-misc/channel-dingtalk"]
-channel-qq = ["zeroclaw-misc/channel-qq"]
-channel-bluesky = ["zeroclaw-misc/channel-bluesky"]
-channel-twitter = ["zeroclaw-misc/channel-twitter"]
-channel-reddit = ["zeroclaw-misc/channel-reddit"]
-channel-notion = ["zeroclaw-misc/channel-notion"]
-channel-linq = ["zeroclaw-misc/channel-linq"]
-channel-wati = ["zeroclaw-misc/channel-wati"]
-channel-nextcloud = ["zeroclaw-misc/channel-nextcloud"]
-channel-mochat = ["zeroclaw-misc/channel-mochat"]
-channel-wecom = ["zeroclaw-misc/channel-wecom"]
-channel-clawdtalk = ["zeroclaw-misc/channel-clawdtalk"]
-channel-webhook = ["zeroclaw-misc/channel-webhook"]
-channel-acp-server = ["zeroclaw-misc/channel-acp-server"]
-channel-whatsapp-cloud = ["zeroclaw-misc/channel-whatsapp-cloud"]
-channel-voice-call = ["zeroclaw-misc/channel-voice-call"]
+# Channels — each forwards to zeroclaw-runtime (which forwards to zeroclaw-channels)
+channel-email = ["zeroclaw-runtime/channel-email"]
+channel-telegram = ["zeroclaw-runtime/channel-telegram"]
+channel-lark = ["zeroclaw-runtime/channel-lark"]
+channel-nostr = ["zeroclaw-runtime/channel-nostr"]
+channel-matrix = ["zeroclaw-runtime/channel-matrix"]
+channel-discord = ["zeroclaw-runtime/channel-discord"]
+channel-slack = ["zeroclaw-runtime/channel-slack"]
+channel-signal = ["zeroclaw-runtime/channel-signal"]
+channel-mattermost = ["zeroclaw-runtime/channel-mattermost"]
+channel-irc = ["zeroclaw-runtime/channel-irc"]
+channel-imessage = ["zeroclaw-runtime/channel-imessage"]
+channel-dingtalk = ["zeroclaw-runtime/channel-dingtalk"]
+channel-qq = ["zeroclaw-runtime/channel-qq"]
+channel-bluesky = ["zeroclaw-runtime/channel-bluesky"]
+channel-twitter = ["zeroclaw-runtime/channel-twitter"]
+channel-reddit = ["zeroclaw-runtime/channel-reddit"]
+channel-notion = ["zeroclaw-runtime/channel-notion"]
+channel-linq = ["zeroclaw-runtime/channel-linq"]
+channel-wati = ["zeroclaw-runtime/channel-wati"]
+channel-nextcloud = ["zeroclaw-runtime/channel-nextcloud"]
+channel-mochat = ["zeroclaw-runtime/channel-mochat"]
+channel-wecom = ["zeroclaw-runtime/channel-wecom"]
+channel-clawdtalk = ["zeroclaw-runtime/channel-clawdtalk"]
+channel-webhook = ["zeroclaw-runtime/channel-webhook"]
+channel-acp-server = ["zeroclaw-runtime/channel-acp-server"]
+channel-whatsapp-cloud = ["zeroclaw-runtime/channel-whatsapp-cloud"]
+channel-voice-call = ["zeroclaw-runtime/channel-voice-call"]
 channel-feishu = ["channel-lark"]
-whatsapp-web = ["zeroclaw-misc/whatsapp-web"]
-voice-wake = ["zeroclaw-misc/voice-wake"]
+whatsapp-web = ["zeroclaw-runtime/whatsapp-web"]
+voice-wake = ["zeroclaw-runtime/voice-wake"]
 
 # Backends and platform flags — each forwards to ONE crate
-observability-prometheus = ["zeroclaw-misc/observability-prometheus"]
-observability-otel = ["zeroclaw-misc/observability-otel"]
-hardware = ["zeroclaw-misc/hardware"]
-peripheral-rpi = ["zeroclaw-misc/peripheral-rpi"]
-sandbox-landlock = ["zeroclaw-misc/sandbox-landlock"]
-sandbox-bubblewrap = ["zeroclaw-misc/sandbox-bubblewrap"]
+observability-prometheus = ["zeroclaw-runtime/observability-prometheus"]
+observability-otel = ["zeroclaw-runtime/observability-otel"]
+hardware = ["zeroclaw-runtime/hardware"]
+peripheral-rpi = ["zeroclaw-runtime/peripheral-rpi"]
+sandbox-landlock = ["zeroclaw-runtime/sandbox-landlock"]
+sandbox-bubblewrap = ["zeroclaw-runtime/sandbox-bubblewrap"]
 browser-native = ["zeroclaw-tools/browser-native"]
-plugins-wasm = ["zeroclaw-misc/plugins-wasm"]
-probe = ["zeroclaw-misc/probe"]
+plugins-wasm = ["zeroclaw-runtime/plugins-wasm"]
+probe = ["zeroclaw-runtime/probe"]
 rag-pdf = ["zeroclaw-tools/rag-pdf"]
-webauthn = ["zeroclaw-misc/webauthn"]
+webauthn = ["zeroclaw-runtime/webauthn"]
 
 # Backward-compatible aliases
 fantoccini = ["browser-native"]

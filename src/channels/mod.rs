@@ -1,4 +1,4 @@
-pub use zeroclaw_misc::channels::*;
+pub use zeroclaw_runtime::channels::*;
 pub mod session_backend {
     pub use zeroclaw_infra::session_backend::*;
 }

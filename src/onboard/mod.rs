@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-pub use zeroclaw_misc::onboard::*;
+pub use zeroclaw_runtime::onboard::*;
 
 #[cfg(test)]
 mod tests {

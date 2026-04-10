@@ -1,5 +1,5 @@
 #[allow(unused_imports)]
-pub use zeroclaw_misc::tunnel::*;
+pub use zeroclaw_runtime::tunnel::*;
 
 #[cfg(test)]
 mod tests {
