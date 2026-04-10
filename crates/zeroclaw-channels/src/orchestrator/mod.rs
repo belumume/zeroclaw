@@ -5526,6 +5526,94 @@ pub async fn start_channels(config: Config) -> Result<()> {
     Ok(())
 }
 
+/// Deliver a cron job announcement to a configured channel.
+/// Scans for credential leaks before delivery.
+pub async fn deliver_announcement(
+    config: &zeroclaw_config::schema::Config,
+    channel: &str,
+    target: &str,
+    output: &str,
+) -> anyhow::Result<()> {
+    use zeroclaw_api::channel::SendMessage;
+
+    // Scan for credential leaks before delivering
+    let leak_detector = zeroclaw_runtime::security::LeakDetector::new();
+    let safe_output = match leak_detector.scan(output) {
+        zeroclaw_runtime::security::LeakResult::Detected { redacted, .. } => redacted,
+        zeroclaw_runtime::security::LeakResult::Clean => output.to_string(),
+    };
+
+    match channel.to_ascii_lowercase().as_str() {
+        #[cfg(feature = "channel-telegram")]
+        "telegram" => {
+            let tg = config
+                .channels_config
+                .telegram
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("telegram channel not configured"))?;
+            let ch = TelegramChannel::new(
+                tg.bot_token.clone(),
+                tg.allowed_users.clone(),
+                tg.mention_only,
+            );
+            zeroclaw_api::channel::Channel::send(&ch, &SendMessage::new(&safe_output, target))
+                .await?;
+        }
+        "discord" => {
+            let dc = config
+                .channels_config
+                .discord
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("discord channel not configured"))?;
+            let ch = DiscordChannel::new(
+                dc.bot_token.clone(),
+                dc.guild_id.clone(),
+                dc.allowed_users.clone(),
+                dc.listen_to_bots,
+                dc.mention_only,
+            );
+            zeroclaw_api::channel::Channel::send(&ch, &SendMessage::new(&safe_output, target))
+                .await?;
+        }
+        "slack" => {
+            let sl = config
+                .channels_config
+                .slack
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("slack channel not configured"))?;
+            let ch = SlackChannel::new(
+                sl.bot_token.clone(),
+                sl.app_token.clone(),
+                sl.channel_id.clone(),
+                Vec::new(),
+                sl.allowed_users.clone(),
+            )
+            .with_workspace_dir(config.workspace_dir.clone());
+            zeroclaw_api::channel::Channel::send(&ch, &SendMessage::new(&safe_output, target))
+                .await?;
+        }
+        "signal" => {
+            let sg = config
+                .channels_config
+                .signal
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("signal channel not configured"))?;
+            let ch = SignalChannel::new(
+                sg.http_url.clone(),
+                sg.account.clone(),
+                sg.group_id.clone(),
+                sg.allowed_from.clone(),
+                sg.ignore_attachments,
+                sg.ignore_stories,
+            );
+            zeroclaw_api::channel::Channel::send(&ch, &SendMessage::new(&safe_output, target))
+                .await?;
+        }
+        other => anyhow::bail!("unsupported delivery channel: {other}"),
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

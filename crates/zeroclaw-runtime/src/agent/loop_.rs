@@ -1,4 +1,22 @@
 use crate::approval::{ApprovalManager, ApprovalRequest, ApprovalResponse};
+
+/// Peripheral tools factory type — takes owned config so the returned future is 'static.
+pub type PeripheralToolsFn = Box<
+    dyn Fn(
+            zeroclaw_config::schema::PeripheralsConfig,
+        ) -> std::pin::Pin<
+            Box<dyn std::future::Future<Output = anyhow::Result<Vec<Box<dyn Tool>>>> + Send>,
+        > + Send
+        + Sync,
+>;
+
+/// Peripheral tools factory, injected by the binary when hardware feature is on.
+static PERIPHERAL_TOOLS_FN: std::sync::OnceLock<PeripheralToolsFn> = std::sync::OnceLock::new();
+
+/// Register the peripheral tools factory. Called once at startup by the binary.
+pub fn register_peripheral_tools_fn(f: PeripheralToolsFn) {
+    let _ = PERIPHERAL_TOOLS_FN.set(f);
+}
 use crate::cost::types::BudgetCheck;
 use crate::i18n::ToolDescriptions;
 use crate::observability::{self, Observer, ObserverEvent, runtime_trace};
@@ -2026,8 +2044,11 @@ pub async fn run(
         None,
     );
 
-    // Peripheral tools are injected by the binary crate when hardware feature is on.
-    let peripheral_tools: Vec<Box<dyn Tool>> = vec![];
+    let peripheral_tools: Vec<Box<dyn Tool>> = if let Some(f) = PERIPHERAL_TOOLS_FN.get() {
+        f(config.peripherals.clone()).await.unwrap_or_default()
+    } else {
+        vec![]
+    };
     if !peripheral_tools.is_empty() {
         tracing::info!(count = peripheral_tools.len(), "Peripheral tools added");
         tools_registry.extend(peripheral_tools);
@@ -3010,8 +3031,11 @@ pub async fn process_message(
         &config,
         None,
     );
-    // Peripheral tools are injected by the binary crate when hardware feature is on.
-    let peripheral_tools: Vec<Box<dyn Tool>> = vec![];
+    let peripheral_tools: Vec<Box<dyn Tool>> = if let Some(f) = PERIPHERAL_TOOLS_FN.get() {
+        f(config.peripherals.clone()).await.unwrap_or_default()
+    } else {
+        vec![]
+    };
     tools_registry.extend(peripheral_tools);
 
     // ── Wire MCP tools (non-fatal) — process_message path ────────

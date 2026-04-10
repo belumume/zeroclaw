@@ -1349,6 +1349,27 @@ async fn main() -> Result<()> {
             } else {
                 info!("🧠 Starting ZeroClaw Daemon on {host}:{port}");
             }
+            // Wire peripheral tools from zeroclaw-hardware
+            #[cfg(feature = "hardware")]
+            zeroclaw_runtime::agent::loop_::register_peripheral_tools_fn(Box::new(|config| {
+                Box::pin(async move {
+                    zeroclaw_hardware::peripherals::create_peripheral_tools(&config).await
+                })
+            }));
+
+            // Wire cron delivery to the channels orchestrator
+            #[cfg(feature = "agent-runtime")]
+            zeroclaw_runtime::cron::scheduler::register_delivery_fn(Box::new(
+                |config, channel, target, output| {
+                    Box::pin(async move {
+                        zeroclaw_channels::orchestrator::deliver_announcement(
+                            &config, &channel, &target, &output,
+                        )
+                        .await
+                    })
+                },
+            ));
+
             let subsystems = daemon::DaemonSubsystems {
                 #[cfg(feature = "gateway")]
                 gateway_start: Some(Box::new(|host, port, config, tx| {
