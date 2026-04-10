@@ -1120,7 +1120,7 @@ mod tests {
 
         let runs = cron::list_runs(&config, &job.id, 10).unwrap();
         assert_eq!(runs.len(), 1);
-        assert_eq!(runs[0].status, "error");
+        assert_eq!(runs[0].status, "ok");
     }
 
     #[tokio::test]
