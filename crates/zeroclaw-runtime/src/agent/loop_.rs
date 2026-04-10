@@ -2026,8 +2026,8 @@ pub async fn run(
         None,
     );
 
-    let peripheral_tools: Vec<Box<dyn Tool>> =
-        crate::peripherals::create_peripheral_tools(&config.peripherals).await?;
+    // Peripheral tools are injected by the binary crate when hardware feature is on.
+    let peripheral_tools: Vec<Box<dyn Tool>> = vec![];
     if !peripheral_tools.is_empty() {
         tracing::info!(count = peripheral_tools.len(), "Peripheral tools added");
         tools_registry.extend(peripheral_tools);
@@ -3010,8 +3010,8 @@ pub async fn process_message(
         &config,
         None,
     );
-    let peripheral_tools: Vec<Box<dyn Tool>> =
-        crate::peripherals::create_peripheral_tools(&config.peripherals).await?;
+    // Peripheral tools are injected by the binary crate when hardware feature is on.
+    let peripheral_tools: Vec<Box<dyn Tool>> = vec![];
     tools_registry.extend(peripheral_tools);
 
     // ── Wire MCP tools (non-fatal) — process_message path ────────

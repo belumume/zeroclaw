@@ -13,7 +13,7 @@
 //!
 //! ## Live update semantics
 //!
-//! ZeroClaw's agent loop calls [`zeroclaw_runtime::hardware::boot`] on **every** request,
+//! ZeroClaw's agent loop calls [`zeroclaw_hardware::boot`] on **every** request,
 //! which re-reads `~/.zeroclaw/hardware/` from disk.  Writing to those files
 //! therefore takes effect on the very next `/api/chat` call — no daemon restart
 //! needed.  The `/api/hardware/reload` endpoint verifies what is on disk and
@@ -380,7 +380,7 @@ pub async fn handle_hardware_context_get(
 /// `POST /api/hardware/reload` — verify on-disk hardware context and report what  
 /// will be loaded on the next chat request.
 ///
-/// Since [`zeroclaw_runtime::hardware::boot`] re-reads from disk on every agent invocation,
+/// Since [`zeroclaw_hardware::boot`] re-reads from disk on every agent invocation,
 /// writing to the hardware files via the other endpoints already takes effect on
 /// the next `/api/chat` call.  This endpoint reads the same files and reports
 /// the current state so callers can confirm the update landed.
@@ -396,7 +396,7 @@ pub async fn handle_hardware_reload(
     let tool_count = state.tools_registry.len();
 
     // Reload hardware context from disk (same function used by the agent loop)
-    let context = zeroclaw_runtime::hardware::load_hardware_context_prompt(&[]);
+    let context = zeroclaw_hardware::load_hardware_context_prompt(&[]);
     let context_length = context.len();
 
     tracing::info!(

@@ -4,6 +4,7 @@
 
 pub mod device;
 pub mod gpio;
+pub mod peripherals;
 pub mod protocol;
 pub mod registry;
 pub mod transport;
@@ -51,6 +52,8 @@ pub mod datasheet;
 #[cfg(all(feature = "peripheral-rpi", target_os = "linux"))]
 pub mod rpi;
 
+pub mod util;
+
 // ── Phase 4: ToolRegistry + plugin system ─────────────────────────────────────
 pub mod loader;
 pub mod manifest;
@@ -61,7 +64,7 @@ pub mod tool_registry;
 #[allow(unused_imports)]
 pub use aardvark::AardvarkTransport;
 
-use crate::hardware::device::DeviceRegistry;
+use crate::device::DeviceRegistry;
 #[cfg(feature = "hardware")]
 use anyhow::Result;
 #[allow(unused_imports)]

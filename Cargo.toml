@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tools", "crates/zeroclaw-runtime", "crates/zeroclaw-tui", "crates/zeroclaw-plugins", "crates/zeroclaw-gateway", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
+members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tools", "crates/zeroclaw-runtime", "crates/zeroclaw-tui", "crates/zeroclaw-plugins", "crates/zeroclaw-gateway", "crates/zeroclaw-hardware", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
 resolver = "2"
 
 [workspace.package]
@@ -53,6 +53,7 @@ zeroclaw-runtime = { path = "crates/zeroclaw-runtime", default-features = false,
 zeroclaw-tui = { path = "crates/zeroclaw-tui", optional = true }
 zeroclaw-plugins = { path = "crates/zeroclaw-plugins", optional = true }
 zeroclaw-gateway = { path = "crates/zeroclaw-gateway", optional = true }
+zeroclaw-hardware = { path = "crates/zeroclaw-hardware", optional = true }
 zeroclaw-tool-call-parser = { path = "crates/zeroclaw-tool-call-parser" }
 # Internal proc macros
 zeroclaw-macros = { path = "crates/zeroclaw-macros" }
@@ -276,13 +277,13 @@ voice-wake = ["zeroclaw-channels/voice-wake"]
 # Backends and platform flags — each forwards to ONE crate
 observability-prometheus = ["zeroclaw-runtime/observability-prometheus"]
 observability-otel = ["zeroclaw-runtime/observability-otel"]
-hardware = ["zeroclaw-runtime/hardware"]
-peripheral-rpi = ["zeroclaw-runtime/peripheral-rpi"]
+hardware = ["dep:zeroclaw-hardware", "zeroclaw-hardware/hardware"]
+peripheral-rpi = ["dep:zeroclaw-hardware", "zeroclaw-hardware/peripheral-rpi"]
 sandbox-landlock = ["zeroclaw-runtime/sandbox-landlock"]
 sandbox-bubblewrap = ["zeroclaw-runtime/sandbox-bubblewrap"]
 browser-native = ["zeroclaw-tools/browser-native"]
 plugins-wasm = ["dep:zeroclaw-plugins", "zeroclaw-runtime/plugins-wasm"]
-probe = ["zeroclaw-runtime/probe"]
+probe = ["dep:zeroclaw-hardware", "zeroclaw-hardware/probe"]
 rag-pdf = ["zeroclaw-tools/rag-pdf"]
 webauthn = ["zeroclaw-runtime/webauthn"]
 

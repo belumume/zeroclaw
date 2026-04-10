@@ -323,7 +323,7 @@ async fn collect_stderr(handle: Option<tokio::process::ChildStderr>) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hardware::manifest::{ExecConfig, ParameterDef, ToolManifest, ToolMeta};
+    use crate::manifest::{ExecConfig, ParameterDef, ToolManifest, ToolMeta};
 
     fn make_manifest(name: &str, params: Vec<ParameterDef>) -> ToolManifest {
         ToolManifest {

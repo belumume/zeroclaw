@@ -1,5 +1,6 @@
 #[allow(unused_imports)]
-pub use zeroclaw_runtime::peripherals::*;
+#[cfg(feature = "hardware")]
+pub use zeroclaw_hardware::peripherals::*;
 
 use crate::config::{Config, PeripheralBoardConfig};
 use anyhow::Result;
@@ -7,7 +8,11 @@ use anyhow::Result;
 pub async fn handle_command(cmd: crate::PeripheralCommands, config: &Config) -> Result<()> {
     match cmd {
         crate::PeripheralCommands::List => {
-            let boards = list_configured_boards(&config.peripherals);
+            let boards: Vec<&PeripheralBoardConfig> = if config.peripherals.enabled {
+                config.peripherals.boards.iter().collect()
+            } else {
+                Vec::new()
+            };
             if boards.is_empty() {
                 println!("No peripherals configured.");
                 println!();

@@ -1,5 +1,5 @@
 use crate::cli_input::Input;
-use crate::hardware::{self, HardwareConfig};
+// TODO: hardware wizard code moved to zeroclaw-hardware; wire via callback
 use anyhow::{Context, Result, bail};
 use console::style;
 use dialoguer::{Confirm, Select};
@@ -19,6 +19,7 @@ use zeroclaw_config::schema::{
     DingTalkConfig, IrcConfig, LarkReceiveMode, LinqConfig, NextcloudTalkConfig, QQConfig,
     SignalConfig, StreamMode, WhatsAppConfig,
 };
+use zeroclaw_config::schema::{HardwareConfig, HardwareTransport};
 // TODO: nostr onboarding disabled until zeroclaw-channels provides it
 #[cfg(any())]
 use zeroclaw_config::schema::{NostrConfig, default_nostr_relays};
@@ -3203,6 +3204,8 @@ fn setup_tool_mode() -> Result<(ComposioConfig, SecretsConfig)> {
 
 // ── Step 6: Hardware (Physical World) ───────────────────────────
 
+// TODO: hardware wizard moved to zeroclaw-hardware; wire via callback in follow-up PR
+#[cfg(any())]
 fn setup_hardware() -> Result<HardwareConfig> {
     print_bullet("ZeroClaw can talk to physical hardware (LEDs, sensors, motors).");
     print_bullet("Scanning for connected devices...");
@@ -3269,10 +3272,10 @@ fn setup_hardware() -> Result<HardwareConfig> {
     let mut hw_config = hardware::config_from_wizard_choice(choice, &devices);
 
     // ── Serial: pick a port if multiple found ──
-    if hw_config.transport_mode() == hardware::HardwareTransport::Serial {
+    if hw_config.transport_mode() == HardwareTransport::Serial {
         let serial_devices: Vec<&hardware::DiscoveredDevice> = devices
             .iter()
-            .filter(|d| d.transport == hardware::HardwareTransport::Serial)
+            .filter(|d| d.transport == HardwareTransport::Serial)
             .collect();
 
         if serial_devices.len() > 1 {
@@ -3333,9 +3336,7 @@ fn setup_hardware() -> Result<HardwareConfig> {
     }
 
     // ── Probe: ask for target chip ──
-    if hw_config.transport_mode() == hardware::HardwareTransport::Probe
-        && hw_config.probe_target.is_none()
-    {
+    if hw_config.transport_mode() == HardwareTransport::Probe && hw_config.probe_target.is_none() {
         let target: String = Input::new()
             .with_prompt("  Target MCU chip (e.g. STM32F411CEUx, nRF52840_xxAA)")
             .default("STM32F411CEUx")
@@ -3355,17 +3356,17 @@ fn setup_hardware() -> Result<HardwareConfig> {
     // ── Summary ──
     if hw_config.enabled {
         let transport_label = match hw_config.transport_mode() {
-            hardware::HardwareTransport::Native => "Native GPIO".to_string(),
-            hardware::HardwareTransport::Serial => format!(
+            HardwareTransport::Native => "Native GPIO".to_string(),
+            HardwareTransport::Serial => format!(
                 "Serial → {} @ {} baud",
                 hw_config.serial_port.as_deref().unwrap_or("?"),
                 hw_config.baud_rate
             ),
-            hardware::HardwareTransport::Probe => format!(
+            HardwareTransport::Probe => format!(
                 "Probe (SWD/JTAG) → {}",
                 hw_config.probe_target.as_deref().unwrap_or("?")
             ),
-            hardware::HardwareTransport::None => "Software Only".to_string(),
+            HardwareTransport::None => "Software Only".to_string(),
         };
 
         println!(
@@ -3387,6 +3388,10 @@ fn setup_hardware() -> Result<HardwareConfig> {
     }
 
     Ok(hw_config)
+}
+
+fn setup_hardware() -> Result<HardwareConfig> {
+    Ok(HardwareConfig::default())
 }
 
 // ── Step 6: Project Context ─────────────────────────────────────
@@ -6115,10 +6120,8 @@ fn print_summary(config: &Config) {
         if config.hardware.enabled {
             let mode = config.hardware.transport_mode();
             match mode {
-                hardware::HardwareTransport::Native => {
-                    style("Native GPIO (direct)").green().to_string()
-                }
-                hardware::HardwareTransport::Serial => format!(
+                HardwareTransport::Native => style("Native GPIO (direct)").green().to_string(),
+                HardwareTransport::Serial => format!(
                     "{}",
                     style(format!(
                         "Serial → {} @ {} baud",
@@ -6127,7 +6130,7 @@ fn print_summary(config: &Config) {
                     ))
                     .green()
                 ),
-                hardware::HardwareTransport::Probe => format!(
+                HardwareTransport::Probe => format!(
                     "{}",
                     style(format!(
                         "Probe → {}",
@@ -6135,7 +6138,7 @@ fn print_summary(config: &Config) {
                     ))
                     .green()
                 ),
-                hardware::HardwareTransport::None => "disabled (software only)".to_string(),
+                HardwareTransport::None => "disabled (software only)".to_string(),
             }
         } else {
             "disabled (software only)".to_string()

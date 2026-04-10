@@ -250,7 +250,7 @@ impl ToolRegistry {
 
     /// Consume the registry and return all tools as a `Vec`.
     ///
-    /// Used by [`crate::hardware::boot`] to hand tools off to the agent loop,
+    /// Used by [`crate::boot`] to hand tools off to the agent loop,
     /// which manages its own flat `Vec<Box<dyn Tool>>` registry.
     /// Order is alphabetical by tool name for deterministic output.
     pub fn into_tools(self) -> Vec<Box<dyn Tool>> {

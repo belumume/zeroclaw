@@ -78,31 +78,24 @@ opentelemetry_sdk = { version = "0.31", default-features = false, features = ["t
 opentelemetry-otlp = { version = "0.31", default-features = false, features = ["trace", "metrics", "http-proto", "reqwest-blocking-client", "reqwest-rustls-webpki-roots"], optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-rppal = { version = "0.22", optional = true }
 landlock = { version = "0.4", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 # Optional deps for specific features
-probe-rs = { version = "0.31", optional = true }
 pdf-extract = { version = "0.10", optional = true }
-nusb = { version = "0.2", default-features = false, optional = true }
-tokio-serial = { version = "5", default-features = false, optional = true }
 
 [features]
 default = ["observability-prometheus", "schema-export"]
 observability-prometheus = ["dep:prometheus"]
 observability-otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentelemetry-otlp"]
-peripheral-rpi = ["rppal"]
 sandbox-landlock = ["dep:landlock"]
-hardware = ["dep:nusb", "dep:tokio-serial"]
 schema-export = ["dep:schemars", "zeroclaw-config/schema-export"]
 
 
 browser-native = []
 rag-pdf = ["dep:pdf-extract"]
-probe = ["dep:probe-rs"]
 plugins-wasm = ["dep:zeroclaw-plugins"]
 webauthn = []
 sandbox-bubblewrap = []

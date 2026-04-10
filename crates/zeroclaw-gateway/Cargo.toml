@@ -16,6 +16,7 @@ zeroclaw-providers = { path = "../zeroclaw-providers" }
 zeroclaw-channels = { path = "../zeroclaw-channels", default-features = false, features = ["channel-email"] }
 zeroclaw-runtime = { path = "../zeroclaw-runtime", default-features = false }
 zeroclaw-tools = { path = "../zeroclaw-tools" }
+zeroclaw-hardware = { path = "../zeroclaw-hardware" }
 zeroclaw-plugins = { path = "../zeroclaw-plugins", optional = true }
 
 # HTTP server

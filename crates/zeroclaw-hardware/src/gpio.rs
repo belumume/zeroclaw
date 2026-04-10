@@ -275,7 +275,7 @@ pub fn gpio_tools(registry: Arc<RwLock<DeviceRegistry>>) -> Vec<Box<dyn Tool>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hardware::{
+    use crate::{
         device::{DeviceCapabilities, DeviceRegistry},
         protocol::ZcResponse,
         transport::{Transport, TransportError, TransportKind},
