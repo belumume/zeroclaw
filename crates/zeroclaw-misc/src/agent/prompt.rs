@@ -299,8 +299,8 @@ impl PromptSection for ChannelMediaSection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zeroclaw_api::tool::Tool;
     use async_trait::async_trait;
+    use zeroclaw_api::tool::Tool;
 
     struct TestTool;
 

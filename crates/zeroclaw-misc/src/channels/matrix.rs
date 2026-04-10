@@ -1,4 +1,3 @@
-use zeroclaw_api::channel::{Channel, ChannelMessage, SendMessage};
 use async_trait::async_trait;
 use matrix_sdk::{
     Client as MatrixSdkClient, LoopCtrl, Room, RoomState, SessionMeta, SessionTokens,
@@ -25,6 +24,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::sync::{Mutex, OnceCell, RwLock, mpsc};
+use zeroclaw_api::channel::{Channel, ChannelMessage, SendMessage};
 
 /// Matrix channel for Matrix Client-Server API.
 /// Uses matrix-sdk for reliable sync and encrypted-room decryption.

@@ -323,8 +323,8 @@ pub fn encode_wav_from_f32(samples: &[f32], sample_rate: u32, channels: u16) -> 
 
 #[cfg(test)]
 mod tests {
-    use zeroclaw_config::traits::ChannelConfig;
     use super::*;
+    use zeroclaw_config::traits::ChannelConfig;
 
     // ── State machine tests ────────────────────────────────
 

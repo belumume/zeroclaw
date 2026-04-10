@@ -663,5 +663,5 @@ mod tests {
         );
         let result = load_hardware_context_from_dir(tmp.path(), &[]);
         // blink.md sorts before gpio.md
-}
+    }
 }

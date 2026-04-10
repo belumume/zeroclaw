@@ -119,12 +119,12 @@ pub async fn create_peripheral_tools(config: &PeripheralsConfig) -> Result<Vec<B
     if !tools.is_empty() {
         let board_names: Vec<String> = config.boards.iter().map(|b| b.board.clone()).collect();
         tools.push(Box::new(HardwareMemoryMapTool::new(board_names.clone())));
-        tools.push(Box::new(zeroclaw_tools::hardware_board_info::HardwareBoardInfoTool::new(
-            board_names.clone(),
-        )));
-        tools.push(Box::new(zeroclaw_tools::hardware_memory_read::HardwareMemoryReadTool::new(
-            board_names,
-        )));
+        tools.push(Box::new(
+            zeroclaw_tools::hardware_board_info::HardwareBoardInfoTool::new(board_names.clone()),
+        ));
+        tools.push(Box::new(
+            zeroclaw_tools::hardware_memory_read::HardwareMemoryReadTool::new(board_names),
+        ));
     }
 
     // Phase C: Add hardware_capabilities tool when any serial boards
@@ -153,12 +153,12 @@ pub fn create_board_info_tools(config: &PeripheralsConfig) -> Vec<Box<dyn Tool>>
     }
     let board_names: Vec<String> = config.boards.iter().map(|b| b.board.clone()).collect();
     vec![
-        Box::new(zeroclaw_tools::hardware_memory_map::HardwareMemoryMapTool::new(
-            board_names.clone(),
-        )),
-        Box::new(zeroclaw_tools::hardware_board_info::HardwareBoardInfoTool::new(
-            board_names.clone(),
-        )),
+        Box::new(
+            zeroclaw_tools::hardware_memory_map::HardwareMemoryMapTool::new(board_names.clone()),
+        ),
+        Box::new(
+            zeroclaw_tools::hardware_board_info::HardwareBoardInfoTool::new(board_names.clone()),
+        ),
         Box::new(zeroclaw_tools::hardware_memory_read::HardwareMemoryReadTool::new(board_names)),
     ]
 }

@@ -61,9 +61,9 @@ pub use zeroclaw_channels::wecom::WeComChannel;
 pub use zeroclaw_channels::whatsapp::WhatsAppChannel;
 // Local channel types (in misc, not zeroclaw-channels)
 pub use cli::CliChannel;
-pub use telegram::TelegramChannel;
 #[cfg(feature = "channel-matrix")]
 pub use matrix::MatrixChannel;
+pub use telegram::TelegramChannel;
 pub use zeroclaw_channels::link_enricher;
 #[cfg(feature = "whatsapp-web")]
 pub use zeroclaw_channels::whatsapp_web::WhatsAppWebChannel;

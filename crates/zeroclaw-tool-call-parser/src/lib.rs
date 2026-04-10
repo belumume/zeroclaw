@@ -778,10 +778,10 @@ fn parse_glm_style_tool_calls(text: &str) -> Vec<(String, serde_json::Value, Opt
                     continue;
                 }
 
-                if rest.starts_with('{') {
-                    if let Ok(json_args) = serde_json::from_str::<serde_json::Value>(rest) {
-                        calls.push((tool_name.to_string(), json_args, Some(line.to_string())));
-                    }
+                if rest.starts_with('{')
+                    && let Ok(json_args) = serde_json::from_str::<serde_json::Value>(rest)
+                {
+                    calls.push((tool_name.to_string(), json_args, Some(line.to_string())));
                 }
             }
         }
@@ -1010,19 +1010,19 @@ pub fn parse_tool_calls(response: &str) -> (String, Vec<ParsedToolCall>) {
         calls = parse_tool_calls_from_json_value(&json_value);
         if !calls.is_empty() {
             // If we found tool_calls, extract any content field as text
-            if let Some(content) = json_value.get("content").and_then(|v| v.as_str()) {
-                if !content.trim().is_empty() {
-                    text_parts.push(content.trim().to_string());
-                }
+            if let Some(content) = json_value.get("content").and_then(|v| v.as_str())
+                && !content.trim().is_empty()
+            {
+                text_parts.push(content.trim().to_string());
             }
             return (text_parts.join("\n"), calls);
         }
     }
 
-    if let Some((minimax_text, minimax_calls)) = parse_minimax_invoke_calls(response) {
-        if !minimax_calls.is_empty() {
-            return (minimax_text, minimax_calls);
-        }
+    if let Some((minimax_text, minimax_calls)) = parse_minimax_invoke_calls(response)
+        && !minimax_calls.is_empty()
+    {
+        return (minimax_text, minimax_calls);
     }
 
     // Fall back to XML-style tool-call tag parsing.
@@ -1061,11 +1061,9 @@ pub fn parse_tool_calls(response: &str) -> (String, Vec<ParsedToolCall>) {
             }
 
             // If JSON parsing failed, try XML format (DeepSeek/GLM style)
-            if !parsed_any {
-                if let Some(xml_calls) = parse_xml_tool_calls(inner) {
-                    calls.extend(xml_calls);
-                    parsed_any = true;
-                }
+            if !parsed_any && let Some(xml_calls) = parse_xml_tool_calls(inner) {
+                calls.extend(xml_calls);
+                parsed_any = true;
             }
 
             if !parsed_any {
@@ -1103,19 +1101,15 @@ pub fn parse_tool_calls(response: &str) -> (String, Vec<ParsedToolCall>) {
                 }
 
                 // Try XML
-                if !parsed_any {
-                    if let Some(xml_calls) = parse_xml_tool_calls(inner) {
-                        calls.extend(xml_calls);
-                        parsed_any = true;
-                    }
+                if !parsed_any && let Some(xml_calls) = parse_xml_tool_calls(inner) {
+                    calls.extend(xml_calls);
+                    parsed_any = true;
                 }
 
                 // Try GLM shortened body
-                if !parsed_any {
-                    if let Some(glm_call) = parse_glm_shortened_body(inner) {
-                        calls.push(glm_call);
-                        parsed_any = true;
-                    }
+                if !parsed_any && let Some(glm_call) = parse_glm_shortened_body(inner) {
+                    calls.push(glm_call);
+                    parsed_any = true;
                 }
 
                 if parsed_any {
@@ -1130,16 +1124,15 @@ pub fn parse_tool_calls(response: &str) -> (String, Vec<ParsedToolCall>) {
 
             // No cross-alias close tag resolved — fall back to JSON recovery
             // from unclosed tags (brace-balancing).
-            if let Some(json_end) = find_json_end(after_open) {
-                if let Ok(value) =
+            if let Some(json_end) = find_json_end(after_open)
+                && let Ok(value) =
                     serde_json::from_str::<serde_json::Value>(&after_open[..json_end])
-                {
-                    let parsed_calls = parse_tool_calls_from_json_value(&value);
-                    if !parsed_calls.is_empty() {
-                        calls.extend(parsed_calls);
-                        remaining = strip_leading_close_tags(&after_open[json_end..]);
-                        continue;
-                    }
+            {
+                let parsed_calls = parse_tool_calls_from_json_value(&value);
+                if !parsed_calls.is_empty() {
+                    calls.extend(parsed_calls);
+                    remaining = strip_leading_close_tags(&after_open[json_end..]);
+                    continue;
                 }
             }
 
@@ -1270,13 +1263,13 @@ pub fn parse_tool_calls(response: &str) -> (String, Vec<ParsedToolCall>) {
             for call in xml_calls {
                 calls.push(call);
                 // Try to remove the XML from text
-                if let Some(start) = cleaned_text.find("<minimax:toolcall>") {
-                    if let Some(end) = cleaned_text.find("</minimax:toolcall>") {
-                        let end_pos = end + "</minimax:toolcall>".len();
-                        if end_pos <= cleaned_text.len() {
-                            cleaned_text =
-                                format!("{}{}", &cleaned_text[..start], &cleaned_text[end_pos..]);
-                        }
+                if let Some(start) = cleaned_text.find("<minimax:toolcall>")
+                    && let Some(end) = cleaned_text.find("</minimax:toolcall>")
+                {
+                    let end_pos = end + "</minimax:toolcall>".len();
+                    if end_pos <= cleaned_text.len() {
+                        cleaned_text =
+                            format!("{}{}", &cleaned_text[..start], &cleaned_text[end_pos..]);
                     }
                 }
             }

@@ -30,7 +30,8 @@
     clippy::unnecessary_literal_bound,
     clippy::unnecessary_map_or,
     clippy::unnecessary_wraps,
-    dead_code, unused_variables,
+    dead_code,
+    unused_variables,
     unused_imports
 )]
 
@@ -1119,22 +1120,38 @@ async fn main() -> Result<()> {
         }
     }
 
-
     #[cfg(not(feature = "agent-runtime"))]
     {
         // Kernel-only mode: minimal CLI agent without channels/tools/gateway
         match cli.command {
-            Commands::Agent { message, provider, model, temperature, .. } => {
+            Commands::Agent {
+                message,
+                provider,
+                model,
+                temperature,
+                ..
+            } => {
                 let final_temperature = temperature.unwrap_or(config.default_temperature);
-                if let Some(p) = &provider { config.default_provider = Some(p.clone()); }
-                if let Some(m) = &model { config.default_model = Some(m.clone()); }
+                if let Some(p) = &provider {
+                    config.default_provider = Some(p.clone());
+                }
+                if let Some(m) = &model {
+                    config.default_model = Some(m.clone());
+                }
                 config.default_temperature = final_temperature;
 
                 let provider_name = config.default_provider.as_deref().unwrap_or("openai");
-                let provider = zeroclaw::providers::create_provider(provider_name, config.api_key.as_deref())?;
+                let provider =
+                    zeroclaw::providers::create_provider(provider_name, config.api_key.as_deref())?;
                 match message {
                     Some(msg) => {
-                        let response = provider.simple_chat(&msg, config.default_model.as_deref().unwrap_or("default"), final_temperature).await?;
+                        let response = provider
+                            .simple_chat(
+                                &msg,
+                                config.default_model.as_deref().unwrap_or("default"),
+                                final_temperature,
+                            )
+                            .await?;
                         println!("{response}");
                     }
                     None => {
@@ -1144,8 +1161,16 @@ async fn main() -> Result<()> {
                         loop {
                             eprint!("> ");
                             line.clear();
-                            if stdin.read_line(&mut line)? == 0 { break; }
-                            let response = provider.simple_chat(line.trim(), config.default_model.as_deref().unwrap_or("default"), final_temperature).await?;
+                            if stdin.read_line(&mut line)? == 0 {
+                                break;
+                            }
+                            let response = provider
+                                .simple_chat(
+                                    line.trim(),
+                                    config.default_model.as_deref().unwrap_or("default"),
+                                    final_temperature,
+                                )
+                                .await?;
                             println!("{response}");
                         }
                     }
@@ -2977,13 +3002,13 @@ mod tests {
     use clap::{CommandFactory, Parser};
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn cli_definition_has_no_flag_conflicts() {
         Cli::command().debug_assert();
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn onboard_help_includes_model_flag() {
         let cmd = Cli::command();
         let onboard = cmd
@@ -3002,7 +3027,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn onboard_cli_accepts_model_provider_and_api_key_in_quick_mode() {
         let cli = Cli::try_parse_from([
             "zeroclaw",
@@ -3036,7 +3061,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn completions_cli_parses_supported_shells() {
         for shell in ["bash", "fish", "zsh", "powershell", "elvish"] {
             let cli = Cli::try_parse_from(["zeroclaw", "completions", shell])
@@ -3049,7 +3074,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn completion_generation_mentions_binary_name() {
         let mut output = Vec::new();
         write_shell_completion(CompletionShell::Bash, &mut output)
@@ -3062,7 +3087,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn onboard_cli_accepts_force_flag() {
         let cli = Cli::try_parse_from(["zeroclaw", "onboard", "--force"])
             .expect("onboard --force should parse");
@@ -3074,14 +3099,14 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn onboard_cli_rejects_removed_interactive_flag() {
         // --interactive was removed; onboard auto-detects TTY instead.
         assert!(Cli::try_parse_from(["zeroclaw", "onboard", "--interactive"]).is_err());
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn onboard_cli_parses_quick_flag() {
         let cli = Cli::try_parse_from(["zeroclaw", "onboard", "--quick"])
             .expect("onboard --quick should parse");
@@ -3093,7 +3118,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn onboard_cli_quick_and_channels_only_conflict() {
         // --quick and --channels-only should both parse at the CLI level
         // (the conflict is checked at runtime), but we verify both flags parse.
@@ -3105,7 +3130,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn onboard_cli_bare_parses() {
         let cli = Cli::try_parse_from(["zeroclaw", "onboard"]).expect("bare onboard should parse");
 
@@ -3116,7 +3141,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn cli_parses_estop_default_engage() {
         let cli = Cli::try_parse_from(["zeroclaw", "estop"]).expect("estop command should parse");
 
@@ -3137,7 +3162,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn cli_parses_estop_resume_domain() {
         let cli = Cli::try_parse_from(["zeroclaw", "estop", "resume", "--domain", "*.chase.com"])
             .expect("estop resume command should parse");
@@ -3152,7 +3177,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn agent_command_parses_with_temperature() {
         let cli = Cli::try_parse_from(["zeroclaw", "agent", "--temperature", "0.5"])
             .expect("agent command with temperature should parse");
@@ -3166,7 +3191,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn agent_command_parses_without_temperature() {
         let cli = Cli::try_parse_from(["zeroclaw", "agent", "--message", "hello"])
             .expect("agent command without temperature should parse");
@@ -3180,7 +3205,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn agent_command_parses_session_state_file() {
         let cli =
             Cli::try_parse_from(["zeroclaw", "agent", "--session-state-file", "session.json"])
@@ -3197,7 +3222,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn agent_fallback_uses_config_default_temperature() {
         // Test that when user doesn't provide --temperature,
         // the fallback logic works correctly
@@ -3212,7 +3237,7 @@ mod tests {
     }
 
     #[test]
-#[cfg(feature = "agent-runtime")]
+    #[cfg(feature = "agent-runtime")]
     fn agent_fallback_uses_hardcoded_when_config_uses_default() {
         // Test that when config uses default value (0.7), fallback still works
         let config = Config::default(); // default_temperature = 0.7
