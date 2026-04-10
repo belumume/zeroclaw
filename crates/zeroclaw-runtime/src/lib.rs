@@ -36,7 +36,5 @@ pub mod skills;
 pub mod sop;
 pub mod tools;
 pub mod trust;
-#[cfg(feature = "tui-onboarding")]
-pub mod tui;
 pub mod tunnel;
 pub mod verifiable_intent;

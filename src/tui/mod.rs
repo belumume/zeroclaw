@@ -1,1 +1,1 @@
-pub use zeroclaw_runtime::tui::*;
+pub use zeroclaw_tui::*;

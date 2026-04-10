@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tools", "crates/zeroclaw-runtime", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
+members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw-config", "crates/zeroclaw-providers", "crates/zeroclaw-memory", "crates/zeroclaw-channels", "crates/zeroclaw-tools", "crates/zeroclaw-runtime", "crates/zeroclaw-tui", "crates/zeroclaw-tool-call-parser", "crates/robot-kit", "crates/aardvark-sys", "crates/zeroclaw-macros", "apps/tauri"]
 resolver = "2"
 
 [workspace.package]
@@ -50,6 +50,7 @@ zeroclaw-memory = { path = "crates/zeroclaw-memory" }
 zeroclaw-channels = { path = "crates/zeroclaw-channels", default-features = false, optional = true }
 zeroclaw-tools = { path = "crates/zeroclaw-tools", optional = true }
 zeroclaw-runtime = { path = "crates/zeroclaw-runtime", default-features = false, optional = true }
+zeroclaw-tui = { path = "crates/zeroclaw-tui", optional = true }
 zeroclaw-tool-call-parser = { path = "crates/zeroclaw-tool-call-parser" }
 # Internal proc macros
 zeroclaw-macros = { path = "crates/zeroclaw-macros" }
@@ -235,7 +236,7 @@ agent-runtime = [
 
 # Major subsystems — each forwards to exactly ONE crate
 gateway = ["zeroclaw-runtime/gateway"]
-tui-onboarding = ["zeroclaw-runtime/tui-onboarding"]
+tui-onboarding = ["dep:zeroclaw-tui"]
 schema-export = ["zeroclaw-config/schema-export"]
 
 # Channels — each forwards to zeroclaw-runtime (which forwards to zeroclaw-channels)
