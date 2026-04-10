@@ -3,7 +3,7 @@ members = [".", "crates/zeroclaw-api", "crates/zeroclaw-infra", "crates/zeroclaw
 resolver = "2"
 
 [workspace.package]
-version = "0.6.9"
+version = "0.7.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/zeroclaw-labs/zeroclaw"
@@ -273,7 +273,6 @@ browser-native = ["zeroclaw-tools/browser-native"]
 plugins-wasm = ["zeroclaw-misc/plugins-wasm"]
 probe = ["zeroclaw-misc/probe"]
 rag-pdf = ["zeroclaw-tools/rag-pdf"]
-skill-creation = ["zeroclaw-misc/skill-creation"]
 webauthn = ["zeroclaw-misc/webauthn"]
 
 # Backward-compatible aliases
@@ -289,7 +288,7 @@ ci-all = [
     "hardware", "peripheral-rpi",
     "sandbox-landlock", "sandbox-bubblewrap",
     "browser-native", "plugins-wasm", "probe", "rag-pdf",
-    "skill-creation", "webauthn",
+    "webauthn",
 ]
 
 [profile.dev]

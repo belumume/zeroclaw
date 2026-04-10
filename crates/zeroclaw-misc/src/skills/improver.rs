@@ -1,7 +1,6 @@
 // Skill self-improvement: atomically updates existing skill documents
 // after the agent uses them successfully.
 //
-// Gated behind `#[cfg(feature = "skill-creation")]` at the module level
 // in `src/skills/mod.rs`.
 
 use anyhow::{Context, Result, bail};

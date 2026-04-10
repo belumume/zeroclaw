@@ -101,7 +101,7 @@ nusb = { version = "0.2", default-features = false, optional = true }
 tokio-serial = { version = "5", default-features = false, optional = true }
 
 [features]
-default = ["observability-prometheus", "skill-creation", "gateway", "tui-onboarding", "schema-export", "channel-email", "channel-lark", "channel-discord", "channel-slack", "channel-signal", "channel-mattermost", "channel-irc", "channel-imessage", "channel-dingtalk", "channel-qq", "channel-bluesky", "channel-twitter", "channel-reddit", "channel-notion", "channel-linq", "channel-wati", "channel-nextcloud", "channel-mochat", "channel-wecom", "channel-clawdtalk", "channel-webhook", "channel-acp-server", "channel-whatsapp-cloud", "channel-voice-call"]
+default = ["observability-prometheus", "gateway", "tui-onboarding", "schema-export", "channel-email", "channel-lark", "channel-discord", "channel-slack", "channel-signal", "channel-mattermost", "channel-irc", "channel-imessage", "channel-dingtalk", "channel-qq", "channel-bluesky", "channel-twitter", "channel-reddit", "channel-notion", "channel-linq", "channel-wati", "channel-nextcloud", "channel-mochat", "channel-wecom", "channel-clawdtalk", "channel-webhook", "channel-acp-server", "channel-whatsapp-cloud", "channel-voice-call"]
 gateway = ["dep:axum", "dep:hyper", "dep:hyper-util", "dep:tower", "dep:tower-http", "dep:http-body-util", "dep:rust-embed", "dep:mime_guess"]
 tui-onboarding = ["dep:ratatui", "dep:crossterm"]
 observability-prometheus = ["dep:prometheus"]
@@ -109,7 +109,6 @@ observability-otel = ["dep:opentelemetry", "dep:opentelemetry_sdk", "dep:opentel
 peripheral-rpi = ["rppal"]
 sandbox-landlock = ["dep:landlock"]
 hardware = ["dep:nusb", "dep:tokio-serial"]
-skill-creation = []
 schema-export = ["dep:schemars", "zeroclaw-config/schema-export"]
 
 # Channel features (forwarded to zeroclaw-channels)

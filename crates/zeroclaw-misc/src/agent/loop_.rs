@@ -2540,7 +2540,6 @@ pub async fn run(
         }
 
         // After successful multi-step execution, attempt autonomous skill creation.
-        #[cfg(feature = "skill-creation")]
         if config.skills.skill_creation.enabled {
             let tool_calls = crate::skills::creator::extract_tool_calls_from_history(&history);
             if tool_calls.len() >= 2 {

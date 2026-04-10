@@ -13,9 +13,7 @@ use std::time::{Duration, SystemTime};
 use zip::ZipArchive;
 
 pub mod audit;
-#[cfg(feature = "skill-creation")]
 pub mod creator;
-#[cfg(feature = "skill-creation")]
 pub mod improver;
 pub mod testing;
 
