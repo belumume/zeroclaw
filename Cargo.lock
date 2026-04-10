@@ -11764,7 +11764,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-channels"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "async-imap",
@@ -11830,7 +11830,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-config"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "chacha20poly1305",
@@ -11887,7 +11887,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-gateway"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -11934,7 +11934,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-hardware"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "aardvark-sys",
  "anyhow",
@@ -11962,7 +11962,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-infra"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "chrono",
@@ -11979,7 +11979,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-macros"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -11988,7 +11988,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-memory"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -12010,7 +12010,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-plugins"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -12028,7 +12028,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-providers"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -12085,7 +12085,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-runtime"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "aardvark-sys",
  "anyhow",
@@ -12164,7 +12164,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-tool-call-parser"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "regex",
  "serde",
@@ -12174,7 +12174,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-tools"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -12217,7 +12217,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclaw-tui"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "crossterm",
@@ -12232,7 +12232,7 @@ dependencies = [
 
 [[package]]
 name = "zeroclawlabs"
-version = "0.7.0"
+version = "0.6.9"
 dependencies = [
  "aardvark-sys",
  "anyhow",
