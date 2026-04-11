@@ -1,5 +1,17 @@
 use crate::approval::{ApprovalManager, ApprovalRequest, ApprovalResponse};
 
+/// CLI channel factory, injected by the binary. Returns a `Box<dyn Channel>` for interactive mode.
+pub static CLI_CHANNEL_FN: std::sync::OnceLock<
+    Box<dyn Fn() -> Box<dyn zeroclaw_api::channel::Channel> + Send + Sync>,
+> = std::sync::OnceLock::new();
+
+/// Register the CLI channel factory. Called once at startup by the binary.
+pub fn register_cli_channel_fn(
+    f: Box<dyn Fn() -> Box<dyn zeroclaw_api::channel::Channel> + Send + Sync>,
+) {
+    let _ = CLI_CHANNEL_FN.set(f);
+}
+
 /// Peripheral tools factory type — takes owned config so the returned future is 'static.
 pub type PeripheralToolsFn = Box<
     dyn Fn(
@@ -2574,7 +2586,10 @@ pub async fn run(
     } else {
         println!("🦀 ZeroClaw Interactive Mode");
         println!("Type /help for commands.\n");
-        let cli = zeroclaw_api::cli_channel::CliChannel::new();
+        let cli = CLI_CHANNEL_FN
+            .get()
+            .expect("CLI channel factory not registered — call register_cli_channel_fn at startup")(
+        );
 
         // Persistent conversation history across turns
         let mut history = if let Some(path) = session_state_file.as_deref() {
@@ -2908,7 +2923,7 @@ pub async fn run(
             if content_was_streamed.load(std::sync::atomic::Ordering::Relaxed) {
                 println!();
             } else if let Err(e) = zeroclaw_api::channel::Channel::send(
-                &cli,
+                &*cli,
                 &zeroclaw_api::channel::SendMessage::new(format!("\n{response}\n"), "user"),
             )
             .await

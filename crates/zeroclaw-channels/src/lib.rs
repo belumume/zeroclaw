@@ -3,7 +3,8 @@
 pub mod orchestrator;
 pub mod util;
 
-// Always-compiled utilities (no feature gate)
+// Always-compiled channels and utilities (no feature gate)
+pub mod cli;
 pub mod link_enricher;
 pub mod transcription;
 pub mod tts;

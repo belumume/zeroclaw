@@ -1349,6 +1349,12 @@ async fn main() -> Result<()> {
             } else {
                 info!("🧠 Starting ZeroClaw Daemon on {host}:{port}");
             }
+            // Wire CLI channel for interactive mode
+            #[cfg(feature = "agent-runtime")]
+            zeroclaw_runtime::agent::loop_::register_cli_channel_fn(Box::new(|| {
+                Box::new(zeroclaw_channels::cli::CliChannel::new())
+            }));
+
             // Wire peripheral tools from zeroclaw-hardware
             #[cfg(feature = "hardware")]
             zeroclaw_runtime::agent::loop_::register_peripheral_tools_fn(Box::new(|config| {

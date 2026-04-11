@@ -59,6 +59,7 @@ pub use crate::wecom::WeComChannel;
 pub use crate::whatsapp::WhatsAppChannel;
 pub use zeroclaw_api::channel::{Channel, ChannelMessage, SendMessage};
 // Local channel types (in misc, not zeroclaw-channels)
+pub use crate::cli::CliChannel;
 pub use crate::link_enricher;
 #[cfg(feature = "whatsapp-web")]
 pub use crate::whatsapp_web::WhatsAppWebChannel;
@@ -66,7 +67,6 @@ pub use crate::whatsapp_web::WhatsAppWebChannel;
 pub use matrix::MatrixChannel;
 #[cfg(feature = "channel-telegram")]
 pub use telegram::TelegramChannel;
-pub use zeroclaw_api::cli_channel::CliChannel;
 pub use zeroclaw_infra::debounce::MessageDebouncer;
 pub use zeroclaw_infra::session_backend::SessionBackend;
 pub use zeroclaw_infra::session_sqlite::SqliteSessionBackend;

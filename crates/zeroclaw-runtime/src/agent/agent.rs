@@ -1281,10 +1281,13 @@ impl Agent {
         println!("Type /quit to exit.\n");
 
         let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-        let cli = zeroclaw_api::cli_channel::CliChannel::new();
+        let cli = crate::agent::loop_::CLI_CHANNEL_FN
+            .get()
+            .expect("CLI channel factory not registered — call register_cli_channel_fn at startup")(
+        );
 
         let listen_handle = tokio::spawn(async move {
-            let _ = zeroclaw_api::channel::Channel::listen(&cli, tx).await;
+            let _ = zeroclaw_api::channel::Channel::listen(&*cli, tx).await;
         });
 
         while let Some(msg) = rx.recv().await {
