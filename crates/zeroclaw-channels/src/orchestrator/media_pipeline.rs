@@ -304,8 +304,10 @@ mod tests {
     #[tokio::test]
     async fn audio_without_transcription_enabled() {
         let config = default_pipeline_config(true);
-        let mut tc = TranscriptionConfig::default();
-        tc.enabled = false;
+        let tc = TranscriptionConfig {
+            enabled: false,
+            ..Default::default()
+        };
         let pipeline = MediaPipeline::new(&config, &tc, false);
 
         let result = pipeline.process("", &[sample_audio()]).await;
@@ -315,8 +317,10 @@ mod tests {
     #[tokio::test]
     async fn multiple_attachments_produce_multiple_annotations() {
         let config = default_pipeline_config(true);
-        let mut tc = TranscriptionConfig::default();
-        tc.enabled = false;
+        let tc = TranscriptionConfig {
+            enabled: false,
+            ..Default::default()
+        };
         let pipeline = MediaPipeline::new(&config, &tc, false);
 
         let attachments = vec![sample_audio(), sample_image(), sample_video()];

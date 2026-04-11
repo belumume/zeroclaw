@@ -1914,10 +1914,10 @@ fn extract_tool_context_summary(history: &[ChatMessage], start_index: usize) -> 
             for segment in content.split(open_tag) {
                 if let Some(json_end) = segment.find(close_tag) {
                     let json_str = segment[..json_end].trim();
-                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
-                        if let Some(name) = val.get("name").and_then(|n| n.as_str()) {
-                            push_unique_tool_name(tool_names, name);
-                        }
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str)
+                        && let Some(name) = val.get("name").and_then(|n| n.as_str())
+                    {
+                        push_unique_tool_name(tool_names, name);
                     }
                 }
             }
@@ -1925,17 +1925,17 @@ fn extract_tool_context_summary(history: &[ChatMessage], start_index: usize) -> 
     }
 
     fn collect_tool_names_from_native_json(content: &str, tool_names: &mut Vec<String>) {
-        if let Ok(val) = serde_json::from_str::<serde_json::Value>(content) {
-            if let Some(calls) = val.get("tool_calls").and_then(|c| c.as_array()) {
-                for call in calls {
-                    let name = call
-                        .get("function")
-                        .and_then(|f| f.get("name"))
-                        .and_then(|n| n.as_str())
-                        .or_else(|| call.get("name").and_then(|n| n.as_str()));
-                    if let Some(name) = name {
-                        push_unique_tool_name(tool_names, name);
-                    }
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(content)
+            && let Some(calls) = val.get("tool_calls").and_then(|c| c.as_array())
+        {
+            for call in calls {
+                let name = call
+                    .get("function")
+                    .and_then(|f| f.get("name"))
+                    .and_then(|n| n.as_str())
+                    .or_else(|| call.get("name").and_then(|n| n.as_str()));
+                if let Some(name) = name {
+                    push_unique_tool_name(tool_names, name);
                 }
             }
         }
@@ -9554,8 +9554,10 @@ BTC is currently around $65,000 based on latest tool output."#
     #[tokio::test]
     async fn process_channel_message_refreshes_available_skills_after_new_session() {
         let workspace = make_workspace();
-        let mut config = Config::default();
-        config.workspace_dir = workspace.path().to_path_buf();
+        let mut config = Config {
+            workspace_dir: workspace.path().to_path_buf(),
+            ..Default::default()
+        };
         config.skills.open_skills_enabled = false;
 
         let initial_skills =

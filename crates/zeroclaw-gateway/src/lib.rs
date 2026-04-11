@@ -2584,9 +2584,11 @@ mod tests {
         let config_path = temp.path().join("config.toml");
         let workspace_path = temp.path().join("workspace");
 
-        let mut config = Config::default();
-        config.config_path = config_path.clone();
-        config.workspace_dir = workspace_path;
+        let config = Config {
+            config_path: config_path.clone(),
+            workspace_dir: workspace_path,
+            ..Default::default()
+        };
         config.save().await.unwrap();
 
         let guard = PairingGuard::new(true, &[]);

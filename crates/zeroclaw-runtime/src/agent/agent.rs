@@ -1654,12 +1654,14 @@ mod tests {
         let workspace_dir = tmp.path().join("workspace");
         std::fs::create_dir_all(&workspace_dir).unwrap();
 
-        let mut config = zeroclaw_config::schema::Config::default();
-        config.workspace_dir = workspace_dir;
-        config.config_path = tmp.path().join("config.toml");
-        config.api_key = Some("test-key".to_string());
-        config.default_provider = Some(format!("custom:http://{addr}"));
-        config.default_model = Some("test-model".to_string());
+        let mut config = zeroclaw_config::schema::Config {
+            workspace_dir,
+            config_path: tmp.path().join("config.toml"),
+            api_key: Some("test-key".to_string()),
+            default_provider: Some(format!("custom:http://{addr}")),
+            default_model: Some("test-model".to_string()),
+            ..zeroclaw_config::schema::Config::default()
+        };
         config.memory.backend = "none".to_string();
         config.memory.auto_save = false;
         config.extra_headers.insert(
@@ -2002,11 +2004,13 @@ mod tests {
                 .expect("memory creation should succeed with valid config"),
         );
 
-        let mut agent_config = zeroclaw_config::schema::AgentConfig::default();
         // Force trimming with the boundary landing inside a pair:
         // 5 entries (AC, TR, AC, TR, AC) > 4 → drop_count = 1 → AC1 dropped,
         // TR1 left as an orphan unless the trim guards against it.
-        agent_config.max_history_messages = 4;
+        let agent_config = zeroclaw_config::schema::AgentConfig {
+            max_history_messages: 4,
+            ..zeroclaw_config::schema::AgentConfig::default()
+        };
 
         let observer: Arc<dyn Observer> = Arc::from(crate::observability::NoopObserver {});
         let mut agent = Agent::builder()

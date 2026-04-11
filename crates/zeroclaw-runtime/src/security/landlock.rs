@@ -223,13 +223,11 @@ mod tests {
     fn landlock_with_none_workspace() {
         // Should work even without a workspace directory
         let result = LandlockSandbox::with_workspace(None);
-        // Result depends on platform and feature flag
-        match result {
-            Ok(sandbox) => assert!(sandbox.is_available()),
-            Err(_) => assert!(!cfg!(all(
-                feature = "sandbox-landlock",
-                target_os = "linux"
-            ))),
+        // On Linux with sandbox-landlock feature, this must succeed.
+        // On other platforms or without the feature, failure is acceptable.
+        if cfg!(all(feature = "sandbox-landlock", target_os = "linux")) {
+            let sandbox = result.expect("landlock should succeed on linux with feature enabled");
+            assert!(sandbox.is_available());
         }
     }
 

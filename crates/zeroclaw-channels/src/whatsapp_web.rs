@@ -1923,9 +1923,11 @@ mod tests {
     #[test]
     #[cfg(feature = "whatsapp-web")]
     fn with_transcription_sets_config_when_enabled() {
-        let mut tc = zeroclaw_config::schema::TranscriptionConfig::default();
-        tc.enabled = true;
-        tc.api_key = Some("test_key".to_string());
+        let tc = zeroclaw_config::schema::TranscriptionConfig {
+            enabled: true,
+            api_key: Some("test_key".to_string()),
+            ..Default::default()
+        };
 
         let ch = make_channel().with_transcription(tc);
         assert!(ch.transcription.is_some());

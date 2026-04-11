@@ -4372,9 +4372,11 @@ mod tests {
 
     #[test]
     fn with_transcription_sets_config_when_enabled() {
-        let mut tc = zeroclaw_config::schema::TranscriptionConfig::default();
-        tc.enabled = true;
-        tc.api_key = Some("test_key".to_string());
+        let tc = zeroclaw_config::schema::TranscriptionConfig {
+            enabled: true,
+            api_key: Some("test_key".to_string()),
+            ..zeroclaw_config::schema::TranscriptionConfig::default()
+        };
 
         let ch =
             TelegramChannel::new("token".into(), vec!["*".into()], false).with_transcription(tc);
@@ -4409,10 +4411,12 @@ mod tests {
 
     #[tokio::test]
     async fn try_parse_voice_message_skips_when_duration_exceeds_limit() {
-        let mut tc = zeroclaw_config::schema::TranscriptionConfig::default();
-        tc.enabled = true;
-        tc.api_key = Some("test_key".to_string());
-        tc.max_duration_secs = 5;
+        let tc = zeroclaw_config::schema::TranscriptionConfig {
+            enabled: true,
+            api_key: Some("test_key".to_string()),
+            max_duration_secs: 5,
+            ..Default::default()
+        };
 
         let ch =
             TelegramChannel::new("token".into(), vec!["*".into()], false).with_transcription(tc);
@@ -4431,10 +4435,12 @@ mod tests {
 
     #[tokio::test]
     async fn try_parse_voice_message_rejects_unauthorized_sender_before_download() {
-        let mut tc = zeroclaw_config::schema::TranscriptionConfig::default();
-        tc.enabled = true;
-        tc.api_key = Some("test_key".to_string());
-        tc.max_duration_secs = 120;
+        let tc = zeroclaw_config::schema::TranscriptionConfig {
+            enabled: true,
+            api_key: Some("test_key".to_string()),
+            max_duration_secs: 120,
+            ..Default::default()
+        };
 
         let ch = TelegramChannel::new("token".into(), vec!["alice".into()], false)
             .with_transcription(tc);

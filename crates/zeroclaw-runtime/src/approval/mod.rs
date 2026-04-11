@@ -600,8 +600,10 @@ mod tests {
 
     #[test]
     fn always_ask_overrides_auto_approve() {
-        let mut config = AutonomyConfig::default();
-        config.always_ask = vec!["weather".into()];
+        let config = AutonomyConfig {
+            always_ask: vec!["weather".into()],
+            ..AutonomyConfig::default()
+        };
         let mgr = ApprovalManager::for_non_interactive(&config);
         assert!(
             mgr.needs_approval("weather"),

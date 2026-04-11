@@ -1676,8 +1676,10 @@ mod tests {
 
     #[test]
     fn masking_keeps_toml_valid_and_preserves_api_keys_type() {
-        let mut cfg = zeroclaw_config::schema::Config::default();
-        cfg.api_key = Some("sk-live-123".to_string());
+        let mut cfg = zeroclaw_config::schema::Config {
+            api_key: Some("sk-live-123".to_string()),
+            ..Default::default()
+        };
         cfg.reliability.api_keys = vec!["rk-1".to_string(), "rk-2".to_string()];
         cfg.gateway.paired_tokens = vec!["pair-token-1".to_string()];
         cfg.tunnel.cloudflare = Some(zeroclaw_config::schema::CloudflareTunnelConfig {
@@ -1809,10 +1811,12 @@ mod tests {
 
     #[test]
     fn hydrate_config_for_save_restores_masked_secrets_and_paths() {
-        let mut current = zeroclaw_config::schema::Config::default();
-        current.config_path = std::path::PathBuf::from("/tmp/current/config.toml");
-        current.workspace_dir = std::path::PathBuf::from("/tmp/current/workspace");
-        current.api_key = Some("real-key".to_string());
+        let mut current = zeroclaw_config::schema::Config {
+            config_path: std::path::PathBuf::from("/tmp/current/config.toml"),
+            workspace_dir: std::path::PathBuf::from("/tmp/current/workspace"),
+            api_key: Some("real-key".to_string()),
+            ..Default::default()
+        };
         current.reliability.api_keys = vec!["r1".to_string(), "r2".to_string()];
         current.gateway.paired_tokens = vec!["pair-1".to_string(), "pair-2".to_string()];
         current.tunnel.cloudflare = Some(zeroclaw_config::schema::CloudflareTunnelConfig {
@@ -2008,21 +2012,23 @@ mod tests {
 
     #[test]
     fn hydrate_config_for_save_restores_route_keys_by_identity_and_clears_unmatched_masks() {
-        let mut current = zeroclaw_config::schema::Config::default();
-        current.model_routes = vec![
-            zeroclaw_config::schema::ModelRouteConfig {
-                hint: "reasoning".to_string(),
-                provider: "openrouter".to_string(),
-                model: "anthropic/claude-sonnet-4.6".to_string(),
-                api_key: Some("route-model-key-1".to_string()),
-            },
-            zeroclaw_config::schema::ModelRouteConfig {
-                hint: "fast".to_string(),
-                provider: "openrouter".to_string(),
-                model: "openai/gpt-4.1-mini".to_string(),
-                api_key: Some("route-model-key-2".to_string()),
-            },
-        ];
+        let mut current = zeroclaw_config::schema::Config {
+            model_routes: vec![
+                zeroclaw_config::schema::ModelRouteConfig {
+                    hint: "reasoning".to_string(),
+                    provider: "openrouter".to_string(),
+                    model: "anthropic/claude-sonnet-4.6".to_string(),
+                    api_key: Some("route-model-key-1".to_string()),
+                },
+                zeroclaw_config::schema::ModelRouteConfig {
+                    hint: "fast".to_string(),
+                    provider: "openrouter".to_string(),
+                    model: "openai/gpt-4.1-mini".to_string(),
+                    api_key: Some("route-model-key-2".to_string()),
+                },
+            ],
+            ..Default::default()
+        };
         current.embedding_routes = vec![
             zeroclaw_config::schema::EmbeddingRouteConfig {
                 hint: "semantic".to_string(),

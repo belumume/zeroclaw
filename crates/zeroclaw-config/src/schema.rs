@@ -11192,9 +11192,11 @@ mod tests {
         let config_path = temp.path().join("config.toml");
         let workspace_dir = temp.path().join("workspace");
 
-        let mut config = Config::default();
-        config.config_path = config_path.clone();
-        config.workspace_dir = workspace_dir;
+        let config = Config {
+            config_path: config_path.clone(),
+            workspace_dir,
+            ..Default::default()
+        };
 
         config.save().await.expect("save config");
 
@@ -12139,10 +12141,12 @@ default_temperature = 0.7
         ));
         fs::create_dir_all(&dir).await.unwrap();
 
-        let mut config = Config::default();
-        config.workspace_dir = dir.join("workspace");
-        config.config_path = dir.join("config.toml");
-        config.api_key = Some("root-credential".into());
+        let mut config = Config {
+            workspace_dir: dir.join("workspace"),
+            config_path: dir.join("config.toml"),
+            api_key: Some("root-credential".into()),
+            ..Default::default()
+        };
         config.composio.api_key = Some("composio-credential".into());
         config.browser.computer_use.api_key = Some("browser-credential".into());
         config.web_search.brave_api_key = Some("brave-credential".into());
@@ -12267,10 +12271,12 @@ default_temperature = 0.7
         fs::create_dir_all(&dir).await.unwrap();
 
         let config_path = dir.join("config.toml");
-        let mut config = Config::default();
-        config.workspace_dir = dir.join("workspace");
-        config.config_path = config_path.clone();
-        config.default_model = Some("model-a".into());
+        let mut config = Config {
+            workspace_dir: dir.join("workspace"),
+            config_path: config_path.clone(),
+            default_model: Some("model-a".into()),
+            ..Default::default()
+        };
         config.save().await.unwrap();
         assert!(config_path.exists());
 
@@ -13658,10 +13664,12 @@ requires_openai_auth = true
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::set_var("ZEROCLAW_WORKSPACE", &workspace_dir) };
 
-        let mut config = Config::default();
-        config.workspace_dir = workspace_dir;
-        config.config_path = PathBuf::from("config.toml");
-        config.default_temperature = 0.5;
+        let config = Config {
+            workspace_dir,
+            config_path: PathBuf::from("config.toml"),
+            default_temperature: 0.5,
+            ..Default::default()
+        };
         config.save().await.unwrap();
 
         assert!(resolved_config_path.exists());
@@ -14018,9 +14026,11 @@ default_model = "legacy-model"
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::remove_var("ZEROCLAW_WORKSPACE") };
 
-        let mut config = Config::default();
-        config.config_path = config_path.clone();
-        config.workspace_dir = config_dir.join("workspace");
+        let mut config = Config {
+            config_path: config_path.clone(),
+            workspace_dir: config_dir.join("workspace"),
+            ..Default::default()
+        };
         config.secrets.encrypt = true;
         config.channels_config.feishu = Some(FeishuConfig {
             enabled: true,
@@ -14998,8 +15008,10 @@ default_model = "persisted-profile"
         let config_path = tmp.path().join("config.toml");
 
         // Create a config and save it
-        let mut config = Config::default();
-        config.config_path = config_path.clone();
+        let config = Config {
+            config_path: config_path.clone(),
+            ..Default::default()
+        };
         config.save().await.unwrap();
 
         let meta = fs::metadata(&config_path).await.unwrap();
@@ -15016,8 +15028,10 @@ default_model = "persisted-profile"
         let tmp = tempfile::TempDir::new().unwrap();
         let config_path = tmp.path().join("config.toml");
 
-        let mut config = Config::default();
-        config.config_path = config_path.clone();
+        let mut config = Config {
+            config_path: config_path.clone(),
+            ..Default::default()
+        };
         config.save().await.unwrap();
 
         // Simulate the regression state observed in issue #1345.
@@ -15193,9 +15207,11 @@ require_otp_to_resume = true
 
         let plaintext_token = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11";
 
-        let mut config = Config::default();
-        config.workspace_dir = dir.join("workspace");
-        config.config_path = dir.join("config.toml");
+        let mut config = Config {
+            workspace_dir: dir.join("workspace"),
+            config_path: dir.join("config.toml"),
+            ..Default::default()
+        };
         config.channels_config.telegram = Some(TelegramConfig {
             enabled: true,
             bot_token: plaintext_token.into(),
@@ -15582,9 +15598,11 @@ require_otp_to_resume = true
 
         let plaintext_secret = "nevis-test-client-secret-value";
 
-        let mut config = Config::default();
-        config.workspace_dir = dir.join("workspace");
-        config.config_path = dir.join("config.toml");
+        let mut config = Config {
+            workspace_dir: dir.join("workspace"),
+            config_path: dir.join("config.toml"),
+            ..Default::default()
+        };
         config.security.nevis.client_secret = Some(plaintext_secret.into());
 
         // Save (triggers encryption)
@@ -16183,8 +16201,10 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
 
     #[test]
     async fn config_tree_traversal_discovers_nested_secrets() {
-        let mut config = Config::default();
-        config.api_key = Some("test-key".into());
+        let mut config = Config {
+            api_key: Some("test-key".into()),
+            ..Default::default()
+        };
         config.channels_config.matrix = Some(MatrixConfig {
             enabled: true,
             homeserver: "https://m.org".into(),

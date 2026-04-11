@@ -1060,8 +1060,10 @@ mod tests {
 
     #[test]
     fn config_validation_catches_bad_temperature() {
-        let mut config = Config::default();
-        config.default_temperature = 5.0;
+        let config = Config {
+            default_temperature: 5.0,
+            ..Config::default()
+        };
         let mut items = Vec::new();
         check_config_semantics(&config, &mut items);
         let temp_item = items.iter().find(|i| i.message.contains("temperature"));
@@ -1071,8 +1073,10 @@ mod tests {
 
     #[test]
     fn config_validation_accepts_valid_temperature() {
-        let mut config = Config::default();
-        config.default_temperature = 0.7;
+        let config = Config {
+            default_temperature: 0.7,
+            ..Config::default()
+        };
         let mut items = Vec::new();
         check_config_semantics(&config, &mut items);
         let temp_item = items.iter().find(|i| i.message.contains("temperature"));
@@ -1092,8 +1096,10 @@ mod tests {
 
     #[test]
     fn config_validation_catches_unknown_provider() {
-        let mut config = Config::default();
-        config.default_provider = Some("totally-fake".into());
+        let config = Config {
+            default_provider: Some("totally-fake".into()),
+            ..Config::default()
+        };
         let mut items = Vec::new();
         check_config_semantics(&config, &mut items);
         let prov_item = items
@@ -1105,8 +1111,10 @@ mod tests {
 
     #[test]
     fn config_validation_catches_malformed_custom_provider() {
-        let mut config = Config::default();
-        config.default_provider = Some("custom:".into());
+        let config = Config {
+            default_provider: Some("custom:".into()),
+            ..Config::default()
+        };
         let mut items = Vec::new();
         check_config_semantics(&config, &mut items);
 
@@ -1120,8 +1128,10 @@ mod tests {
 
     #[test]
     fn config_validation_accepts_custom_provider() {
-        let mut config = Config::default();
-        config.default_provider = Some("custom:https://my-api.com".into());
+        let config = Config {
+            default_provider: Some("custom:https://my-api.com".into()),
+            ..Config::default()
+        };
         let mut items = Vec::new();
         check_config_semantics(&config, &mut items);
         let prov_item = items.iter().find(|i| i.message.contains("is valid"));
@@ -1159,13 +1169,15 @@ mod tests {
 
     #[test]
     fn config_validation_warns_empty_model_route() {
-        let mut config = Config::default();
-        config.model_routes = vec![zeroclaw_config::schema::ModelRouteConfig {
-            hint: "fast".into(),
-            provider: "groq".into(),
-            model: String::new(),
-            api_key: None,
-        }];
+        let config = Config {
+            model_routes: vec![zeroclaw_config::schema::ModelRouteConfig {
+                hint: "fast".into(),
+                provider: "groq".into(),
+                model: String::new(),
+                api_key: None,
+            }],
+            ..Config::default()
+        };
         let mut items = Vec::new();
         check_config_semantics(&config, &mut items);
         let route_item = items.iter().find(|i| i.message.contains("empty model"));
@@ -1175,14 +1187,16 @@ mod tests {
 
     #[test]
     fn config_validation_warns_empty_embedding_route_model() {
-        let mut config = Config::default();
-        config.embedding_routes = vec![zeroclaw_config::schema::EmbeddingRouteConfig {
-            hint: "semantic".into(),
-            provider: "openai".into(),
-            model: String::new(),
-            dimensions: Some(1536),
-            api_key: None,
-        }];
+        let config = Config {
+            embedding_routes: vec![zeroclaw_config::schema::EmbeddingRouteConfig {
+                hint: "semantic".into(),
+                provider: "openai".into(),
+                model: String::new(),
+                dimensions: Some(1536),
+                api_key: None,
+            }],
+            ..Config::default()
+        };
 
         let mut items = Vec::new();
         check_config_semantics(&config, &mut items);
@@ -1196,14 +1210,16 @@ mod tests {
 
     #[test]
     fn config_validation_warns_invalid_embedding_route_provider() {
-        let mut config = Config::default();
-        config.embedding_routes = vec![zeroclaw_config::schema::EmbeddingRouteConfig {
-            hint: "semantic".into(),
-            provider: "groq".into(),
-            model: "text-embedding-3-small".into(),
-            dimensions: None,
-            api_key: None,
-        }];
+        let config = Config {
+            embedding_routes: vec![zeroclaw_config::schema::EmbeddingRouteConfig {
+                hint: "semantic".into(),
+                provider: "groq".into(),
+                model: "text-embedding-3-small".into(),
+                dimensions: None,
+                api_key: None,
+            }],
+            ..Config::default()
+        };
 
         let mut items = Vec::new();
         check_config_semantics(&config, &mut items);

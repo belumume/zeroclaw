@@ -3672,15 +3672,17 @@ mod tests {
     #[tokio::test]
     async fn lark_audio_file_key_missing_returns_none() {
         let ch = make_channel();
-        let mut tc = zeroclaw_config::schema::TranscriptionConfig::default();
-        tc.enabled = true;
-        tc.default_provider = "local_whisper".to_string();
-        tc.local_whisper = Some(zeroclaw_config::schema::LocalWhisperConfig {
-            url: "http://localhost:0/v1/transcribe".to_string(),
-            bearer_token: Some("unused".to_string()),
-            max_audio_bytes: 10 * 1024 * 1024,
-            timeout_secs: 30,
-        });
+        let tc = zeroclaw_config::schema::TranscriptionConfig {
+            enabled: true,
+            default_provider: "local_whisper".to_string(),
+            local_whisper: Some(zeroclaw_config::schema::LocalWhisperConfig {
+                url: "http://localhost:0/v1/transcribe".to_string(),
+                bearer_token: Some("unused".to_string()),
+                max_audio_bytes: 10 * 1024 * 1024,
+                timeout_secs: 30,
+            }),
+            ..Default::default()
+        };
         let ch = ch.with_transcription(tc);
         let manager = ch.transcription_manager.as_deref().unwrap();
 
@@ -3755,15 +3757,17 @@ mod tests {
             .mount(&whisper_server)
             .await;
 
-        let mut config = zeroclaw_config::schema::TranscriptionConfig::default();
-        config.enabled = true;
-        config.local_whisper = Some(zeroclaw_config::schema::LocalWhisperConfig {
-            url: format!("{}/v1/transcribe", whisper_server.uri()),
-            bearer_token: Some("test-token".to_string()),
-            max_audio_bytes: 10 * 1024 * 1024,
-            timeout_secs: 30,
-        });
-        config.default_provider = "local_whisper".to_string();
+        let config = zeroclaw_config::schema::TranscriptionConfig {
+            enabled: true,
+            default_provider: "local_whisper".to_string(),
+            local_whisper: Some(zeroclaw_config::schema::LocalWhisperConfig {
+                url: format!("{}/v1/transcribe", whisper_server.uri()),
+                bearer_token: Some("test-token".to_string()),
+                max_audio_bytes: 10 * 1024 * 1024,
+                timeout_secs: 30,
+            }),
+            ..Default::default()
+        };
 
         let mut ch = make_channel();
         ch.api_base_override = Some(mock_server.uri());

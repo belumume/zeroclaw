@@ -3206,8 +3206,10 @@ mod tests {
         let mut app = test_app();
         app.provider_tier_idx = 0;
         app.provider_idx = 0; // OpenRouter (non-custom)
-        let mut config = Config::default();
-        config.api_url = Some("http://old-custom-url.com".to_string());
+        let mut config = Config {
+            api_url: Some("http://old-custom-url.com".to_string()),
+            ..Config::default()
+        };
         apply_tui_selections_to_config(&app, &mut config);
         assert!(
             config.api_url.is_none(),
@@ -3229,8 +3231,10 @@ mod tests {
     #[test]
     fn save_no_api_key_when_empty() {
         let app = test_app(); // api_key_input is empty
-        let mut config = Config::default();
-        config.api_key = Some("existing-key".to_string());
+        let mut config = Config {
+            api_key: Some("existing-key".to_string()),
+            ..Config::default()
+        };
         apply_tui_selections_to_config(&app, &mut config);
         // Should preserve existing key, not overwrite with empty
         assert_eq!(config.api_key.as_deref(), Some("existing-key"));
@@ -3241,8 +3245,10 @@ mod tests {
     #[test]
     fn save_model_auto_clears_default() {
         let app = test_app(); // model_idx 0 = "Auto (recommended)"
-        let mut config = Config::default();
-        config.default_model = Some("old-model".to_string());
+        let mut config = Config {
+            default_model: Some("old-model".to_string()),
+            ..Config::default()
+        };
         apply_tui_selections_to_config(&app, &mut config);
         assert!(
             config.default_model.is_none(),

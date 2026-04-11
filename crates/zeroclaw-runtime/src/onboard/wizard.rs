@@ -6298,8 +6298,10 @@ mod tests {
 
     #[test]
     fn apply_provider_update_preserves_non_provider_settings() {
-        let mut config = Config::default();
-        config.default_temperature = 1.23;
+        let mut config = Config {
+            default_temperature: 1.23,
+            ..Config::default()
+        };
         config.memory.backend = "markdown".to_string();
         config.skills.open_skills_enabled = true;
         config.channels_config.cli = false;
@@ -6327,8 +6329,10 @@ mod tests {
 
     #[test]
     fn apply_provider_update_clears_api_key_when_empty() {
-        let mut config = Config::default();
-        config.api_key = Some("sk-old".to_string());
+        let mut config = Config {
+            api_key: Some("sk-old".to_string()),
+            ..Config::default()
+        };
 
         apply_provider_update(
             &mut config,
@@ -7862,36 +7866,38 @@ mod tests {
     fn channels_repair_preserves_unmodified_channels() {
         use zeroclaw_config::schema::{DiscordConfig, MatrixConfig, StreamMode};
 
-        let mut existing = ChannelsConfig::default();
-        existing.discord = Some(DiscordConfig {
-            enabled: true,
-            bot_token: "keep-me".into(),
-            guild_id: None,
-            allowed_users: vec![],
-            listen_to_bots: false,
-            interrupt_on_new_message: false,
-            mention_only: false,
-            proxy_url: None,
-            stream_mode: StreamMode::default(),
-            draft_update_interval_ms: 1500,
-            multi_message_delay_ms: 800,
-            stall_timeout_secs: 0,
-        });
-        existing.matrix = Some(MatrixConfig {
-            enabled: true,
-            homeserver: "https://m.org".into(),
-            access_token: "old-token".into(),
-            user_id: None,
-            device_id: None,
-            room_id: "!r:m".into(),
-            allowed_users: vec![],
-            allowed_rooms: vec![],
-            interrupt_on_new_message: false,
-            stream_mode: StreamMode::default(),
-            draft_update_interval_ms: 1500,
-            multi_message_delay_ms: 800,
-            recovery_key: None,
-        });
+        let existing = ChannelsConfig {
+            discord: Some(DiscordConfig {
+                enabled: true,
+                bot_token: "keep-me".into(),
+                guild_id: None,
+                allowed_users: vec![],
+                listen_to_bots: false,
+                interrupt_on_new_message: false,
+                mention_only: false,
+                proxy_url: None,
+                stream_mode: StreamMode::default(),
+                draft_update_interval_ms: 1500,
+                multi_message_delay_ms: 800,
+                stall_timeout_secs: 0,
+            }),
+            matrix: Some(MatrixConfig {
+                enabled: true,
+                homeserver: "https://m.org".into(),
+                access_token: "old-token".into(),
+                user_id: None,
+                device_id: None,
+                room_id: "!r:m".into(),
+                allowed_users: vec![],
+                allowed_rooms: vec![],
+                interrupt_on_new_message: false,
+                stream_mode: StreamMode::default(),
+                draft_update_interval_ms: 1500,
+                multi_message_delay_ms: 800,
+                recovery_key: None,
+            }),
+            ..ChannelsConfig::default()
+        };
 
         // Simulate the wizard starting from existing config and only updating Matrix
         let mut config = existing;
@@ -7909,22 +7915,24 @@ mod tests {
     fn matrix_reconfigure_preserves_non_prompted_fields() {
         use zeroclaw_config::schema::{MatrixConfig, StreamMode};
 
-        let mut existing = ChannelsConfig::default();
-        existing.matrix = Some(MatrixConfig {
-            enabled: true,
-            homeserver: "https://m.org".into(),
-            access_token: "tok".into(),
-            user_id: None,
-            device_id: Some("ZEROCLAW".into()),
-            room_id: "!r:m".into(),
-            allowed_users: vec!["@u:m".into()],
-            allowed_rooms: vec!["!keep:m.org".into()],
-            interrupt_on_new_message: true,
-            stream_mode: StreamMode::Partial,
-            draft_update_interval_ms: 2000,
-            multi_message_delay_ms: 1000,
-            recovery_key: Some("recovery-secret".into()),
-        });
+        let existing = ChannelsConfig {
+            matrix: Some(MatrixConfig {
+                enabled: true,
+                homeserver: "https://m.org".into(),
+                access_token: "tok".into(),
+                user_id: None,
+                device_id: Some("ZEROCLAW".into()),
+                room_id: "!r:m".into(),
+                allowed_users: vec!["@u:m".into()],
+                allowed_rooms: vec!["!keep:m.org".into()],
+                interrupt_on_new_message: true,
+                stream_mode: StreamMode::Partial,
+                draft_update_interval_ms: 2000,
+                multi_message_delay_ms: 1000,
+                recovery_key: Some("recovery-secret".into()),
+            }),
+            ..ChannelsConfig::default()
+        };
 
         // Simulate re-configure: wizard preserves non-prompted fields
         let existing_mx = existing.matrix.as_ref();

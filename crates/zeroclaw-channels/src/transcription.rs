@@ -887,8 +887,10 @@ mod tests {
         unsafe { std::env::remove_var("GROQ_API_KEY") };
 
         let data = vec![0u8; 100];
-        let mut config = TranscriptionConfig::default();
-        config.api_key = Some("transcription-key".to_string());
+        let config = TranscriptionConfig {
+            api_key: Some("transcription-key".to_string()),
+            ..TranscriptionConfig::default()
+        };
 
         // Keep invalid extension so we fail before network, but after key resolution.
         let err = transcribe_audio(data, "recording.aac", &config)
@@ -903,12 +905,14 @@ mod tests {
     #[tokio::test]
     async fn openai_default_provider_uses_openai_config() {
         let data = vec![0u8; 100];
-        let mut config = TranscriptionConfig::default();
-        config.default_provider = "openai".to_string();
-        config.openai = Some(zeroclaw_config::schema::OpenAiSttConfig {
-            api_key: None,
-            model: "gpt-4o-mini-transcribe".to_string(),
-        });
+        let config = TranscriptionConfig {
+            default_provider: "openai".to_string(),
+            openai: Some(zeroclaw_config::schema::OpenAiSttConfig {
+                api_key: None,
+                model: "gpt-4o-mini-transcribe".to_string(),
+            }),
+            ..TranscriptionConfig::default()
+        };
 
         let err = transcribe_audio(data, "test.ogg", &config)
             .await
@@ -1014,8 +1018,10 @@ mod tests {
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::remove_var("GROQ_API_KEY") };
 
-        let mut config = TranscriptionConfig::default();
-        config.api_key = Some("test-groq-key".to_string());
+        let config = TranscriptionConfig {
+            api_key: Some("test-groq-key".to_string()),
+            ..TranscriptionConfig::default()
+        };
 
         let manager = TranscriptionManager::new(&config).unwrap();
         assert!(manager.providers.contains_key("groq"));
@@ -1027,16 +1033,18 @@ mod tests {
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::remove_var("GROQ_API_KEY") };
 
-        let mut config = TranscriptionConfig::default();
-        config.api_key = Some("test-groq-key".to_string());
-        config.openai = Some(zeroclaw_config::schema::OpenAiSttConfig {
-            api_key: Some("test-openai-key".to_string()),
-            model: "whisper-1".to_string(),
-        });
-        config.deepgram = Some(zeroclaw_config::schema::DeepgramSttConfig {
-            api_key: Some("test-deepgram-key".to_string()),
-            model: "nova-2".to_string(),
-        });
+        let config = TranscriptionConfig {
+            api_key: Some("test-groq-key".to_string()),
+            openai: Some(zeroclaw_config::schema::OpenAiSttConfig {
+                api_key: Some("test-openai-key".to_string()),
+                model: "whisper-1".to_string(),
+            }),
+            deepgram: Some(zeroclaw_config::schema::DeepgramSttConfig {
+                api_key: Some("test-deepgram-key".to_string()),
+                model: "nova-2".to_string(),
+            }),
+            ..TranscriptionConfig::default()
+        };
 
         let manager = TranscriptionManager::new(&config).unwrap();
         assert!(manager.providers.contains_key("groq"));
@@ -1050,8 +1058,10 @@ mod tests {
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::remove_var("GROQ_API_KEY") };
 
-        let mut config = TranscriptionConfig::default();
-        config.api_key = Some("test-groq-key".to_string());
+        let config = TranscriptionConfig {
+            api_key: Some("test-groq-key".to_string()),
+            ..TranscriptionConfig::default()
+        };
 
         let manager = TranscriptionManager::new(&config).unwrap();
         let err = manager
@@ -1069,12 +1079,14 @@ mod tests {
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::remove_var("GROQ_API_KEY") };
 
-        let mut config = TranscriptionConfig::default();
-        config.default_provider = "openai".to_string();
-        config.openai = Some(zeroclaw_config::schema::OpenAiSttConfig {
-            api_key: Some("test-openai-key".to_string()),
-            model: "whisper-1".to_string(),
-        });
+        let config = TranscriptionConfig {
+            default_provider: "openai".to_string(),
+            openai: Some(zeroclaw_config::schema::OpenAiSttConfig {
+                api_key: Some("test-openai-key".to_string()),
+                model: "whisper-1".to_string(),
+            }),
+            ..TranscriptionConfig::default()
+        };
 
         let manager = TranscriptionManager::new(&config).unwrap();
         assert_eq!(manager.default_provider, "openai");
@@ -1212,9 +1224,11 @@ mod tests {
 
     #[test]
     fn local_whisper_registered_when_config_present() {
-        let mut config = TranscriptionConfig::default();
-        config.local_whisper = Some(local_whisper_config("http://127.0.0.1:9999/v1/transcribe"));
-        config.default_provider = "local_whisper".to_string();
+        let config = TranscriptionConfig {
+            local_whisper: Some(local_whisper_config("http://127.0.0.1:9999/v1/transcribe")),
+            default_provider: "local_whisper".to_string(),
+            ..TranscriptionConfig::default()
+        };
 
         let manager = TranscriptionManager::new(&config).unwrap();
         assert!(
@@ -1230,12 +1244,14 @@ mod tests {
         // registration. When local_whisper is also the default_provider and
         // transcription is enabled, the safety net in TranscriptionManager
         // surfaces the error: "not configured".
-        let mut config = TranscriptionConfig::default();
         let mut bad_cfg = local_whisper_config("http://127.0.0.1:9999/v1/transcribe");
         bad_cfg.bearer_token = Some(String::new());
-        config.local_whisper = Some(bad_cfg);
-        config.enabled = true;
-        config.default_provider = "local_whisper".to_string();
+        let config = TranscriptionConfig {
+            local_whisper: Some(bad_cfg),
+            enabled: true,
+            default_provider: "local_whisper".to_string(),
+            ..TranscriptionConfig::default()
+        };
 
         let err = TranscriptionManager::new(&config).err().unwrap();
         assert!(

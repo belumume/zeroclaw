@@ -664,7 +664,7 @@ mod tests {
             &tmp.path().join("skills").join("gpio.md"),
             "# Skill: GPIO\ngpio_write",
         );
-        let result = load_hardware_context_from_dir(tmp.path(), &[]);
+        load_hardware_context_from_dir(tmp.path(), &[]);
         // blink.md sorts before gpio.md
     }
 }
