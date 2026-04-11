@@ -7,10 +7,10 @@ description = "Hardware discovery, peripherals, and device management for ZeroCl
 publish = false
 
 [dependencies]
-zeroclaw-api = { path = "../zeroclaw-api" }
-zeroclaw-config = { path = "../zeroclaw-config", default-features = false }
-zeroclaw-tools = { path = "../zeroclaw-tools" }
-aardvark-sys = { path = "../aardvark-sys" }
+zeroclaw-api = { path = "../zeroclaw-api", version = "0.1.0" }
+zeroclaw-config = { path = "../zeroclaw-config", version = "0.6.9", default-features = false }
+zeroclaw-tools = { path = "../zeroclaw-tools", version = "0.6.9" }
+aardvark-sys = { path = "../aardvark-sys", version = "0.1.0" }
 
 anyhow = "1.0"
 async-trait = "0.1"
