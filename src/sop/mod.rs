@@ -6,10 +6,10 @@ use anyhow::Result;
 pub fn handle_command(command: crate::SopCommands, config: &crate::config::Config) -> Result<()> {
     let workspace_dir = &config.workspace_dir;
     let default_mode = parse_execution_mode(&config.sop.default_execution_mode);
+    let sops = load_sops(workspace_dir, config.sop.sops_dir.as_deref(), default_mode);
 
     match command {
         crate::SopCommands::List => {
-            let sops = load_sops(workspace_dir, config.sop.sops_dir.as_deref(), default_mode);
             if sops.is_empty() {
                 println!("No SOPs found.");
                 println!();
@@ -42,7 +42,6 @@ pub fn handle_command(command: crate::SopCommands, config: &crate::config::Confi
             Ok(())
         }
         crate::SopCommands::Validate { name } => {
-            let sops = load_sops(workspace_dir, config.sop.sops_dir.as_deref(), default_mode);
             let targets: Vec<_> = match &name {
                 Some(n) => sops.iter().filter(|s| s.name == *n).collect(),
                 None => sops.iter().collect(),
@@ -76,7 +75,6 @@ pub fn handle_command(command: crate::SopCommands, config: &crate::config::Confi
             Ok(())
         }
         crate::SopCommands::Show { name } => {
-            let sops = load_sops(workspace_dir, config.sop.sops_dir.as_deref(), default_mode);
             let sop = sops
                 .iter()
                 .find(|s| s.name == name)
