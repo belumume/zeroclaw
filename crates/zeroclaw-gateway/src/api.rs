@@ -1728,6 +1728,7 @@ mod tests {
             proxy_url: None,
         });
         cfg.channels.email = Some(zeroclaw_config::scattered_types::EmailConfig {
+            enabled: true,
             imap_host: "imap.example.com".to_string(),
             imap_port: 993,
             imap_folder: "INBOX".to_string(),
@@ -1880,6 +1881,7 @@ mod tests {
             proxy_url: None,
         });
         current.channels.email = Some(zeroclaw_config::scattered_types::EmailConfig {
+            enabled: true,
             imap_host: "imap.example.com".to_string(),
             imap_port: 993,
             imap_folder: "INBOX".to_string(),
