@@ -3952,7 +3952,6 @@ fn build_channel_by_id(config: &Config, channel_id: &str) -> Result<Arc<dyn Chan
                 SlackChannel::new(
                     sl.bot_token.clone(),
                     sl.app_token.clone(),
-                    sl.channel_id.clone(),
                     sl.channel_ids.clone(),
                     sl.allowed_users.clone(),
                 )
@@ -4401,7 +4400,6 @@ fn collect_configured_channels(
                     SlackChannel::new(
                         sl.bot_token.clone(),
                         sl.app_token.clone(),
-                        sl.channel_id.clone(),
                         sl.channel_ids.clone(),
                         sl.allowed_users.clone(),
                     )
@@ -5655,8 +5653,7 @@ pub async fn deliver_announcement(
             let ch = SlackChannel::new(
                 sl.bot_token.clone(),
                 sl.app_token.clone(),
-                sl.channel_id.clone(),
-                Vec::new(),
+                sl.channel_ids.clone(),
                 sl.allowed_users.clone(),
             )
             .with_workspace_dir(config.workspace_dir.clone());

@@ -782,7 +782,6 @@ fn apply_tui_selections_to_config(app: &App, config: &mut Config) {
                     enabled: true,
                     bot_token: String::from("xoxb-YOUR_SLACK_BOT_TOKEN"),
                     app_token: Some(String::from("xapp-YOUR_SLACK_APP_TOKEN")),
-                    channel_id: None,
                     channel_ids: vec![],
                     allowed_users: vec![],
                     interrupt_on_new_message: false,

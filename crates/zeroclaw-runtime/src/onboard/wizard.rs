@@ -3996,7 +3996,7 @@ fn setup_channels(
                 let sl_channel_default = config
                     .slack
                     .as_ref()
-                    .and_then(|sl| sl.channel_id.clone())
+                    .and_then(|sl| sl.channel_ids.first().cloned())
                     .unwrap_or_default();
                 let channel: String = Input::new()
                     .with_prompt(
@@ -4051,14 +4051,19 @@ fn setup_channels(
                     } else {
                         Some(app_token)
                     },
-                    channel_id: if channel.is_empty() {
-                        None
+                    channel_ids: if channel.is_empty() {
+                        existing_sl
+                            .map(|s| s.channel_ids.clone())
+                            .unwrap_or_default()
                     } else {
-                        Some(channel)
+                        let mut ids = existing_sl
+                            .map(|s| s.channel_ids.clone())
+                            .unwrap_or_default();
+                        if !ids.contains(&channel) {
+                            ids.insert(0, channel);
+                        }
+                        ids
                     },
-                    channel_ids: existing_sl
-                        .map(|s| s.channel_ids.clone())
-                        .unwrap_or_default(),
                     allowed_users,
                     interrupt_on_new_message: existing_sl
                         .map(|s| s.interrupt_on_new_message)

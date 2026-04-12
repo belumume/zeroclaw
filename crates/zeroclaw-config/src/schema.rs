@@ -6965,11 +6965,9 @@ pub struct SlackConfig {
     /// Slack app-level token for Socket Mode (xapp-...).
     #[secret]
     pub app_token: Option<String>,
-    /// Optional channel ID to restrict the bot to a single channel.
-    /// Omit (or set `"*"`) to listen across all accessible channels.
-    pub channel_id: Option<String>,
-    /// Optional explicit list of channel IDs to watch.
-    /// When set, this takes precedence over `channel_id`.
+    /// Explicit list of channel IDs to watch.
+    /// Empty = listen across all accessible channels.
+    /// Migrated from the legacy `channel_id` singular field.
     #[serde(default)]
     pub channel_ids: Vec<String>,
     /// Allowed Slack user IDs. Empty = deny all.
@@ -12926,22 +12924,7 @@ guild_id = "123"
     }
 
     #[test]
-    async fn slack_config_toml_backward_compat() {
-        let toml_str = r#"
-bot_token = "xoxb-tok"
-channel_id = "C123"
-"#;
-        let parsed: SlackConfig = toml::from_str(toml_str).unwrap();
-        assert!(parsed.channel_ids.is_empty());
-        assert!(parsed.allowed_users.is_empty());
-        assert!(!parsed.interrupt_on_new_message);
-        assert_eq!(parsed.thread_replies, None);
-        assert!(!parsed.mention_only);
-        assert_eq!(parsed.channel_id.as_deref(), Some("C123"));
-    }
-
-    #[test]
-    async fn slack_config_toml_accepts_channel_ids() {
+    async fn slack_config_toml_with_channel_ids() {
         let toml_str = r#"
 bot_token = "xoxb-tok"
 channel_ids = ["C123", "D456"]
@@ -12952,7 +12935,15 @@ channel_ids = ["C123", "D456"]
         assert!(!parsed.interrupt_on_new_message);
         assert_eq!(parsed.thread_replies, None);
         assert!(!parsed.mention_only);
-        assert!(parsed.channel_id.is_none());
+    }
+
+    #[test]
+    async fn slack_config_toml_without_channel_ids_defaults_empty() {
+        let toml_str = r#"
+bot_token = "xoxb-tok"
+"#;
+        let parsed: SlackConfig = toml::from_str(toml_str).unwrap();
+        assert!(parsed.channel_ids.is_empty());
     }
 
     #[test]
