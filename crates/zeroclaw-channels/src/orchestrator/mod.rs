@@ -11,16 +11,14 @@
 //!
 //! # Extension
 //!
-//! To add a new channel, implement [`Channel`] in a new submodule and wire it into
-//! [`start_channels`]. See `AGENTS.md` §7.2 for the full change playbook.
+//! To add a new channel, implement [`Channel`] in a new top-level module in
+//! `zeroclaw-channels/src/`, declare it in `lib.rs` behind the appropriate feature
+//! gate, and wire it into [`start_channels`] here. See `AGENTS.md` §7.2 for the
+//! full change playbook.
 
 pub mod acp_server;
-#[cfg(feature = "channel-matrix")]
-pub mod matrix;
 pub mod media_pipeline;
 pub mod mqtt;
-#[cfg(feature = "channel-telegram")]
-pub mod telegram;
 
 // Channel types imported directly from source crates (no shim files)
 pub use crate::bluesky::BlueskyChannel;
@@ -63,12 +61,12 @@ pub use zeroclaw_api::channel::{Channel, ChannelMessage, SendMessage};
 // Local channel types (in misc, not zeroclaw-channels)
 pub use crate::cli::CliChannel;
 pub use crate::link_enricher;
+#[cfg(feature = "channel-matrix")]
+pub use crate::matrix::MatrixChannel;
+#[cfg(feature = "channel-telegram")]
+pub use crate::telegram::TelegramChannel;
 #[cfg(feature = "whatsapp-web")]
 pub use crate::whatsapp_web::WhatsAppWebChannel;
-#[cfg(feature = "channel-matrix")]
-pub use matrix::MatrixChannel;
-#[cfg(feature = "channel-telegram")]
-pub use telegram::TelegramChannel;
 pub use zeroclaw_infra::debounce::MessageDebouncer;
 pub use zeroclaw_infra::session_backend::SessionBackend;
 pub use zeroclaw_infra::session_sqlite::SqliteSessionBackend;
@@ -463,7 +461,7 @@ fn is_stop_command(content: &str) -> bool {
 /// `<tool_call>`, `<toolcall>`, `<tool-call>`, `<tool>`, or `<invoke>`
 /// blocks that are internal protocol and must not be forwarded to end
 /// users on any channel.
-fn strip_tool_call_tags(message: &str) -> String {
+pub(crate) fn strip_tool_call_tags(message: &str) -> String {
     const TOOL_CALL_OPEN_TAGS: [&str; 7] = [
         "<function_calls>",
         "<function_call>",

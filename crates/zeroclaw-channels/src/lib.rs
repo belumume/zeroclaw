@@ -34,6 +34,8 @@ pub mod lark;
 pub mod line;
 #[cfg(feature = "channel-linq")]
 pub mod linq;
+#[cfg(feature = "channel-matrix")]
+pub mod matrix;
 #[cfg(feature = "channel-mattermost")]
 pub mod mattermost;
 #[cfg(feature = "channel-mochat")]
@@ -52,6 +54,8 @@ pub mod reddit;
 pub mod signal;
 #[cfg(feature = "channel-slack")]
 pub mod slack;
+#[cfg(feature = "channel-telegram")]
+pub mod telegram;
 #[cfg(feature = "channel-twitter")]
 pub mod twitter;
 #[cfg(feature = "channel-voice-call")]
