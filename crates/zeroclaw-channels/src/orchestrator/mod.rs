@@ -10389,7 +10389,7 @@ This is an example JSON object for profile settings."#;
     #[test]
     fn collect_configured_channels_skips_disabled_email() {
         let mut config = Config::default();
-        config.channels_config.email = Some(zeroclaw_config::scattered_types::EmailConfig {
+        config.channels.email = Some(zeroclaw_config::scattered_types::EmailConfig {
             enabled: false,
             ..Default::default()
         });
@@ -10405,11 +10405,10 @@ This is an example JSON object for profile settings."#;
     #[test]
     fn collect_configured_channels_skips_disabled_voice_call() {
         let mut config = Config::default();
-        config.channels_config.voice_call =
-            Some(zeroclaw_config::scattered_types::VoiceCallConfig {
-                enabled: false,
-                ..Default::default()
-            });
+        config.channels.voice_call = Some(zeroclaw_config::scattered_types::VoiceCallConfig {
+            enabled: false,
+            ..Default::default()
+        });
 
         let channels = collect_configured_channels(&config, "test");
         assert!(
