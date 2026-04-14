@@ -16796,7 +16796,9 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             stream_mode: StreamMode::default(),
             draft_update_interval_ms: 1500,
             multi_message_delay_ms: 800,
+            mention_only: false,
             recovery_key: None,
+            password: None,
         });
         config
             .set_secret("channels.matrix.access-token", "sk-test".into())
