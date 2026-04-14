@@ -10057,6 +10057,12 @@ impl Config {
                     "model_providers.{profile_name}.wire_api must be one of: responses, chat_completions"
                 );
             }
+
+            if let Some(temp) = profile.temperature {
+                validate_temperature(temp).map_err(|e| {
+                    anyhow::anyhow!("providers.models.{profile_name}.temperature: {e}")
+                })?;
+            }
         }
 
         // Providers — fallback reference check
@@ -14702,6 +14708,56 @@ default_model = "persisted-profile"
 
         // SAFETY: test-only, single-threaded test runner.
         unsafe { std::env::remove_var("ZEROCLAW_TEMPERATURE") };
+    }
+
+    #[test]
+    fn validate_rejects_out_of_range_temperature() {
+        let mut config = Config::default();
+        config.providers.fallback = Some("test".into());
+        config.providers.models.insert(
+            "test".into(),
+            ModelProviderConfig {
+                temperature: Some(99.0),
+                ..Default::default()
+            },
+        );
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.to_string().contains("temperature"),
+            "expected temperature validation error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_negative_temperature() {
+        let mut config = Config::default();
+        config.providers.fallback = Some("test".into());
+        config.providers.models.insert(
+            "test".into(),
+            ModelProviderConfig {
+                temperature: Some(-0.5),
+                ..Default::default()
+            },
+        );
+        let err = config.validate().unwrap_err();
+        assert!(
+            err.to_string().contains("temperature"),
+            "expected temperature validation error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_accepts_valid_temperature() {
+        let mut config = Config::default();
+        config.providers.fallback = Some("test".into());
+        config.providers.models.insert(
+            "test".into(),
+            ModelProviderConfig {
+                temperature: Some(0.7),
+                ..Default::default()
+            },
+        );
+        assert!(config.validate().is_ok());
     }
 
     #[test]
