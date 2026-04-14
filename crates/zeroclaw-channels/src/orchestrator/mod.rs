@@ -2873,14 +2873,11 @@ async fn process_channel_message(
             let reply_target = msg.reply_target.clone();
             let draft_id = draft_id_ref.to_string();
             Some(tokio::spawn(async move {
-                use zeroclaw_runtime::agent::loop_::DraftEvent;
+                use zeroclaw_runtime::agent::loop_::StreamDelta;
                 let mut accumulated = String::new();
                 while let Some(event) = rx.recv().await {
                     match event {
-                        DraftEvent::Clear => {
-                            accumulated.clear();
-                        }
-                        DraftEvent::Progress(text) => {
+                        StreamDelta::Status(text) => {
                             let visible = strip_think_tags_inline(&text);
                             if let Err(e) = channel
                                 .update_draft_progress(&reply_target, &draft_id, &visible)
@@ -2889,7 +2886,7 @@ async fn process_channel_message(
                                 tracing::debug!("Draft progress update failed: {e}");
                             }
                         }
-                        DraftEvent::Content(text) => {
+                        StreamDelta::Text(text) => {
                             accumulated.push_str(&text);
                             let visible = strip_think_tags_inline(&accumulated);
                             if let Err(e) = channel
