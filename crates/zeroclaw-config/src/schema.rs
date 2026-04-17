@@ -6809,6 +6809,10 @@ fn default_multi_message_delay_ms() -> u64 {
     800
 }
 
+fn default_telegram_approval_timeout_secs() -> u64 {
+    120
+}
+
 fn default_matrix_draft_update_interval_ms() -> u64 {
     1500
 }
@@ -6849,6 +6853,10 @@ pub struct TelegramConfig {
     /// Overrides the global `[proxy]` setting for this channel only.
     #[serde(default)]
     pub proxy_url: Option<String>,
+    /// How long (seconds) to wait for the operator to tap an inline-keyboard
+    /// button on a tool approval prompt before auto-denying. Default: 120.
+    #[serde(default = "default_telegram_approval_timeout_secs")]
+    pub approval_timeout_secs: u64,
 }
 
 impl ChannelConfig for TelegramConfig {
@@ -11672,6 +11680,7 @@ auto_save = true
                     mention_only: false,
                     ack_reactions: None,
                     proxy_url: None,
+                    approval_timeout_secs: default_telegram_approval_timeout_secs(),
                 }),
                 discord: None,
                 discord_history: None,
@@ -12561,6 +12570,7 @@ default_temperature = 0.7
             mention_only: false,
             ack_reactions: None,
             proxy_url: None,
+            approval_timeout_secs: 120,
         };
         let json = serde_json::to_string(&tc).unwrap();
         let parsed: TelegramConfig = serde_json::from_str(&json).unwrap();
@@ -15741,6 +15751,7 @@ require_otp_to_resume = true
             mention_only: false,
             ack_reactions: None,
             proxy_url: None,
+            approval_timeout_secs: default_telegram_approval_timeout_secs(),
         });
 
         // Save (triggers encryption)
