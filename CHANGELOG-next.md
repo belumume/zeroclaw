@@ -212,6 +212,7 @@ extension point — all other crates are Beta or Experimental.
 
 Thank you to everyone who contributed to this release:
 
+- @abhijeet117
 - @aliasliao
 - @ArgenisDLR
 - @Audacity88
@@ -223,7 +224,9 @@ Thank you to everyone who contributed to this release:
 - @JordanTheJet
 - @kunalk16
 - @markuman
+- @micookie
 - @nayrosk
+- @niedbalski
 - @ninenox
 - @singlerider
 - @theonlyhennygod
@@ -232,6 +235,7 @@ Thank you to everyone who contributed to this release:
 - @vernonstinebaker
 - @WareWolf-MoonWall
 - @wlh320
+- @zavertiaev
 
 ---
 
