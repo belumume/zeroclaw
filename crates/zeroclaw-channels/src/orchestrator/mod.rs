@@ -3063,6 +3063,8 @@ async fn process_channel_message(
                         ctx.context_token_budget,
                         None, // shared_budget
                         target_channel.as_deref(),
+                        None, // receipt_generator
+                        None, // collected_receipts
                     ),
                     ),
                     ),
