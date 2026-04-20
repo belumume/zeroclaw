@@ -5207,9 +5207,14 @@ pub async fn start_channels(config: Config) -> Result<()> {
         }
     }
 
-    let tools_registry = Arc::new(built_tools);
-
     let skills = zeroclaw_runtime::skills::load_skills_with_config(&workspace, &config);
+
+    // Register skill-defined tools so the gateway can execute them (not just
+    // describe them in the prompt). Without this, skill tools like email.send
+    // appear in the system prompt but return "Unknown tool" when called.
+    zeroclaw_runtime::tools::register_skill_tools(&mut built_tools, &skills, security.clone());
+
+    let tools_registry = Arc::new(built_tools);
 
     // ── Load locale-aware tool descriptions ────────────────────────
     let i18n_locale = config
