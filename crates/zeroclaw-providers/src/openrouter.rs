@@ -17,6 +17,7 @@ pub struct OpenRouterProvider {
     credential: Option<String>,
     timeout_secs: u64,
     max_tokens: Option<u32>,
+    extra_body: Option<serde_json::Value>,
 }
 
 const DEFAULT_OPENROUTER_TIMEOUT_SECS: u64 = 120;
@@ -185,6 +186,7 @@ impl OpenRouterProvider {
                 .filter(|secs| *secs > 0)
                 .unwrap_or(DEFAULT_OPENROUTER_TIMEOUT_SECS),
             max_tokens: None,
+            extra_body: None,
         }
     }
 
@@ -197,6 +199,14 @@ impl OpenRouterProvider {
     /// Set the maximum output tokens for API requests.
     pub fn with_max_tokens(mut self, max_tokens: Option<u32>) -> Self {
         self.max_tokens = max_tokens;
+        self
+    }
+
+    /// Set extra JSON parameters to merge into every API request body.
+    /// Keys in `extra` are inserted at the top level of the serialized request,
+    /// overriding any existing keys with the same name.
+    pub fn with_extra_body(mut self, extra: serde_json::Value) -> Self {
+        self.extra_body = Some(extra);
         self
     }
 
@@ -370,6 +380,24 @@ impl OpenRouterProvider {
         })
     }
 
+    /// Serialize `request` to JSON, merge `self.extra_body` keys at the top
+    /// level (extra_body wins on conflicts), and return the merged Value.
+    fn merge_extra_body<T: Serialize>(&self, request: &T) -> anyhow::Result<serde_json::Value> {
+        let Some(extra) = &self.extra_body else {
+            return Ok(serde_json::to_value(request)?);
+        };
+        let overrides = extra
+            .as_object()
+            .ok_or_else(|| anyhow::anyhow!("provider_extra must be a JSON object, got: {extra}"))?;
+        let mut value = serde_json::to_value(request)?;
+        if let Some(base) = value.as_object_mut() {
+            for (k, v) in overrides {
+                base.insert(k.clone(), v.clone());
+            }
+        }
+        Ok(value)
+    }
+
     fn http_client(&self) -> Client {
         zeroclaw_config::schema::build_runtime_proxy_client_with_timeouts(
             "provider.openrouter",
@@ -434,13 +462,14 @@ impl Provider for OpenRouterProvider {
             max_tokens: self.max_tokens,
         };
 
+        let body = self.merge_extra_body(&request)?;
         let response = self
             .http_client()
             .post("https://openrouter.ai/api/v1/chat/completions")
             .header("Authorization", format!("Bearer {credential}"))
             .header("HTTP-Referer", "https://github.com/zeroclaw-labs/zeroclaw")
             .header("X-Title", "ZeroClaw")
-            .json(&request)
+            .json(&body)
             .send()
             .await?;
 
@@ -448,9 +477,12 @@ impl Provider for OpenRouterProvider {
             return Err(super::api_error("OpenRouter", response).await);
         }
 
-        let body = Self::read_response_body("OpenRouter", response).await?;
-        let chat_response =
-            Self::parse_response_body::<ApiChatResponse>("OpenRouter", &body, "chat-completions")?;
+        let resp_body = Self::read_response_body("OpenRouter", response).await?;
+        let chat_response = Self::parse_response_body::<ApiChatResponse>(
+            "OpenRouter",
+            &resp_body,
+            "chat-completions",
+        )?;
 
         chat_response
             .choices
@@ -484,13 +516,14 @@ impl Provider for OpenRouterProvider {
             max_tokens: self.max_tokens,
         };
 
+        let body = self.merge_extra_body(&request)?;
         let response = self
             .http_client()
             .post("https://openrouter.ai/api/v1/chat/completions")
             .header("Authorization", format!("Bearer {credential}"))
             .header("HTTP-Referer", "https://github.com/zeroclaw-labs/zeroclaw")
             .header("X-Title", "ZeroClaw")
-            .json(&request)
+            .json(&body)
             .send()
             .await?;
 
@@ -498,9 +531,12 @@ impl Provider for OpenRouterProvider {
             return Err(super::api_error("OpenRouter", response).await);
         }
 
-        let body = Self::read_response_body("OpenRouter", response).await?;
-        let chat_response =
-            Self::parse_response_body::<ApiChatResponse>("OpenRouter", &body, "chat-completions")?;
+        let resp_body = Self::read_response_body("OpenRouter", response).await?;
+        let chat_response = Self::parse_response_body::<ApiChatResponse>(
+            "OpenRouter",
+            &resp_body,
+            "chat-completions",
+        )?;
 
         chat_response
             .choices
@@ -533,13 +569,14 @@ impl Provider for OpenRouterProvider {
             stream: None,
         };
 
+        let body = self.merge_extra_body(&native_request)?;
         let response = self
             .http_client()
             .post("https://openrouter.ai/api/v1/chat/completions")
             .header("Authorization", format!("Bearer {credential}"))
             .header("HTTP-Referer", "https://github.com/zeroclaw-labs/zeroclaw")
             .header("X-Title", "ZeroClaw")
-            .json(&native_request)
+            .json(&body)
             .send()
             .await?;
 
@@ -547,9 +584,12 @@ impl Provider for OpenRouterProvider {
             return Err(super::api_error("OpenRouter", response).await);
         }
 
-        let body = Self::read_response_body("OpenRouter", response).await?;
-        let native_response =
-            Self::parse_response_body::<NativeChatResponse>("OpenRouter", &body, "native chat")?;
+        let resp_body = Self::read_response_body("OpenRouter", response).await?;
+        let native_response = Self::parse_response_body::<NativeChatResponse>(
+            "OpenRouter",
+            &resp_body,
+            "native chat",
+        )?;
         let usage = native_response.usage.map(|u| TokenUsage {
             input_tokens: u.prompt_tokens,
             output_tokens: u.completion_tokens,
@@ -732,13 +772,14 @@ impl Provider for OpenRouterProvider {
             stream: None,
         };
 
+        let body = self.merge_extra_body(&native_request)?;
         let response = self
             .http_client()
             .post("https://openrouter.ai/api/v1/chat/completions")
             .header("Authorization", format!("Bearer {credential}"))
             .header("HTTP-Referer", "https://github.com/zeroclaw-labs/zeroclaw")
             .header("X-Title", "ZeroClaw")
-            .json(&native_request)
+            .json(&body)
             .send()
             .await?;
 
@@ -746,9 +787,12 @@ impl Provider for OpenRouterProvider {
             return Err(super::api_error("OpenRouter", response).await);
         }
 
-        let body = Self::read_response_body("OpenRouter", response).await?;
-        let native_response =
-            Self::parse_response_body::<NativeChatResponse>("OpenRouter", &body, "native chat")?;
+        let resp_body = Self::read_response_body("OpenRouter", response).await?;
+        let native_response = Self::parse_response_body::<NativeChatResponse>(
+            "OpenRouter",
+            &resp_body,
+            "native chat",
+        )?;
         let usage = native_response.usage.map(|u| TokenUsage {
             input_tokens: u.prompt_tokens,
             output_tokens: u.completion_tokens,
@@ -1465,6 +1509,123 @@ mod tests {
         assert!(OpenRouterProvider::convert_tools(Some(&tools)).is_none());
     }
 
+    #[test]
+    fn with_extra_body_sets_value() {
+        let extra = serde_json::json!({"provider": {"only": ["Anthropic"]}});
+        let provider = OpenRouterProvider::new(Some("key"), None).with_extra_body(extra.clone());
+        assert_eq!(provider.extra_body, Some(extra));
+    }
+
+    #[test]
+    fn extra_body_none_produces_unchanged_request() {
+        let provider = OpenRouterProvider::new(Some("key"), None);
+        let request = ChatRequest {
+            model: "test-model".into(),
+            messages: vec![],
+            temperature: 0.5,
+            max_tokens: None,
+        };
+
+        let base = serde_json::to_value(&request).unwrap();
+        let merged = provider.merge_extra_body(&request).unwrap();
+        assert_eq!(base, merged);
+    }
+
+    #[test]
+    fn extra_body_empty_object_produces_unchanged_request() {
+        let provider =
+            OpenRouterProvider::new(Some("key"), None).with_extra_body(serde_json::json!({}));
+        let request = ChatRequest {
+            model: "test-model".into(),
+            messages: vec![],
+            temperature: 0.5,
+            max_tokens: None,
+        };
+
+        let base = serde_json::to_value(&request).unwrap();
+        let merged = provider.merge_extra_body(&request).unwrap();
+        assert_eq!(base, merged);
+    }
+
+    #[test]
+    fn extra_body_adds_new_top_level_keys() {
+        let provider = OpenRouterProvider::new(Some("key"), None)
+            .with_extra_body(serde_json::json!({"provider": {"only": ["Anthropic"]}}));
+        let request = ChatRequest {
+            model: "test-model".into(),
+            messages: vec![],
+            temperature: 0.5,
+            max_tokens: None,
+        };
+
+        let merged = provider.merge_extra_body(&request).unwrap();
+        let obj = merged.as_object().unwrap();
+        assert_eq!(
+            obj.get("provider").unwrap(),
+            &serde_json::json!({"only": ["Anthropic"]})
+        );
+        assert_eq!(obj.get("model").unwrap(), "test-model");
+        assert_eq!(obj.get("temperature").unwrap(), 0.5);
+    }
+
+    #[test]
+    fn extra_body_overrides_existing_keys() {
+        let provider = OpenRouterProvider::new(Some("key"), None)
+            .with_extra_body(serde_json::json!({"temperature": 0.9}));
+        let request = ChatRequest {
+            model: "test-model".into(),
+            messages: vec![],
+            temperature: 0.5,
+            max_tokens: None,
+        };
+
+        let merged = provider.merge_extra_body(&request).unwrap();
+        let obj = merged.as_object().unwrap();
+        assert_eq!(obj.get("temperature").unwrap(), 0.9);
+    }
+
+    #[test]
+    fn extra_body_merges_at_top_level_not_nested() {
+        let provider = OpenRouterProvider::new(Some("key"), None)
+            .with_extra_body(serde_json::json!({"transforms": ["middle-out"]}));
+        let request = ChatRequest {
+            model: "test-model".into(),
+            messages: vec![],
+            temperature: 0.5,
+            max_tokens: None,
+        };
+
+        let merged = provider.merge_extra_body(&request).unwrap();
+        let obj = merged.as_object().unwrap();
+        assert_eq!(
+            obj.get("transforms").unwrap(),
+            &serde_json::json!(["middle-out"])
+        );
+        assert!(obj.get("extra_body").is_none());
+    }
+
+    #[test]
+    fn extra_body_with_nested_provider_routing() {
+        let provider = OpenRouterProvider::new(Some("key"), None).with_extra_body(
+            serde_json::json!({"provider": {"only": ["Anthropic"], "allow_fallbacks": false}}),
+        );
+        let request = NativeChatRequest {
+            model: "anthropic/claude-sonnet-4".into(),
+            messages: vec![],
+            temperature: 0.7,
+            tools: None,
+            tool_choice: None,
+            max_tokens: None,
+            stream: None,
+        };
+
+        let merged = provider.merge_extra_body(&request).unwrap();
+        let obj = merged.as_object().unwrap();
+        let prov = obj.get("provider").unwrap();
+        assert_eq!(prov["only"], serde_json::json!(["Anthropic"]));
+        assert_eq!(prov["allow_fallbacks"], false);
+    }
+
     /// Regression for #5822.
     ///
     /// `AbortOnDrop` must cancel the bound tokio task when it is dropped.
@@ -1487,14 +1648,10 @@ mod tests {
         let raw_handle = handle.abort_handle();
         let guard = AbortOnDrop(handle.abort_handle());
 
-        // Sanity: the task is live and has not finished synchronously.
         assert!(!raw_handle.is_finished());
 
         drop(guard);
 
-        // After dropping the guard the task should be cancelled promptly.
-        // Poll `is_finished` within a generous bound; 2 seconds is far more
-        // than necessary but keeps the test robust on loaded CI runners.
         let cancelled = timeout(Duration::from_secs(2), async {
             loop {
                 if raw_handle.is_finished() {
@@ -1509,7 +1666,6 @@ mod tests {
             cancelled.is_ok(),
             "task should be aborted within 2 s of AbortOnDrop being dropped"
         );
-        // The task was cancelled, not completed — the flag must stay false.
         assert!(
             !finished.load(Ordering::SeqCst),
             "cancelled task must not have run its completion side effect"

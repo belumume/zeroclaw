@@ -555,6 +555,12 @@ pub struct ModelProviderConfig {
     /// Merge system messages into first user message.
     #[serde(default)]
     pub merge_system_into_user: bool,
+    /// Extra JSON parameters to include in API requests.
+    /// Merged at the top level of the request body, allowing provider-specific
+    /// features (routing, transforms, etc.) without code changes.
+    /// Example: `provider_extra = { provider = { only = ["Anthropic"] } }`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_extra: Option<serde_json::Value>,
 }
 
 // ── Delegate Tool Configuration ─────────────────────────────────
@@ -11194,6 +11200,10 @@ impl_enum_prop_kind!(
     SandboxBackend,
     AutonomyLevel,
 );
+
+impl HasPropKind for serde_json::Value {
+    const PROP_KIND: PropKind = PropKind::Enum;
+}
 
 #[cfg(test)]
 mod tests {
