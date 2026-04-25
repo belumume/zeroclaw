@@ -109,6 +109,26 @@ pub trait SessionBackend: Send + Sync {
         Ok(None)
     }
 
+    /// Look up metadata for a single session by key.
+    ///
+    /// The default impl loads all messages to derive the count and calls
+    /// `get_session_name` for the name. `created_at` and `last_activity` are
+    /// set to `Utc::now()` at call time — backends with stored timestamps
+    /// (e.g. SQLite) should override this method.
+    fn get_session_metadata(&self, session_key: &str) -> Option<SessionMetadata> {
+        let messages = self.load(session_key);
+        if messages.is_empty() {
+            return None;
+        }
+        Some(SessionMetadata {
+            key: session_key.to_string(),
+            name: self.get_session_name(session_key).ok().flatten(),
+            created_at: Utc::now(),
+            last_activity: Utc::now(),
+            message_count: messages.len(),
+        })
+    }
+
     /// Set the session state (e.g. "idle", "running", "error").
     /// `turn_id` identifies the current turn (set when running, cleared on idle).
     fn set_session_state(
