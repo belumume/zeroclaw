@@ -386,6 +386,13 @@ pub struct AppState {
     /// WebAuthn state for hardware key authentication (optional, requires `webauthn` feature)
     #[cfg(feature = "webauthn")]
     pub webauthn: Option<Arc<api_webauthn::WebAuthnState>>,
+    /// Per-session cancellation tokens for aborting in-flight agent responses.
+    /// Key is session_key (e.g. `gw_<session_id>`), value is the token for the
+    /// current turn. Entries are inserted before each turn and removed after
+    /// completion (normal or cancelled).
+    pub cancel_tokens: Arc<
+        std::sync::Mutex<std::collections::HashMap<String, tokio_util::sync::CancellationToken>>,
+    >,
 }
 
 /// Run the HTTP gateway using axum with proper HTTP/1.1 compliance.
@@ -907,6 +914,7 @@ pub async fn run_gateway(
         path_prefix: path_prefix.unwrap_or("").to_string(),
         web_dist_dir,
         canvas_store,
+        cancel_tokens: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
         #[cfg(feature = "webauthn")]
         webauthn: if config.security.webauthn.enabled {
             let secret_store = Arc::new(zeroclaw_runtime::security::SecretStore::new(
@@ -997,6 +1005,7 @@ pub async fn run_gateway(
         )
         .route("/api/sessions/{id}", delete(api::handle_api_session_delete).put(api::handle_api_session_rename))
         .route("/api/sessions/{id}/state", get(api::handle_api_session_state))
+        .route("/api/sessions/{id}/abort", post(api::handle_api_session_abort))
         // ── Pairing + Device management API ──
         .route("/api/pairing/initiate", post(api_pairing::initiate_pairing))
         .route("/api/pair", post(api_pairing::submit_pairing_enhanced))
@@ -2436,6 +2445,7 @@ mod tests {
             device_registry: None,
             pending_pairings: None,
             canvas_store: CanvasStore::new(),
+            cancel_tokens: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             #[cfg(feature = "webauthn")]
             webauthn: None,
         };
@@ -2508,6 +2518,7 @@ mod tests {
             device_registry: None,
             pending_pairings: None,
             canvas_store: CanvasStore::new(),
+            cancel_tokens: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             #[cfg(feature = "webauthn")]
             webauthn: None,
         };
@@ -2906,6 +2917,7 @@ mod tests {
             device_registry: None,
             pending_pairings: None,
             canvas_store: CanvasStore::new(),
+            cancel_tokens: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             #[cfg(feature = "webauthn")]
             webauthn: None,
         };
@@ -2986,6 +2998,7 @@ mod tests {
             device_registry: None,
             pending_pairings: None,
             canvas_store: CanvasStore::new(),
+            cancel_tokens: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             #[cfg(feature = "webauthn")]
             webauthn: None,
         };
@@ -3078,6 +3091,7 @@ mod tests {
             device_registry: None,
             pending_pairings: None,
             canvas_store: CanvasStore::new(),
+            cancel_tokens: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             #[cfg(feature = "webauthn")]
             webauthn: None,
         };
@@ -3142,6 +3156,7 @@ mod tests {
             device_registry: None,
             pending_pairings: None,
             canvas_store: CanvasStore::new(),
+            cancel_tokens: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             #[cfg(feature = "webauthn")]
             webauthn: None,
         };
@@ -3211,6 +3226,7 @@ mod tests {
             device_registry: None,
             pending_pairings: None,
             canvas_store: CanvasStore::new(),
+            cancel_tokens: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             #[cfg(feature = "webauthn")]
             webauthn: None,
         };
@@ -3285,6 +3301,7 @@ mod tests {
             device_registry: None,
             pending_pairings: None,
             canvas_store: CanvasStore::new(),
+            cancel_tokens: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             #[cfg(feature = "webauthn")]
             webauthn: None,
         };
@@ -3356,6 +3373,7 @@ mod tests {
             device_registry: None,
             pending_pairings: None,
             canvas_store: CanvasStore::new(),
+            cancel_tokens: Arc::new(std::sync::Mutex::new(std::collections::HashMap::new())),
             #[cfg(feature = "webauthn")]
             webauthn: None,
         };
