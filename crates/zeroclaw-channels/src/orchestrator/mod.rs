@@ -4344,8 +4344,10 @@ struct ConfiguredChannel {
 fn collect_configured_channels(
     config: &Config,
     matrix_skip_context: &str,
+    tool_specs: &[(String, String)],
 ) -> Vec<ConfiguredChannel> {
     let _ = matrix_skip_context;
+    let _ = tool_specs;
     let mut channels = Vec::new();
 
     #[cfg(feature = "channel-telegram")]
@@ -4366,6 +4368,7 @@ fn collect_configured_channels(
                     .with_tts(config.tts.clone())
                     .with_workspace_dir(config.workspace_dir.clone())
                     .with_proxy_url(tg.proxy_url.clone())
+                    .with_tool_command_specs(tool_specs.to_vec())
                     .with_approval_timeout_secs(tg.approval_timeout_secs),
                 ),
             });
@@ -4991,7 +4994,7 @@ fn collect_configured_channels(
 /// Run health checks for configured channels.
 pub async fn doctor_channels(config: Config) -> Result<()> {
     #[allow(unused_mut)]
-    let mut channels = collect_configured_channels(&config, "health check");
+    let mut channels = collect_configured_channels(&config, "health check", &[]);
 
     #[cfg(feature = "channel-nostr")]
     if let Some(ref ns) = config.channels.nostr {
@@ -5227,6 +5230,12 @@ pub async fn start_channels(config: Config) -> Result<()> {
     // appear in the system prompt but return "Unknown tool" when called.
     zeroclaw_runtime::tools::register_skill_tools(&mut built_tools, &skills, security.clone());
 
+    // Extract (name, description) specs from built tools for channel command registration.
+    let tool_specs: Vec<(String, String)> = built_tools
+        .iter()
+        .map(|t| (t.name().to_string(), t.description().to_string()))
+        .collect();
+
     let tools_registry = Arc::new(built_tools);
 
     // ── Load locale-aware tool descriptions ────────────────────────
@@ -5360,7 +5369,7 @@ pub async fn start_channels(config: Config) -> Result<()> {
     // Collect active channels from a shared builder to keep startup and doctor parity.
     #[allow(unused_mut)]
     let mut channels: Vec<Arc<dyn Channel>> =
-        collect_configured_channels(&config, "runtime startup")
+        collect_configured_channels(&config, "runtime startup", &tool_specs)
             .into_iter()
             .map(|configured| configured.channel)
             .collect();
@@ -10429,7 +10438,7 @@ This is an example JSON object for profile settings."#;
             proxy_url: None,
         });
 
-        let channels = collect_configured_channels(&config, "test");
+        let channels = collect_configured_channels(&config, "test", &[]);
 
         assert!(
             channels
@@ -10452,7 +10461,7 @@ This is an example JSON object for profile settings."#;
             ..Default::default()
         });
 
-        let channels = collect_configured_channels(&config, "test");
+        let channels = collect_configured_channels(&config, "test", &[]);
         assert!(
             !channels.iter().any(|entry| entry.display_name == "Email"),
             "disabled email should not be collected"
@@ -10468,7 +10477,7 @@ This is an example JSON object for profile settings."#;
             ..Default::default()
         });
 
-        let channels = collect_configured_channels(&config, "test");
+        let channels = collect_configured_channels(&config, "test", &[]);
         assert!(
             !channels
                 .iter()
