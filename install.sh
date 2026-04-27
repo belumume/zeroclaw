@@ -178,6 +178,7 @@ install_prebuilt() {
   if [ "$DRY_RUN" = true ]; then
     info "[dry-run] Would download $asset_url"
     info "[dry-run] Would install to $CARGO_HOME/bin/zeroclaw"
+    info "[dry-run] Would install web dashboard to \${XDG_DATA_HOME:-$PREFIX/.local/share}/zeroclaw/web/dist"
     return 0
   fi
 
@@ -216,6 +217,14 @@ install_prebuilt() {
   tar -xzf "$tmp_dir/$asset_name" -C "$tmp_dir"
   mkdir -p "$CARGO_HOME/bin"
   install -m 755 "$tmp_dir/zeroclaw" "$CARGO_HOME/bin/zeroclaw"
+
+  # Install web dashboard assets bundled in the release tarball
+  if [ -d "$tmp_dir/web/dist" ]; then
+    web_data_dir="${XDG_DATA_HOME:-$PREFIX/.local/share}/zeroclaw/web/dist"
+    mkdir -p "$web_data_dir"
+    cp -r "$tmp_dir/web/dist/." "$web_data_dir/"
+    info "Web dashboard installed to $web_data_dir"
+  fi
 
   rm -rf "$tmp_dir"
   trap - EXIT
