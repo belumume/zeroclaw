@@ -7353,6 +7353,14 @@ pub struct MatrixConfig {
     /// Seconds to wait for operator approval on `always_ask` tools before auto-denying.
     #[serde(default = "default_channel_approval_timeout_secs")]
     pub approval_timeout_secs: u64,
+    /// When true (default), replies are sent as thread replies. Starts a new thread from the
+    /// incoming message when none exists. When false, only continues existing threads.
+    #[serde(default = "default_true")]
+    pub reply_in_thread: bool,
+    /// When true (default), the bot sends acknowledgement reactions while processing
+    /// (👀 on receipt, ✅ on completion). Disable to keep rooms reaction-free.
+    #[serde(default = "default_true")]
+    pub ack_reactions: bool,
 }
 
 impl ChannelConfig for MatrixConfig {
@@ -12982,6 +12990,8 @@ default_temperature = 0.7
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         };
         let json = serde_json::to_string(&mc).unwrap();
         let parsed: MatrixConfig = serde_json::from_str(&json).unwrap();
@@ -13014,6 +13024,8 @@ default_temperature = 0.7
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         };
         let toml_str = toml::to_string(&mc).unwrap();
         let parsed: MatrixConfig = toml::from_str(&toml_str).unwrap();
@@ -13037,6 +13049,17 @@ allowed_rooms = ["!ops:matrix.org"]
         assert!(parsed.user_id.is_none());
         assert!(parsed.device_id.is_none());
         assert_eq!(parsed.allowed_rooms, vec!["!ops:matrix.org"]);
+    }
+
+    #[test]
+    async fn matrix_config_reply_in_thread_defaults_to_true() {
+        let toml = r#"
+homeserver = "https://matrix.org"
+access_token = "tok"
+allowed_users = ["@u:matrix.org"]
+"#;
+        let parsed: MatrixConfig = toml::from_str(toml).unwrap();
+        assert!(parsed.reply_in_thread);
     }
 
     #[test]
@@ -13123,6 +13146,8 @@ allowed_rooms = ["!ops:matrix.org"]
                 mention_only: false,
                 password: None,
                 approval_timeout_secs: 300,
+                reply_in_thread: true,
+                ack_reactions: true,
             }),
             signal: None,
             whatsapp: None,
@@ -17150,6 +17175,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         };
         let fields = mx.secret_fields();
         assert_eq!(fields.len(), 3);
@@ -17180,6 +17207,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         };
         let fields = mx.secret_fields();
         assert!(!fields[0].is_set);
@@ -17203,6 +17232,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         };
         mx.set_secret("channels.matrix.access-token", "new-token".into())
             .unwrap();
@@ -17227,6 +17258,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         };
         assert!(
             mx.set_secret("channels.matrix.nonexistent", "val".into())
@@ -17268,6 +17301,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         });
 
         let fields = config.secret_fields();
@@ -17295,6 +17330,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         });
 
         config
@@ -17322,6 +17359,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             recovery_key: None,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         });
         config
             .set_secret("channels.matrix.access-token", "sk-test".into())
@@ -17363,6 +17402,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         };
 
         // Encrypt
@@ -17396,6 +17437,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         };
 
         mx.encrypt_secrets(&store).unwrap();
@@ -17427,6 +17470,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         };
 
         mx.encrypt_secrets(&store).unwrap();
@@ -17453,6 +17498,8 @@ auto_approve = ["file_read", "file_write", "file_edit", "memory_recall", "memory
             mention_only: false,
             password: None,
             approval_timeout_secs: 300,
+            reply_in_thread: true,
+            ack_reactions: true,
         }
     }
 
