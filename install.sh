@@ -148,7 +148,7 @@ detect_target_triple() {
 # ── Pre-built binary install ──────────────────────────────────────
 
 install_prebuilt() {
-  local triple version asset_name asset_url sha256_url tmp_dir
+  local triple version asset_name asset_url sha256_url tmp_dir web_data_dir
   triple=$(detect_target_triple)
 
   if [ -z "$triple" ]; then
