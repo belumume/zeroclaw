@@ -865,6 +865,34 @@ mod tests {
     }
 
     #[test]
+    fn test_resolve_tavily_api_key_decrypts_encrypted_key() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let store = zeroclaw_config::secrets::SecretStore::new(tmp.path(), true);
+        let encrypted = store.encrypt("tvly-secret-key").unwrap();
+
+        let config_path = tmp.path().join("config.toml");
+        std::fs::write(
+            &config_path,
+            format!("[web_search]\ntavily_api_key = \"{}\"\n", encrypted),
+        )
+        .unwrap();
+
+        // Boot key is the encrypted blob -- should trigger reload + decrypt
+        let tool = WebSearchTool::new_with_config(
+            "tavily".to_string(),
+            None,
+            Some(encrypted),
+            None,
+            5,
+            15,
+            config_path,
+            true,
+        );
+        let key = tool.resolve_tavily_api_key().unwrap();
+        assert_eq!(key, "tvly-secret-key");
+    }
+
+    #[test]
     fn test_parse_searxng_results_empty() {
         let tool = WebSearchTool::new("searxng".to_string(), None, 5, 15);
         let json = serde_json::json!({"results": []});
