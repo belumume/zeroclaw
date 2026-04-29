@@ -161,13 +161,28 @@ If you want to use Pi GPIO peripherals from skills, enable the relevant feature 
 
 ## Containerized deployment (Podman recommended over Docker)
 
-If you want to isolate ZeroClaw and any agent stack you run alongside it, **Podman is the better fit on Pi than Docker** for three reasons:
+**Pis are memory-constrained, and that's the operating reality this section is written against.** The 2 GB Pi 4 is the low-bar test unit for this guide — if a setup doesn't leave headroom on a 2 GB box, it's not a setup we recommend. ZeroClaw itself runs in well under 5 MB RSS at runtime, but everything you stack alongside it (channel transports, browser-control, MCP servers, an adjacent agent or two, plus the OS) competes for the same fixed pool. Memory you don't spend on container infrastructure is memory ZeroClaw and its tools get to use.
 
-1. **Rootless by default.** Podman doesn't need a root daemon; containers run as your user. On an exposed edge device that matters more than on a developer laptop.
-2. **systemd-native via Quadlets.** Podman ships `.container` unit files that systemd manages directly — same lifecycle, logging, and dependency model as any other unit. No separate `docker.service` to babysit.
-3. **No daemon memory footprint.** On a Pi 4 (4 GB), the savings from skipping `dockerd`'s ~150 MB RSS is worth more than it would be on a workstation.
+Concrete budget on a 2 GB Pi 4 running Raspberry Pi OS Bookworm/Trixie headless:
 
-The trade-off: Podman's rootless network model uses slirp4netns (or pasta on newer versions), which is slower than the bridge that Docker's daemon sets up. For workloads that move a lot of HTTP traffic between containers on the same Pi, that's worth measuring. For ZeroClaw's typical "one or two long-running agent containers" pattern, the difference is negligible.
+| Component | Approx RSS |
+|---|---|
+| Kernel + base userspace + sshd | ~150-250 MB |
+| `dockerd` (idle, no containers) | ~150-200 MB |
+| ZeroClaw runtime (gateway only) | ~5 MB |
+| One agent container (e.g. ghcr.io/zeroclaw-labs/zeroclaw) | ~30-80 MB |
+| **Available with Docker** | ~1.3-1.5 GB |
+| **Available with Podman (no daemon)** | ~1.5-1.7 GB |
+
+The Podman delta is on the order of ~150-200 MB freed up — small in absolute terms, large as a percentage of what's left over after the OS gets its share. On a 2 GB unit that's the difference between comfortably running ZeroClaw + a heavy channel transport (Matrix with media, browser-automation skills) and OOM-killing under load.
+
+**Three reasons Podman is the better fit on Pi than Docker:**
+
+1. **Rootless by default → security headroom.** Podman doesn't need a root daemon; containers run as your user. On an exposed edge device that matters more than on a developer laptop.
+2. **systemd-native via Quadlets → operational simplicity.** Podman ships `.container` unit files that systemd manages directly — same lifecycle, logging, and dependency model as any other unit. No separate `docker.service` to babysit, no separate logging layer.
+3. **No daemon RSS → memory headroom.** Skipping `dockerd`'s persistent ~150-200 MB is the single biggest knob you can turn on a 2 GB Pi without sacrificing isolation.
+
+The trade-off: Podman's rootless network model uses slirp4netns (or pasta on newer versions), which is slower than the bridge that Docker's daemon sets up. For workloads that move a lot of HTTP traffic between containers on the same Pi, that's worth measuring. For ZeroClaw's typical "one or two long-running agent containers" pattern, the difference is negligible — and on memory-constrained hardware, the daemon-RSS savings dominate the calculation anyway.
 
 ### Quick install (Raspberry Pi OS Bookworm/Trixie)
 
