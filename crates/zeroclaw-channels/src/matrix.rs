@@ -474,6 +474,7 @@ mod client {
         collections::HashMap,
         path::{Path, PathBuf},
         sync::Arc,
+        time::Duration,
     };
 
     use anyhow::{Context as _, Result, anyhow, bail};
@@ -482,11 +483,28 @@ mod client {
         authentication::matrix::MatrixSession,
         ruma::{OwnedRoomId, RoomAliasId},
     };
+    use serde::Deserialize;
     use tokio::sync::RwLock;
     use tracing::{debug, info, warn};
 
     use super::session;
     use zeroclaw_config::schema::MatrixConfig;
+
+    const WHOAMI_ENDPOINT: &str = "_matrix/client/v3/account/whoami";
+    const WHOAMI_TIMEOUT: Duration = Duration::from_secs(30);
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    pub(super) struct AccessTokenIdentity {
+        pub user_id: String,
+        pub device_id: Option<String>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct WhoamiResponse {
+        user_id: String,
+        #[serde(default)]
+        device_id: Option<String>,
+    }
 
     pub(super) fn store_dir(state_dir: &Path) -> PathBuf {
         state_dir.join("store")
@@ -779,19 +797,10 @@ mod client {
     }
 
     async fn access_token_login(client: &Client, config: &MatrixConfig) -> Result<()> {
-        let user_id = config
-            .user_id
-            .clone()
-            .filter(|s| !s.is_empty())
-            .ok_or_else(|| {
-                anyhow!("matrix.user_id is required when using access_token-based login")
-            })?
-            .parse()
-            .context("parse matrix.user_id")?;
-        let device_id = config
+        let identity = resolve_access_token_identity(config).await?;
+        let user_id = identity.user_id.parse().context("parse matrix.user_id")?;
+        let device_id = identity
             .device_id
-            .clone()
-            .filter(|s| !s.is_empty())
             .unwrap_or_else(|| format!("ZEROCLAW_{}", uuid::Uuid::new_v4().simple()));
         let session = MatrixSession {
             meta: SessionMeta {
@@ -810,6 +819,107 @@ mod client {
             .context("attach matrix session via access_token")?;
         info!("matrix: logged in via access_token");
         Ok(())
+    }
+
+    fn non_empty_config_value(value: Option<&str>) -> Option<String> {
+        value
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(ToOwned::to_owned)
+    }
+
+    pub(super) async fn resolve_access_token_identity(
+        config: &MatrixConfig,
+    ) -> Result<AccessTokenIdentity> {
+        let configured_user_id = non_empty_config_value(config.user_id.as_deref());
+        let configured_device_id = non_empty_config_value(config.device_id.as_deref());
+
+        if let (Some(user_id), Some(device_id)) =
+            (configured_user_id.as_ref(), configured_device_id.as_ref())
+        {
+            return Ok(AccessTokenIdentity {
+                user_id: user_id.clone(),
+                device_id: Some(device_id.clone()),
+            });
+        }
+
+        let whoami = fetch_access_token_whoami(config).await?;
+
+        if let Some(ref configured) = configured_user_id
+            && configured != &whoami.user_id
+        {
+            bail!(
+                "matrix: configured channels.matrix.user-id ({configured}) does not match Matrix whoami user_id ({})",
+                whoami.user_id
+            );
+        }
+
+        if let (Some(configured), Some(actual)) = (&configured_device_id, &whoami.device_id)
+            && configured != actual
+        {
+            bail!(
+                "matrix: configured channels.matrix.device-id ({configured}) does not match Matrix whoami device_id ({actual})"
+            );
+        }
+
+        Ok(AccessTokenIdentity {
+            user_id: configured_user_id.unwrap_or(whoami.user_id),
+            device_id: configured_device_id.or(whoami.device_id),
+        })
+    }
+
+    async fn fetch_access_token_whoami(config: &MatrixConfig) -> Result<WhoamiResponse> {
+        let url = matrix_client_api_url(&config.homeserver, WHOAMI_ENDPOINT)?;
+        let response = reqwest::Client::builder()
+            .timeout(WHOAMI_TIMEOUT)
+            .build()
+            .context("matrix: build whoami HTTP client")?
+            .get(url)
+            .bearer_auth(&config.access_token)
+            .send()
+            .await
+            .context("matrix: whoami request failed")?;
+        let status = response.status();
+
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            let body = if body.chars().count() > 256 {
+                format!("{}...", body.chars().take(256).collect::<String>())
+            } else {
+                body
+            };
+            bail!("matrix: whoami request failed with HTTP {status}: {body}");
+        }
+
+        let mut whoami = response
+            .json::<WhoamiResponse>()
+            .await
+            .context("matrix: failed to parse whoami response")?;
+        whoami.user_id = whoami.user_id.trim().to_string();
+        if whoami.user_id.is_empty() {
+            bail!("matrix: whoami response did not include user_id");
+        }
+        whoami.device_id = whoami
+            .device_id
+            .map(|device_id| device_id.trim().to_string())
+            .filter(|device_id| !device_id.is_empty());
+
+        Ok(whoami)
+    }
+
+    fn matrix_client_api_url(homeserver: &str, endpoint_path: &str) -> Result<reqwest::Url> {
+        let mut url = reqwest::Url::parse(homeserver).context("parse matrix homeserver URL")?;
+        let base_path = url.path().trim_end_matches('/');
+        let endpoint_path = endpoint_path.trim_start_matches('/');
+        let full_path = if base_path.is_empty() || base_path == "/" {
+            format!("/{endpoint_path}")
+        } else {
+            format!("{base_path}/{endpoint_path}")
+        };
+        url.set_path(&full_path);
+        url.set_query(None);
+        url.set_fragment(None);
+        Ok(url)
     }
 
     fn session_blob_from(client: &Client) -> Option<session::SessionBlob> {
@@ -3136,9 +3246,17 @@ mod tests {
         //! Pure-logic tests for the auth-flow gating helpers — keeps
         //! corruption-recovery decisions verifiable without touching the SDK.
 
-        use super::super::client::{can_password_relogin, store_has_orphan_data};
+        use super::super::client::{
+            can_password_relogin, resolve_access_token_identity, store_has_orphan_data,
+        };
         use tempfile::TempDir;
+        use wiremock::{
+            Mock, MockServer, ResponseTemplate,
+            matchers::{header, method, path},
+        };
         use zeroclaw_config::schema::MatrixConfig;
+
+        const WHOAMI_PATH: &str = "/_matrix/client/v3/account/whoami";
 
         fn cfg(password: Option<&str>, user_id: Option<&str>) -> MatrixConfig {
             MatrixConfig {
@@ -3159,6 +3277,14 @@ mod tests {
                 approval_timeout_secs: 300,
                 reply_in_thread: true,
                 ack_reactions: true,
+            }
+        }
+
+        fn access_token_cfg(homeserver: String) -> MatrixConfig {
+            MatrixConfig {
+                homeserver,
+                access_token: "secret-token".into(),
+                ..cfg(None, None)
             }
         }
 
@@ -3197,6 +3323,87 @@ mod tests {
             std::fs::create_dir_all(&store).unwrap();
             std::fs::write(store.join("matrix-sdk-crypto.sqlite3"), b"x").unwrap();
             assert!(store_has_orphan_data(dir.path()));
+        }
+
+        #[tokio::test]
+        async fn access_token_identity_fetches_missing_user_and_device_from_whoami() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path(WHOAMI_PATH))
+                .and(header("authorization", "Bearer secret-token"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "user_id": "@bot:example.org",
+                    "device_id": "DEVICE42"
+                })))
+                .mount(&server)
+                .await;
+
+            let identity = resolve_access_token_identity(&access_token_cfg(server.uri()))
+                .await
+                .unwrap();
+
+            assert_eq!(identity.user_id, "@bot:example.org");
+            assert_eq!(identity.device_id.as_deref(), Some("DEVICE42"));
+        }
+
+        #[tokio::test]
+        async fn access_token_identity_uses_complete_config_without_whoami() {
+            let mut config = access_token_cfg("http://127.0.0.1:9".into());
+            config.user_id = Some(" @bot:example.org ".into());
+            config.device_id = Some(" DEVICE42 ".into());
+
+            let identity = resolve_access_token_identity(&config).await.unwrap();
+
+            assert_eq!(identity.user_id, "@bot:example.org");
+            assert_eq!(identity.device_id.as_deref(), Some("DEVICE42"));
+        }
+
+        #[tokio::test]
+        async fn access_token_identity_rejects_configured_user_mismatch() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path(WHOAMI_PATH))
+                .and(header("authorization", "Bearer secret-token"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "user_id": "@actual:example.org",
+                    "device_id": "DEVICE42"
+                })))
+                .mount(&server)
+                .await;
+            let mut config = access_token_cfg(server.uri());
+            config.user_id = Some("@configured:example.org".into());
+
+            let err = resolve_access_token_identity(&config).await.unwrap_err();
+
+            assert!(
+                err.to_string()
+                    .contains("does not match Matrix whoami user_id"),
+                "{err}"
+            );
+        }
+
+        #[tokio::test]
+        async fn access_token_identity_rejects_configured_device_mismatch() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path(WHOAMI_PATH))
+                .and(header("authorization", "Bearer secret-token"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "user_id": "@bot:example.org",
+                    "device_id": "ACTUAL_DEVICE"
+                })))
+                .mount(&server)
+                .await;
+            let mut config = access_token_cfg(server.uri());
+            config.device_id = Some("CONFIGURED_DEVICE".into());
+
+            let err = resolve_access_token_identity(&config).await.unwrap_err();
+
+            assert!(
+                err.to_string()
+                    .contains("does not match Matrix whoami device_id"),
+                "{err}"
+            );
         }
     }
 
