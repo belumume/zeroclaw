@@ -281,10 +281,21 @@ impl WebSearchTool {
     }
 
     async fn search_tavily(&self, query: &str) -> anyhow::Result<String> {
+        self.search_tavily_at("https://api.tavily.com/search", query)
+            .await
+    }
+
+    /// Inner Tavily request implementation, parameterized on the endpoint URL
+    /// so request-shape tests can target a local mock server. Production calls
+    /// always go through [`Self::search_tavily`].
+    async fn search_tavily_at(&self, url: &str, query: &str) -> anyhow::Result<String> {
         let api_key = self.resolve_tavily_api_key()?;
 
+        // Tavily authenticates via `Authorization: Bearer <key>` per
+        // https://docs.tavily.com/documentation/api-reference/endpoint/search
+        // (the API also tolerates `api_key` in the body for legacy clients,
+        // but bearer-header is the documented contract).
         let body = serde_json::json!({
-            "api_key": api_key,
             "query": query,
             "max_results": self.max_results,
             "search_depth": "basic",
@@ -298,8 +309,8 @@ impl WebSearchTool {
         let client = builder.build()?;
 
         let response = client
-            .post("https://api.tavily.com/search")
-            .header("Content-Type", "application/json")
+            .post(url)
+            .bearer_auth(&api_key)
             .json(&body)
             .send()
             .await?;
@@ -890,6 +901,74 @@ mod tests {
         );
         let key = tool.resolve_tavily_api_key().unwrap();
         assert_eq!(key, "tvly-secret-key");
+    }
+
+    /// Regression: Tavily auth must travel as `Authorization: Bearer <key>`
+    /// (the documented contract per
+    /// https://docs.tavily.com/documentation/api-reference/endpoint/search),
+    /// NOT as an `api_key` field in the JSON body. The previous shape worked
+    /// against the live service for legacy reasons, but the docs identify
+    /// bearer-header as the canonical method.
+    #[tokio::test]
+    async fn test_tavily_request_uses_bearer_auth_header_not_body_field() {
+        use wiremock::matchers::{header, method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+
+        Mock::given(method("POST"))
+            .and(path("/search"))
+            .and(header("authorization", "Bearer tvly-test-key"))
+            .and(header("content-type", "application/json"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "query": "what is rust",
+                "results": []
+            })))
+            .mount(&server)
+            .await;
+
+        let tool = WebSearchTool::new_with_config(
+            "tavily".to_string(),
+            None,
+            Some("tvly-test-key".to_string()),
+            None,
+            5,
+            15,
+            PathBuf::new(),
+            false,
+        );
+
+        let result = tool
+            .search_tavily_at(&format!("{}/search", server.uri()), "what is rust")
+            .await
+            .expect("request should succeed against the mock");
+        assert!(
+            result.contains("No results found"),
+            "parser should report empty results: {result}"
+        );
+
+        let recorded = server
+            .received_requests()
+            .await
+            .expect("wiremock should have captured the request");
+        assert_eq!(recorded.len(), 1, "expected exactly one POST /search");
+
+        let body: serde_json::Value =
+            serde_json::from_slice(&recorded[0].body).expect("body should be JSON");
+
+        // Auth must NOT leak into the body — bearer header is the only auth channel.
+        assert!(
+            body.get("api_key").is_none(),
+            "api_key must not appear in the request body; got: {body}"
+        );
+
+        // The documented body fields must still be present so the search
+        // contract continues to match the upstream API spec.
+        assert_eq!(body["query"], "what is rust");
+        assert_eq!(body["search_depth"], "basic");
+        assert_eq!(body["max_results"], 5);
+        assert_eq!(body["include_answer"], false);
+        assert_eq!(body["include_raw_content"], false);
     }
 
     #[test]
