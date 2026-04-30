@@ -31,7 +31,7 @@ Fastest path. No compiler, no swap, no OOM risk.
 curl -LsSf https://raw.githubusercontent.com/zeroclaw-labs/zeroclaw/master/install.sh | sh
 ```
 
-The script auto-detects your architecture (`aarch64` or `armv7`) and downloads the matching release binary into `~/.local/bin/`.
+The script auto-detects your architecture (`aarch64` or `armv7`) and installs the matching release binary into `$CARGO_HOME/bin/zeroclaw` (defaulting to `~/.cargo/bin/zeroclaw`). Make sure that directory is on your `PATH`.
 
 ### Manual download
 
@@ -68,17 +68,20 @@ If you already have a beefier machine, cross-compiling is faster than building o
 # Install the cross-compilation target
 rustup target add aarch64-unknown-linux-gnu
 
-# Install a cross-linker
-brew install aarch64-elf-gcc
+# Install a Linux GNU cross-toolchain — same pattern used by the Arduino Uno Q guide
+brew tap messense/macos-cross-toolchains
+brew install aarch64-unknown-linux-gnu
 
 # Build
-CC_aarch64_unknown_linux_gnu=aarch64-elf-gcc \
-CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-elf-gcc \
+CC_aarch64_unknown_linux_gnu=aarch64-unknown-linux-gnu-gcc \
+CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-unknown-linux-gnu-gcc \
 cargo build --release --target aarch64-unknown-linux-gnu
 
 # Copy to your Pi
 scp target/aarch64-unknown-linux-gnu/release/zeroclaw pi@raspberrypi:~/
 ```
+
+> **Note:** earlier drafts of this guide suggested `aarch64-elf-gcc` from Homebrew. That toolchain produces bare-metal ELF binaries and links against newlib, not glibc — it will not produce a working Raspberry Pi OS binary. Use the `messense/macos-cross-toolchains` tap above (a real Linux GNU/glibc toolchain), or fall back to Option 3 (build on the Pi).
 
 ### From Linux x86_64
 
