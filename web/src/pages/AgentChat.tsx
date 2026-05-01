@@ -320,8 +320,10 @@ export default function AgentChat() {
     }
   };
 
+  const isComposingRef = useRef(false);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !isComposingRef.current) {
       e.preventDefault();
       handleSend();
     }
@@ -403,7 +405,7 @@ export default function AgentChat() {
     <div className="flex flex-col h-[calc(100vh-3.5rem)]">
       {/* Connection status bar */}
       {error && (
-        <div className="px-4 py-2 border-b flex items-center gap-2 text-sm animate-fade-in" style={{ background: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.2)', color: '#f87171', }}>
+        <div className="px-4 py-2 border-b flex items-center gap-2 text-sm animate-fade-in" style={{ background: 'var(--color-status-error-alpha-08)', borderColor: 'var(--color-status-error-alpha-20)', color: 'var(--color-status-error)' }}>
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>
@@ -499,6 +501,8 @@ export default function AgentChat() {
             value={input}
             onChange={handleTextareaChange}
             onKeyDown={handleKeyDown}
+            onCompositionStart={() => { isComposingRef.current = true; }}
+            onCompositionEnd={() => { isComposingRef.current = false; }}
             placeholder={!connected
               ? t('agent.connecting')
               : typing
