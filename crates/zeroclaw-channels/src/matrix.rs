@@ -492,6 +492,8 @@ mod client {
 
     const WHOAMI_ENDPOINT: &str = "_matrix/client/v3/account/whoami";
     const WHOAMI_TIMEOUT: Duration = Duration::from_secs(30);
+    const WHOAMI_ERROR_BODY_PREVIEW_BYTES: usize = 4096;
+    const WHOAMI_ERROR_BODY_DISPLAY_CHARS: usize = 256;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     pub(super) struct AccessTokenIdentity {
@@ -504,6 +506,14 @@ mod client {
         user_id: String,
         #[serde(default)]
         device_id: Option<String>,
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct MatrixErrorResponse {
+        #[serde(default)]
+        errcode: Option<String>,
+        #[serde(default)]
+        error: Option<String>,
     }
 
     pub(super) fn store_dir(state_dir: &Path) -> PathBuf {
@@ -801,7 +811,7 @@ mod client {
         let user_id = identity.user_id.parse().context("parse matrix.user_id")?;
         let device_id = identity
             .device_id
-            .unwrap_or_else(|| format!("ZEROCLAW_{}", uuid::Uuid::new_v4().simple()));
+            .ok_or_else(|| anyhow!("matrix: access-token login requires a Matrix device_id"))?;
         let session = MatrixSession {
             meta: SessionMeta {
                 user_id,
@@ -862,6 +872,12 @@ mod client {
             );
         }
 
+        if configured_device_id.is_none() && whoami.device_id.is_none() {
+            bail!(
+                "matrix: whoami response did not include device_id; configure channels.matrix.device-id for access-token login"
+            );
+        }
+
         Ok(AccessTokenIdentity {
             user_id: configured_user_id.unwrap_or(whoami.user_id),
             device_id: configured_device_id.or(whoami.device_id),
@@ -882,12 +898,7 @@ mod client {
         let status = response.status();
 
         if !status.is_success() {
-            let body = response.text().await.unwrap_or_default();
-            let body = if body.chars().count() > 256 {
-                format!("{}...", body.chars().take(256).collect::<String>())
-            } else {
-                body
-            };
+            let body = read_whoami_error_body_preview(response).await;
             bail!("matrix: whoami request failed with HTTP {status}: {body}");
         }
 
@@ -905,6 +916,75 @@ mod client {
             .filter(|device_id| !device_id.is_empty());
 
         Ok(whoami)
+    }
+
+    async fn read_whoami_error_body_preview(mut response: reqwest::Response) -> String {
+        let mut preview = Vec::new();
+        let mut truncated = false;
+
+        while preview.len() < WHOAMI_ERROR_BODY_PREVIEW_BYTES {
+            let chunk = match response.chunk().await {
+                Ok(Some(chunk)) => chunk,
+                Ok(None) => break,
+                Err(err) => return format!("failed to read response body: {err}"),
+            };
+            let remaining = WHOAMI_ERROR_BODY_PREVIEW_BYTES - preview.len();
+            if chunk.len() > remaining {
+                preview.extend_from_slice(&chunk[..remaining]);
+                truncated = true;
+                break;
+            }
+            preview.extend_from_slice(&chunk);
+        }
+
+        if preview.len() == WHOAMI_ERROR_BODY_PREVIEW_BYTES {
+            truncated = true;
+        }
+
+        format_whoami_error_body_preview(&preview, truncated)
+    }
+
+    fn format_whoami_error_body_preview(preview: &[u8], truncated: bool) -> String {
+        if let Ok(error) = serde_json::from_slice::<MatrixErrorResponse>(preview) {
+            let errcode = error
+                .errcode
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty());
+            let message = error
+                .error
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty());
+            let formatted = match (errcode, message) {
+                (Some(errcode), Some(message)) => Some(format!("{errcode}: {message}")),
+                (Some(errcode), None) => Some(errcode.to_string()),
+                (None, Some(message)) => Some(message.to_string()),
+                (None, None) => None,
+            };
+            if let Some(formatted) = formatted {
+                return truncate_with_ellipsis(&formatted, WHOAMI_ERROR_BODY_DISPLAY_CHARS);
+            }
+        }
+
+        let body = String::from_utf8_lossy(preview).trim().to_string();
+        if body.is_empty() {
+            return "<empty response body>".to_string();
+        }
+        let mut body = truncate_with_ellipsis(&body, WHOAMI_ERROR_BODY_DISPLAY_CHARS);
+        if truncated {
+            body.push_str(" [truncated]");
+        }
+        body
+    }
+
+    fn truncate_with_ellipsis(value: &str, max_chars: usize) -> String {
+        let mut chars = value.chars();
+        let mut truncated: String = chars.by_ref().take(max_chars).collect();
+        if chars.next().is_some() {
+            truncated.push_str("...");
+        }
+        truncated
     }
 
     fn matrix_client_api_url(homeserver: &str, endpoint_path: &str) -> Result<reqwest::Url> {
@@ -3347,6 +3427,29 @@ mod tests {
         }
 
         #[tokio::test]
+        async fn access_token_identity_rejects_whoami_without_device_when_not_configured() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path(WHOAMI_PATH))
+                .and(header("authorization", "Bearer secret-token"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "user_id": "@bot:example.org"
+                })))
+                .mount(&server)
+                .await;
+
+            let err = resolve_access_token_identity(&access_token_cfg(server.uri()))
+                .await
+                .unwrap_err();
+
+            assert!(
+                err.to_string()
+                    .contains("whoami response did not include device_id"),
+                "{err}"
+            );
+        }
+
+        #[tokio::test]
         async fn access_token_identity_uses_complete_config_without_whoami() {
             let mut config = access_token_cfg("http://127.0.0.1:9".into());
             config.user_id = Some(" @bot:example.org ".into());
@@ -3380,6 +3483,30 @@ mod tests {
                     .contains("does not match Matrix whoami user_id"),
                 "{err}"
             );
+        }
+
+        #[tokio::test]
+        async fn access_token_identity_reports_matrix_error_envelope_without_raw_body() {
+            let server = MockServer::start().await;
+            Mock::given(method("GET"))
+                .and(path(WHOAMI_PATH))
+                .and(header("authorization", "Bearer secret-token"))
+                .respond_with(ResponseTemplate::new(403).set_body_json(serde_json::json!({
+                    "errcode": "M_FORBIDDEN",
+                    "error": "token rejected",
+                    "access_token": "secret-token"
+                })))
+                .mount(&server)
+                .await;
+
+            let err = resolve_access_token_identity(&access_token_cfg(server.uri()))
+                .await
+                .unwrap_err();
+            let message = err.to_string();
+
+            assert!(message.contains("M_FORBIDDEN: token rejected"), "{message}");
+            assert!(!message.contains("access_token"), "{message}");
+            assert!(!message.contains("secret-token"), "{message}");
         }
 
         #[tokio::test]
