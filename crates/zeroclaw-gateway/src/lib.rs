@@ -1485,31 +1485,85 @@ async fn persist_pairing_tokens(config: Arc<Mutex<Config>>, pairing: &PairingGua
     Ok(())
 }
 
+/// Result of a gateway chat turn. Carries the response text plus per-turn
+/// token / cost totals captured from the cost-tracking scope (when present)
+/// so callers can populate observer-event annotations without racing
+/// concurrent webhook traffic that shares the same `CostTracker`.
+struct GatewayChatOutcome {
+    response: String,
+    input_tokens: Option<u64>,
+    output_tokens: Option<u64>,
+    cost_usd: Option<f64>,
+}
+
 /// Full-featured chat with tools for channel and webhook handlers.
 async fn run_gateway_chat_with_tools(
     state: &AppState,
     message: &str,
     session_id: Option<&str>,
-) -> anyhow::Result<String> {
+) -> anyhow::Result<GatewayChatOutcome> {
     // Tests exercise webhook infrastructure (idempotency, auth, autosave)
     // through handle_webhook, so dispatch to the mock provider directly
-    // instead of bootstrapping the full agent runtime.
+    // instead of bootstrapping the full agent runtime. The mock path
+    // doesn't go through the cost-tracking scope, so usage stays None.
     #[cfg(test)]
     {
         let _ = session_id;
-        return state
+        let response = state
             .provider
             .chat_with_system(None, message, &state.model, Some(state.temperature))
-            .await;
+            .await?;
+        Ok(GatewayChatOutcome {
+            response,
+            input_tokens: None,
+            output_tokens: None,
+            cost_usd: None,
+        })
     }
 
     #[cfg(not(test))]
     {
         let config = state.config.lock().clone();
-        Box::pin(zeroclaw_runtime::agent::process_message(
-            config, message, session_id,
-        ))
-        .await
+        // Scope the cost tracking context so per-LLM-call usage flows into the
+        // gateway's cost tracker and costs.jsonl. Without this scope, the
+        // tracker exists on AppState but never receives any records from the
+        // runtime tool loop. The context's per-scope `turn_usage` accumulator
+        // also lets us read out this turn's tokens / cost after the scope
+        // exits without racing concurrent webhook traffic that shares the
+        // same tracker.
+        let cost_tracking_context = state.cost_tracker.as_ref().map(|tracker| {
+            zeroclaw_runtime::agent::loop_::ToolLoopCostTrackingContext::new(
+                tracker.clone(),
+                std::sync::Arc::new(state.config.lock().cost.prices.clone()),
+            )
+        });
+        let captured_usage = cost_tracking_context
+            .as_ref()
+            .map(|ctx| ctx.turn_usage.clone());
+        let response = Box::pin(
+            zeroclaw_runtime::agent::loop_::TOOL_LOOP_COST_TRACKING_CONTEXT.scope(
+                cost_tracking_context,
+                zeroclaw_runtime::agent::process_message(config, message, session_id),
+            ),
+        )
+        .await?;
+        let usage = captured_usage
+            .map(|cell| *cell.lock())
+            .filter(|u| u.input_tokens > 0 || u.output_tokens > 0);
+        let (input_tokens, output_tokens, cost_usd) = match usage {
+            Some(u) => (
+                Some(u.input_tokens),
+                Some(u.output_tokens),
+                Some(u.cost_usd),
+            ),
+            None => (None, None, None),
+        };
+        Ok(GatewayChatOutcome {
+            response,
+            input_tokens,
+            output_tokens,
+            cost_usd,
+        })
     }
 }
 
@@ -1650,8 +1704,22 @@ async fn handle_webhook(
     );
 
     match run_gateway_chat_with_tools(&state, message, session_id.as_deref()).await {
-        Ok(response) => {
+        Ok(GatewayChatOutcome {
+            response,
+            input_tokens,
+            output_tokens,
+            cost_usd,
+        }) => {
             let duration = started_at.elapsed();
+            // Per-turn token / cost annotation captured from the cost-tracking
+            // scope inside `run_gateway_chat_with_tools` (None outside of test
+            // / when no LLM call recorded). Cost is also persisted to
+            // /api/cost and costs.jsonl via the same scope.
+            let tokens_used = input_tokens
+                .zip(output_tokens)
+                .map(|(i, o)| i + o)
+                .or(input_tokens)
+                .or(output_tokens);
             state.observer.record_event(
                 &zeroclaw_runtime::observability::ObserverEvent::LlmResponse {
                     provider: provider_label.clone(),
@@ -1671,8 +1739,8 @@ async fn handle_webhook(
                     provider: provider_label,
                     model: model_label,
                     duration,
-                    tokens_used: None,
-                    cost_usd: None,
+                    tokens_used,
+                    cost_usd,
                 },
             );
 
@@ -1877,7 +1945,7 @@ async fn handle_whatsapp_message(
         ))
         .await
         {
-            Ok(response) => {
+            Ok(GatewayChatOutcome { response, .. }) => {
                 // Send reply via WhatsApp
                 if let Err(e) = wa
                     .send(&SendMessage::new(response, &msg.reply_target))
@@ -1997,7 +2065,7 @@ async fn handle_linq_webhook(
         ))
         .await
         {
-            Ok(response) => {
+            Ok(GatewayChatOutcome { response, .. }) => {
                 // Send reply via Linq
                 if let Err(e) = linq
                     .send(&SendMessage::new(response, &msg.reply_target))
@@ -2112,7 +2180,7 @@ async fn handle_wati_webhook(State(state): State<AppState>, body: Bytes) -> impl
         ))
         .await
         {
-            Ok(response) => {
+            Ok(GatewayChatOutcome { response, .. }) => {
                 // Send reply via WATI
                 if let Err(e) = wati
                     .send(&SendMessage::new(response, &msg.reply_target))
@@ -2228,7 +2296,7 @@ async fn handle_nextcloud_talk_webhook(
         ))
         .await
         {
-            Ok(response) => {
+            Ok(GatewayChatOutcome { response, .. }) => {
                 if let Err(e) = nextcloud_talk
                     .send(&SendMessage::new(response, &msg.reply_target))
                     .await
