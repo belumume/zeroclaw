@@ -105,48 +105,27 @@ workflow only runs on `workflow_dispatch`, not on `push`).
 
 ### One-time setup
 
-Install `act` via any of the methods documented at
-[nektosact.com/installation](https://nektosact.com/installation/index.html).
-Common paths:
+`act` runs the workflows. The cleanest install path is the GitHub CLI
+extension, because it inherits your `gh` authentication and exposes a
+real `GITHUB_TOKEN` to every workflow run:
 
-```bash
-# Bash script (Linux / macOS)
-curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
+1. Install the GitHub CLI from <https://cli.github.com> (Linux, macOS,
+   Windows). Authenticate once: `gh auth login`.
+2. Install the `act` extension:
 
-# macOS (Homebrew)
-brew install act
+   ```bash
+   gh extension install nektos/gh-act
+   ```
 
-# Windows (winget or Chocolatey)
-winget install nektos.act
-choco install act-cli
+3. Install Docker Engine or Docker Desktop from
+   <https://docs.docker.com/engine/install/>. On Linux, add yourself to
+   the `docker` group so you don't need `sudo`. `act` also works with
+   Podman and Colima — see the
+   [act runners documentation](https://nektosact.com/usage/runners.html).
 
-# As a gh extension
-gh extension install https://github.com/nektos/gh-act
-```
-
-Or download a static binary directly from
-[github.com/nektos/act/releases](https://github.com/nektos/act/releases) and
-drop it on your `PATH`.
-
-`act` requires a Docker-compatible container runtime. Install Docker Engine
-or Docker Desktop using the official instructions at
-[docs.docker.com/engine/install](https://docs.docker.com/engine/install/),
-then ensure your user can reach the daemon without `sudo` (typically by
-adding yourself to the `docker` group and re-logging in). `act` also
-supports Podman and Colima as alternatives — see the act runners
-documentation for configuration.
-
-The repository ships a pre-configured `.actrc` at the root that pins the
-Linux runner image to `catthehacker/ubuntu:act-latest`, forces amd64
-architecture, and references a `.secrets` file. Create the secrets file
-once (it is gitignored, never committed):
-
-```bash
-touch .secrets
-```
-
-Add provider-specific secrets only if you are testing a workflow that
-actually uses them.
+That's the whole setup. The repository's `.actrc` and
+`scripts/dev/act-local.sh` handle everything else (runner image, secrets
+file, artifact server, action SHA pre-fetching).
 
 ### Per-release dry-run
 
@@ -157,42 +136,46 @@ git fetch upstream
 git checkout upstream/master
 ```
 
-List the workflows so you can pick the right job:
+List what's runnable across every workflow file:
 
 ```bash
-act -W .github/workflows/release-stable-manual.yml -l
+./scripts/dev/act-local.sh --list
 ```
 
-Run the build-shaped jobs that exercise codegen and compilation. The first
-run pulls the runner image (~1.5 GB) and primes the Rust cache; subsequent
-runs are much faster.
+Run a specific job, pick interactively, or run everything that's
+act-runnable:
 
 ```bash
-# Builds the web dashboard end-to-end (gen-api → tsc → vite).
-act -j web -W .github/workflows/release-stable-manual.yml
-
-# Cross-platform binary builds (slowest job; consider running only one
-# matrix entry locally if you want to validate compile shape without
-# burning an hour on every target).
-act -j build -W .github/workflows/release-stable-manual.yml
+./scripts/dev/act-local.sh release-stable-manual:web   # one job
+./scripts/dev/act-local.sh                              # interactive picker
+./scripts/dev/act-local.sh --all                        # every act-runnable job
 ```
 
-What you are looking for: the build steps complete successfully. Two
-classes of failure are *expected* under `act` and do not indicate a real
-problem:
+The first run pulls the runner image (~1.5 GB) and primes the Rust build
+cache via `Swatinem/rust-cache`; subsequent runs are much faster. The
+script auto-creates the gitignored `.secrets` file, pre-fetches every
+pinned action SHA into `~/.cache/act/` (act's shallow clone can't
+resolve arbitrary commits otherwise), threads `GITHUB_TOKEN` from your
+`gh` auth into the run, and sets `--artifact-server-path` so
+`actions/upload-artifact` and `actions/download-artifact` work between
+jobs. All of that is plain `act` underneath — the script just removes
+the flag soup.
 
-- `actions/upload-artifact@v4` failing with
-  `Unable to get the ACTIONS_RUNTIME_TOKEN env variable`. `act` does not
-  implement GitHub's runtime artifact API; uploads only work on real CI.
-- Jobs that depend on a release tag, a GitHub-issued OIDC token, or an
-  environment secret you have not put in `.secrets`. Skip these with
-  `act -j <other-job>` or accept that they will not run locally.
+### What's expected to fail under `act` (and is fine)
 
-Anything else — a `tsc` error, a missing file, a Rust compile failure, a
-`cargo` lockfile mismatch — is a real defect. Do not click **Run workflow**
-on the GitHub Actions form until those are fixed and merged. If a fix is
-required, it goes through the standard PR flow on a branch off master, just
-like any other CI fix.
+`act` cannot simulate a few GitHub-only surfaces. These failures are
+not real defects:
+
+- Jobs that depend on a real release tag (`publish` creating a GitHub
+  Release).
+- Environment-gated jobs (`crates-io`, `docker`, `publish`) — the
+  approval UI doesn't exist locally.
+- OIDC-based federated identity tokens.
+
+Everything else — a `tsc` error, a missing file, a Rust compile
+failure, a `cargo` lockfile mismatch — is a real defect. Do not click
+**Run workflow** on the GitHub Actions form until those are fixed via a
+standard PR off master.
 
 ---
 
