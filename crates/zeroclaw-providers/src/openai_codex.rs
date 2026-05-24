@@ -1346,6 +1346,7 @@ impl ModelProvider for OpenAiCodexModelProvider {
             native_tool_calling: true,
             vision: true,
             prompt_caching: false,
+            extended_thinking: false,
         }
     }
 
@@ -1689,6 +1690,7 @@ mod tests {
                 ProviderChatRequest {
                     messages: &messages,
                     tools: None,
+                    thinking: None,
                 },
                 "gpt-5-codex",
                 None,
@@ -1725,6 +1727,7 @@ mod tests {
                 ProviderChatRequest {
                     messages: &messages,
                     tools: None,
+                    thinking: None,
                 },
                 "gpt-5-codex",
                 None,
@@ -1757,6 +1760,7 @@ mod tests {
                 ProviderChatRequest {
                     messages: &messages,
                     tools: None,
+                    thinking: None,
                 },
                 "gpt-5-codex",
                 None,
@@ -1789,6 +1793,7 @@ mod tests {
                 ProviderChatRequest {
                     messages: &messages,
                     tools: None,
+                    thinking: None,
                 },
                 "gpt-5-codex",
                 None,
