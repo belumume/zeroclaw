@@ -632,15 +632,7 @@ pub async fn run_gateway(
 
     let (mut tools_registry_raw, delegate_handle_gw) = match (&agent_alias_opt, agent_setup) {
         (Some(agent_alias), Some((risk_profile, security))) => {
-            let (
-                tools_registry_raw,
-                delegate_handle_gw,
-                ask_user_handle_gw,
-                reaction_handle_gw,
-                poll_handle_gw,
-                escalate_handle_gw,
-                channel_send_handle_gw,
-            ) = tools::all_tools_with_runtime(
+            let all_tools_result = tools::all_tools_with_runtime(
                 Arc::new(config.clone()),
                 &security,
                 &risk_profile,
@@ -666,14 +658,14 @@ pub async fn run_gateway(
             // orchestrator::start_channels).
             // reaction_handle_gw is PerToolChannelHandle (not Option);
             // register_channels_for_tools expects &Option for all handles.
-            let reaction_handle_gw_opt = Some(reaction_handle_gw);
+            let reaction_handle_gw_opt = Some(all_tools_result.reaction_handle.clone());
             let channel_names = zeroclaw_channels::orchestrator::register_channels_for_tools(
                 &config,
-                &ask_user_handle_gw,
+                &all_tools_result.ask_user_handle,
                 &reaction_handle_gw_opt,
-                &poll_handle_gw,
-                &escalate_handle_gw,
-                &channel_send_handle_gw,
+                &all_tools_result.poll_handle,
+                &all_tools_result.escalate_handle,
+                &all_tools_result.channel_send_handle,
             );
             if !channel_names.is_empty() {
                 ::zeroclaw_log::record!(
@@ -686,7 +678,7 @@ pub async fn run_gateway(
                     ),
                 );
             }
-            (tools_registry_raw, delegate_handle_gw)
+            (all_tools_result.tools, all_tools_result.delegate_handle)
         }
         (Some(_), None) => {
             // Agent existed but its config failed to resolve. Warned

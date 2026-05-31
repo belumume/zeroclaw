@@ -138,7 +138,7 @@ pub use security_ops::SecurityOpsTool;
 pub use send_message_to_peer::SendMessageToPeerTool;
 pub use shell::ShellTool;
 pub use skill_http::SkillHttpTool;
-pub use skill_tool::SkillShellTool;
+pub use skill_tool::{SkillBuiltinTool, SkillShellTool};
 pub use sop_advance::SopAdvanceTool;
 pub use sop_approve::SopApproveTool;
 pub use sop_execute::SopExecuteTool;
@@ -282,12 +282,26 @@ pub fn register_skill_tools(
     skills: &[crate::skills::Skill],
     security: Arc<SecurityPolicy>,
 ) {
+    register_skill_tools_with_context(tools_registry, skills, security, &[]);
+}
+
+/// Register skill-defined tools with full context for builtin kinds.
+///
+/// `unfiltered_registry` provides the pre-policy tool list for `kind = "builtin"`
+/// delegation.
+pub fn register_skill_tools_with_context(
+    tools_registry: &mut Vec<Box<dyn Tool>>,
+    skills: &[crate::skills::Skill],
+    security: Arc<SecurityPolicy>,
+    unfiltered_registry: &[Arc<dyn Tool>],
+) {
     if skills.is_empty() {
         return;
     }
 
     let before = tools_registry.len();
-    let skill_tools = crate::skills::skills_to_tools(skills, security);
+    let skill_tools =
+        crate::skills::skills_to_tools_with_context(skills, security, unfiltered_registry);
     let existing_names: std::collections::HashSet<String> = tools_registry
         .iter()
         .map(|t| t.name().to_string())
@@ -330,6 +344,29 @@ pub fn register_skill_tools(
     );
 }
 
+/// Build resolution-only MCP tool wrappers for skill MCP elevation
+/// (`kind = "mcp"`).
+///
+/// These wrappers are **not** added to the model-visible tool registry — they
+/// exist solely so a skill MCP elevation can resolve its `target`
+/// (`{server}__{tool}`, e.g. `images__generate`) by name at registration time
+/// and delegate to it. Cheap: MCP tool definitions are cached at connect time,
+/// so this performs no network I/O. Returned alongside the built-in
+/// `unfiltered_tool_arcs` to form the skill resolution registry.
+pub async fn collect_mcp_elevation_arcs(registry: &Arc<McpRegistry>) -> Vec<Arc<dyn Tool>> {
+    let mut arcs: Vec<Arc<dyn Tool>> = Vec::new();
+    for name in registry.tool_names() {
+        if let Some(def) = registry.get_tool_def(&name).await {
+            arcs.push(Arc::new(McpToolWrapper::new(
+                name,
+                def,
+                Arc::clone(registry),
+            )));
+        }
+    }
+    arcs
+}
+
 /// Always-on built-in tools that surface in the integrations panel as
 /// `(display_name, description)` pairs. The integrations registry consumes
 /// this verbatim — adding a new always-on built-in is one row here, no
@@ -345,6 +382,24 @@ pub const BUILTIN_TOOL_INTEGRATIONS: &[(&str, &str)] = &[
         "Spawn an ephemeral SubAgent that inherits this agent's identity",
     ),
 ];
+
+/// Bundled return values from tool registry construction.
+///
+/// Named struct to avoid an ever-growing positional tuple that's painful
+/// to destructure across many callers.
+#[allow(clippy::type_complexity)]
+pub struct AllToolsResult {
+    pub tools: Vec<Box<dyn Tool>>,
+    pub delegate_handle: Option<DelegateParentToolsHandle>,
+    pub ask_user_handle: Option<PerToolChannelHandle>,
+    pub reaction_handle: PerToolChannelHandle,
+    pub poll_handle: Option<PerToolChannelHandle>,
+    pub escalate_handle: Option<PerToolChannelHandle>,
+    pub channel_send_handle: Option<PerToolChannelHandle>,
+    /// Pre-boxed Arcs of every tool (before policy filter). Used by
+    /// skill-scoped builtin elevation to resolve targets at registration.
+    pub unfiltered_tool_arcs: Vec<Arc<dyn Tool>>,
+}
 
 /// Create full tool registry including memory tools and optional Composio
 #[allow(
@@ -378,7 +433,7 @@ pub fn all_tools(
     Option<PerToolChannelHandle>,
     Option<PerToolChannelHandle>,
 ) {
-    all_tools_with_runtime(
+    let result = all_tools_with_runtime(
         config,
         security,
         risk_profile,
@@ -396,6 +451,15 @@ pub fn all_tools(
         root_config,
         canvas_store,
         is_subagent_caller,
+    );
+    (
+        result.tools,
+        result.delegate_handle,
+        result.ask_user_handle,
+        result.reaction_handle,
+        result.poll_handle,
+        result.escalate_handle,
+        result.channel_send_handle,
     )
 }
 
@@ -423,15 +487,7 @@ pub fn all_tools_with_runtime(
     root_config: &zeroclaw_config::schema::Config,
     canvas_store: Option<CanvasStore>,
     is_subagent_caller: bool,
-) -> (
-    Vec<Box<dyn Tool>>,
-    Option<DelegateParentToolsHandle>,
-    Option<PerToolChannelHandle>,
-    PerToolChannelHandle,
-    Option<PerToolChannelHandle>,
-    Option<PerToolChannelHandle>,
-    Option<PerToolChannelHandle>,
-) {
+) -> AllToolsResult {
     let has_shell_access = runtime.has_shell_access();
     let runtime_kind = root_config.runtime.kind.as_str();
     let sandbox_cfg = risk_profile.sandbox_config();
@@ -1086,15 +1142,16 @@ pub fn all_tools_with_runtime(
                         .with_outcome(::zeroclaw_log::EventOutcome::Failure),
                     "microsoft365: client_credentials auth_flow requires a non-empty client_secret"
                 );
-                return (
-                    boxed_registry_from_arcs(tool_arcs),
-                    None,
+                return AllToolsResult {
+                    unfiltered_tool_arcs: tool_arcs.clone(),
+                    tools: boxed_registry_from_arcs(tool_arcs),
+                    delegate_handle: None,
                     ask_user_handle,
                     reaction_handle,
-                    Some(poll_handle),
+                    poll_handle: Some(poll_handle),
                     escalate_handle,
                     channel_send_handle,
-                );
+                };
             }
 
             let resolved = zeroclaw_tools::microsoft365::types::Microsoft365ResolvedConfig {
@@ -1283,15 +1340,16 @@ pub fn all_tools_with_runtime(
         )));
     }
 
-    (
-        boxed_registry_from_arcs(tool_arcs),
+    AllToolsResult {
+        unfiltered_tool_arcs: tool_arcs.clone(),
+        tools: boxed_registry_from_arcs(tool_arcs),
         delegate_handle,
         ask_user_handle,
         reaction_handle,
-        Some(poll_handle),
+        poll_handle: Some(poll_handle),
         escalate_handle,
         channel_send_handle,
-    )
+    }
 }
 
 #[cfg(test)]
