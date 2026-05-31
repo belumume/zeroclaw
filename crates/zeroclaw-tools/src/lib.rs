@@ -26,6 +26,7 @@ pub mod escalate;
 pub mod file_download;
 pub mod file_edit;
 pub mod file_upload;
+pub mod file_upload_bundle;
 pub mod file_write;
 pub mod gemini_cli;
 pub mod git_operations;

@@ -66,6 +66,7 @@ pub use zeroclaw_tools::escalate::EscalateToHumanTool;
 pub use zeroclaw_tools::file_download::FileDownloadTool;
 pub use zeroclaw_tools::file_edit::FileEditTool;
 pub use zeroclaw_tools::file_upload::FileUploadTool;
+pub use zeroclaw_tools::file_upload_bundle::FileUploadBundleTool;
 pub use zeroclaw_tools::file_write::FileWriteTool;
 pub use zeroclaw_tools::gemini_cli::GeminiCliTool;
 pub use zeroclaw_tools::git_operations::GitOperationsTool;
@@ -966,6 +967,19 @@ pub fn all_tools_with_runtime(
         tool_arcs.push(Arc::new(FileUploadTool::new(
             security.clone(),
             root_config.file_upload.clone(),
+        )));
+    }
+
+    // File upload bundle tool — enabled iff [file_upload_bundle].url is set
+    if root_config
+        .file_upload_bundle
+        .url
+        .as_deref()
+        .is_some_and(|u| !u.trim().is_empty())
+    {
+        tool_arcs.push(Arc::new(FileUploadBundleTool::new(
+            security.clone(),
+            root_config.file_upload_bundle.clone(),
         )));
     }
 
