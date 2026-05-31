@@ -51,6 +51,7 @@ pub use zeroclaw_tools::browser_open::BrowserOpenTool;
 pub use zeroclaw_tools::calculator::CalculatorTool;
 pub use zeroclaw_tools::canvas::{ALLOWED_CONTENT_TYPES, MAX_CONTENT_SIZE};
 pub use zeroclaw_tools::canvas::{CanvasStore, CanvasTool};
+pub use zeroclaw_tools::channel_send::ChannelSendTool;
 pub use zeroclaw_tools::claude_code::ClaudeCodeTool;
 pub use zeroclaw_tools::claude_code_runner::ClaudeCodeRunnerTool;
 pub use zeroclaw_tools::cli_discovery::{DiscoveredCli, discover_cli_tools};
@@ -152,6 +153,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use zeroclaw_config::schema::{AliasedAgentConfig, Config};
 use zeroclaw_memory::Memory;
+
+/// Per-tool channel-map handle — `Arc<RwLock<HashMap<channel_name, channel>>>`.
+///
+/// Each channel-driven tool owns its own handle so callers can populate it
+/// independently (late-bound registration). Shared alias of the same
+/// underlying type formerly known as `ChannelMapHandle`.
+pub type PerToolChannelHandle =
+    Arc<RwLock<HashMap<String, Arc<dyn zeroclaw_api::channel::Channel>>>>;
 
 /// Shared handle to the delegate tool's parent-tools list.
 /// Callers can push additional tools (e.g. MCP wrappers) after construction.
@@ -361,10 +370,11 @@ pub fn all_tools(
 ) -> (
     Vec<Box<dyn Tool>>,
     Option<DelegateParentToolsHandle>,
-    Option<ChannelMapHandle>,
-    ChannelMapHandle,
-    Option<ChannelMapHandle>,
-    Option<ChannelMapHandle>,
+    Option<PerToolChannelHandle>,
+    PerToolChannelHandle,
+    Option<PerToolChannelHandle>,
+    Option<PerToolChannelHandle>,
+    Option<PerToolChannelHandle>,
 ) {
     all_tools_with_runtime(
         config,
@@ -414,10 +424,11 @@ pub fn all_tools_with_runtime(
 ) -> (
     Vec<Box<dyn Tool>>,
     Option<DelegateParentToolsHandle>,
-    Option<ChannelMapHandle>,
-    ChannelMapHandle,
-    Option<ChannelMapHandle>,
-    Option<ChannelMapHandle>,
+    Option<PerToolChannelHandle>,
+    PerToolChannelHandle,
+    Option<PerToolChannelHandle>,
+    Option<PerToolChannelHandle>,
+    Option<PerToolChannelHandle>,
 ) {
     let has_shell_access = runtime.has_shell_access();
     let runtime_kind = root_config.runtime.kind.as_str();
@@ -957,11 +968,11 @@ pub fn all_tools_with_runtime(
         )));
     }
 
-    // Poll tool — always registered; uses late-bound channel map handle
-    let channel_map_handle: ChannelMapHandle = Arc::new(RwLock::new(HashMap::new()));
+    // Poll tool — always registered; owns its own late-bound channel map.
+    let poll_handle: PerToolChannelHandle = Arc::new(RwLock::new(HashMap::new()));
     tool_arcs.push(Arc::new(PollTool::new(
         security.clone(),
-        Arc::clone(&channel_map_handle),
+        Arc::clone(&poll_handle),
     )));
 
     // SOP tools (registered when sops_dir is configured)
@@ -986,23 +997,37 @@ pub fn all_tools_with_runtime(
         )));
     }
 
-    // Emoji reaction tool — always registered; channel map populated later by start_channels.
-    let reaction_tool = ReactionTool::new(security.clone());
-    let reaction_handle = reaction_tool.channel_map_handle();
+    // Emoji reaction tool — always registered; owns its own late-bound channel map.
+    let reaction_handle: PerToolChannelHandle = Arc::new(RwLock::new(HashMap::new()));
+    let reaction_tool = ReactionTool::new(security.clone(), Arc::clone(&reaction_handle));
     tool_arcs.push(Arc::new(reaction_tool));
 
-    // Interactive ask_user tool — always registered; channel map populated later by start_channels.
-    let ask_user_tool = AskUserTool::new(security.clone());
-    let ask_user_handle = ask_user_tool.channel_map_handle();
+    // Interactive ask_user tool — always registered; owns its own late-bound channel map.
+    let ask_user_handle: Option<PerToolChannelHandle> = Some(Arc::new(RwLock::new(HashMap::new())));
+    let ask_user_tool =
+        AskUserTool::new(security.clone(), ask_user_handle.as_ref().cloned().unwrap());
     tool_arcs.push(Arc::new(ask_user_tool));
 
-    // Human escalation tool — always registered; channel map populated later by start_channels.
+    // Human escalation tool — always registered; owns its own late-bound channel map.
+    let escalate_handle: Option<PerToolChannelHandle> = Some(Arc::new(RwLock::new(HashMap::new())));
     let escalate_tool = EscalateToHumanTool::new(
         security.clone(),
         root_config.escalation.alert_channels.clone(),
+        escalate_handle.as_ref().cloned().unwrap(),
     );
-    let escalate_handle = escalate_tool.channel_map_handle();
     tool_arcs.push(Arc::new(escalate_tool));
+
+    // Channel send tool — always registered; owns its own late-bound channel map
+    // and a map of configured default targets for recipient enforcement.
+    let channel_send_handle: Option<PerToolChannelHandle> =
+        Some(Arc::new(RwLock::new(HashMap::new())));
+    let default_targets = crate::channel_targets::build_default_targets_map(root_config);
+    let channel_send_tool = ChannelSendTool::new(
+        security.clone(),
+        channel_send_handle.as_ref().cloned().unwrap(),
+        Arc::new(parking_lot::RwLock::new(default_targets)),
+    );
+    tool_arcs.push(Arc::new(channel_send_tool));
 
     // Microsoft 365 Graph API integration
     if root_config.microsoft365.enabled {
@@ -1036,10 +1061,11 @@ pub fn all_tools_with_runtime(
                 return (
                     boxed_registry_from_arcs(tool_arcs),
                     None,
-                    Some(reaction_handle),
-                    channel_map_handle,
-                    Some(ask_user_handle),
-                    Some(escalate_handle),
+                    ask_user_handle,
+                    reaction_handle,
+                    Some(poll_handle),
+                    escalate_handle,
+                    channel_send_handle,
                 );
             }
 
@@ -1232,10 +1258,11 @@ pub fn all_tools_with_runtime(
     (
         boxed_registry_from_arcs(tool_arcs),
         delegate_handle,
-        Some(reaction_handle),
-        channel_map_handle,
-        Some(ask_user_handle),
-        Some(escalate_handle),
+        ask_user_handle,
+        reaction_handle,
+        Some(poll_handle),
+        escalate_handle,
+        channel_send_handle,
     )
 }
 
@@ -1280,7 +1307,7 @@ mod tests {
         let http = zeroclaw_config::schema::HttpRequestConfig::default();
         let cfg = test_config(&tmp);
 
-        let (tools, _, _, _, _, _) = all_tools(
+        let (tools, _, _, _, _, _, _) = all_tools(
             Arc::new(Config::default()),
             &security,
             &zeroclaw_config::schema::RiskProfileConfig::default(),
@@ -1326,7 +1353,7 @@ mod tests {
         let http = zeroclaw_config::schema::HttpRequestConfig::default();
         let cfg = test_config(&tmp);
 
-        let (tools, _, _, _, _, _) = all_tools(
+        let (tools, _, _, _, _, _, _) = all_tools(
             Arc::new(Config::default()),
             &security,
             &zeroclaw_config::schema::RiskProfileConfig::default(),
@@ -1473,7 +1500,7 @@ mod tests {
             },
         );
 
-        let (tools, _, _, _, _, _) = all_tools(
+        let (tools, _, _, _, _, _, _) = all_tools(
             Arc::new(Config::default()),
             &security,
             &zeroclaw_config::schema::RiskProfileConfig::default(),
@@ -1510,7 +1537,7 @@ mod tests {
         let http = zeroclaw_config::schema::HttpRequestConfig::default();
         let cfg = test_config(&tmp);
 
-        let (tools, _, _, _, _, _) = all_tools(
+        let (tools, _, _, _, _, _, _) = all_tools(
             Arc::new(Config::default()),
             &security,
             &zeroclaw_config::schema::RiskProfileConfig::default(),
@@ -1549,7 +1576,7 @@ mod tests {
         cfg.skills.prompt_injection_mode =
             zeroclaw_config::schema::SkillsPromptInjectionMode::Compact;
 
-        let (tools, _, _, _, _, _) = all_tools(
+        let (tools, _, _, _, _, _, _) = all_tools(
             Arc::new(cfg.clone()),
             &security,
             &zeroclaw_config::schema::RiskProfileConfig::default(),
@@ -1587,7 +1614,7 @@ mod tests {
         let mut cfg = test_config(&tmp);
         cfg.skills.prompt_injection_mode = zeroclaw_config::schema::SkillsPromptInjectionMode::Full;
 
-        let (tools, _, _, _, _, _) = all_tools(
+        let (tools, _, _, _, _, _, _) = all_tools(
             Arc::new(cfg.clone()),
             &security,
             &zeroclaw_config::schema::RiskProfileConfig::default(),
