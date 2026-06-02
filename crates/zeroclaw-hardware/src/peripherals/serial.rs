@@ -77,7 +77,7 @@ pub struct SerialTransport {
 const SERIAL_TIMEOUT_SECS: u64 = 5;
 
 impl SerialTransport {
-    async fn request(&self, cmd: &str, args: Value) -> anyhow::Result<ToolResult> {
+    pub(crate) async fn request(&self, cmd: &str, args: Value) -> anyhow::Result<ToolResult> {
         let mut port = self.port.lock().await;
         let resp = tokio::time::timeout(
             std::time::Duration::from_secs(SERIAL_TIMEOUT_SECS),

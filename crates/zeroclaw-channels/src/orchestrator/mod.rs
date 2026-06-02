@@ -7681,6 +7681,23 @@ pub async fn start_channels(
         );
         let mut built_tools = all_tools_result_ch.tools;
         let delegate_handle_ch = all_tools_result_ch.delegate_handle;
+
+        // Wire peripheral tools (gpio_read/gpio_write etc.) so channel-driven
+        // sessions (Telegram, Discord, etc.) can actuate hardware when
+        // [peripherals] is configured. Mirrors the agent loop wiring.
+        // The helper is safe to call unconditionally (returns empty when
+        // no peripherals are wired).
+        let peripheral_tools =
+            zeroclaw_runtime::agent::loop_::load_peripheral_tools(config.peripherals.clone()).await;
+        if !peripheral_tools.is_empty() {
+            ::zeroclaw_log::record!(
+                INFO,
+                ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
+                    .with_attrs(::serde_json::json!({"count": peripheral_tools.len()})),
+                "Peripheral tools added (channels orchestrator)"
+            );
+            built_tools.extend(peripheral_tools);
+        }
         let reaction_handle_ch = all_tools_result_ch.reaction_handle;
         let ask_user_handle_ch = all_tools_result_ch.ask_user_handle;
         let poll_handle_ch = all_tools_result_ch.poll_handle;
