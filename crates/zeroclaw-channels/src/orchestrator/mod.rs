@@ -6850,7 +6850,8 @@ fn collect_configured_channels(
                     peer_resolver,
                 )
                 .with_workspace_dir(config.channel_workspace_dir(&format!("qq.{alias}")))
-                .with_proxy_url(qq.proxy_url.clone()),
+                .with_proxy_url(qq.proxy_url.clone())
+                .with_transcription(config.transcription.clone()),
             ),
         });
     }
