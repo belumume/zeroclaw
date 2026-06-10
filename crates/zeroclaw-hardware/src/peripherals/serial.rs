@@ -5,10 +5,9 @@
 //! Response: {"id":"1","ok":true,"result":"done"}
 
 use crate::peripherals::Peripheral;
-use crate::util::{
-    is_serial_path_allowed, serial_open_baud, serial_path_allowlist_hint,
-    should_open_serial_nonexclusive,
-};
+#[cfg(unix)]
+use crate::util::should_open_serial_nonexclusive;
+use crate::util::{is_serial_path_allowed, serial_open_baud, serial_path_allowlist_hint};
 use async_trait::async_trait;
 use portable_atomic::{AtomicU64, Ordering};
 use serde_json::{Value, json};
@@ -139,10 +138,13 @@ impl SerialPeripheral {
             );
         }
 
-        let mut builder = tokio_serial::new(path, serial_open_baud(path, config.baud));
-        if should_open_serial_nonexclusive(path) {
-            builder = builder.exclusive(false);
-        }
+        let builder = tokio_serial::new(path, serial_open_baud(path, config.baud));
+        #[cfg(unix)]
+        let builder = if should_open_serial_nonexclusive(path) {
+            builder.exclusive(false)
+        } else {
+            builder
+        };
         let port = builder.open_native_async().map_err(|e| {
             ::zeroclaw_log::record!(
                 ERROR,

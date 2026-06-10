@@ -9362,7 +9362,7 @@ temperature = 0.3
         // before returning. The value is synthetic and not a real credential.
         unsafe { std::env::set_var(env_name, "sk-or-v1-test-channel-reload") };
 
-        let result = load_runtime_config_and_provider(&config_path, "openrouter.agent_demo").await;
+        let result = load_runtime_config_and_defaults(&config_path, "demo").await;
 
         // SAFETY: undo the test-only process env mutation above.
         unsafe { std::env::remove_var(env_name) };
@@ -10381,6 +10381,8 @@ temperature = 0.3
         tokio::fs::write(
             &config_path,
             r#"
+schema_version = 3
+
 [agents.agent_a]
 model_provider = "openrouter.hot"
 
