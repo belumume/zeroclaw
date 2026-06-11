@@ -962,6 +962,75 @@ impl StreamTextGuard {
     }
 }
 
+#[derive(Debug, Default)]
+struct StreamThinkTagStripper {
+    pending: String,
+    in_think: bool,
+}
+
+impl StreamThinkTagStripper {
+    const START_TAG: &'static str = "<think>";
+    const END_TAG: &'static str = "</think>";
+
+    fn push(&mut self, chunk: &str) -> String {
+        if chunk.is_empty() {
+            return String::new();
+        }
+
+        let mut input = std::mem::take(&mut self.pending);
+        input.push_str(chunk);
+        let mut visible = String::new();
+
+        loop {
+            if self.in_think {
+                if let Some(end) = input.find(Self::END_TAG) {
+                    input = input[end + Self::END_TAG.len()..].to_string();
+                    self.in_think = false;
+                    continue;
+                }
+
+                let keep_len = longest_suffix_matching_prefix(&input, Self::END_TAG);
+                if keep_len > 0 {
+                    self.pending = input[input.len() - keep_len..].to_string();
+                }
+                return visible;
+            }
+
+            if let Some(start) = input.find(Self::START_TAG) {
+                visible.push_str(&input[..start]);
+                input = input[start + Self::START_TAG.len()..].to_string();
+                self.in_think = true;
+                continue;
+            }
+
+            let keep_len = longest_suffix_matching_prefix(&input, Self::START_TAG);
+            if keep_len > 0 {
+                let emit_len = input.len() - keep_len;
+                visible.push_str(&input[..emit_len]);
+                self.pending = input[emit_len..].to_string();
+            } else {
+                visible.push_str(&input);
+            }
+            return visible;
+        }
+    }
+
+    fn finish(&mut self) -> String {
+        if self.in_think {
+            self.pending.clear();
+            return String::new();
+        }
+        std::mem::take(&mut self.pending)
+    }
+}
+
+fn longest_suffix_matching_prefix(text: &str, pattern: &str) -> usize {
+    (1..pattern.len())
+        .rev()
+        .find(|&len| text.ends_with(&pattern[..len]))
+        .unwrap_or(0)
+}
+
 fn find_embedded_protocol_candidate_start(text: &str) -> Option<usize> {
     let lower = text.to_ascii_lowercase();
     let mut earliest: Option<usize> = None;
@@ -1168,6 +1237,7 @@ async fn consume_provider_streaming_response(
     let mut delta_sender = on_delta;
     let mut suppress_forwarding = false;
     let mut text_guard = StreamTextGuard::new(request_tools);
+    let mut think_stripper = StreamThinkTagStripper::default();
 
     loop {
         let next_chunk = if let Some(token) = cancellation_token {
@@ -1228,7 +1298,12 @@ async fn consume_provider_streaming_response(
                     continue;
                 }
 
-                outcome.response_text.push_str(&chunk.delta);
+                let sanitized_delta = think_stripper.push(&chunk.delta);
+                if sanitized_delta.is_empty() {
+                    continue;
+                }
+
+                outcome.response_text.push_str(&sanitized_delta);
 
                 if suppress_forwarding {
                     continue;
@@ -1237,14 +1312,14 @@ async fn consume_provider_streaming_response(
                 if strict_tool_parsing {
                     if let Some(tx) = delta_sender {
                         outcome.forwarded_live_deltas = true;
-                        if tx.send(StreamDelta::Text(chunk.delta)).await.is_err() {
+                        if tx.send(StreamDelta::Text(sanitized_delta)).await.is_err() {
                             delta_sender = None;
                         }
                     }
                     continue;
                 }
 
-                let Some(forward_text) = text_guard.push(&chunk.delta) else {
+                let Some(forward_text) = text_guard.push(&sanitized_delta) else {
                     continue;
                 };
 
@@ -1253,6 +1328,28 @@ async fn consume_provider_streaming_response(
                     if tx.send(StreamDelta::Text(forward_text)).await.is_err() {
                         delta_sender = None;
                     }
+                }
+            }
+        }
+    }
+
+    let trailing_delta = think_stripper.finish();
+    if !trailing_delta.is_empty() {
+        outcome.response_text.push_str(&trailing_delta);
+        if !suppress_forwarding {
+            if strict_tool_parsing {
+                if let Some(tx) = delta_sender {
+                    outcome.forwarded_live_deltas = true;
+                    if tx.send(StreamDelta::Text(trailing_delta)).await.is_err() {
+                        delta_sender = None;
+                    }
+                }
+            } else if let Some(forward_text) = text_guard.push(&trailing_delta)
+                && let Some(tx) = delta_sender
+            {
+                outcome.forwarded_live_deltas = true;
+                if tx.send(StreamDelta::Text(forward_text)).await.is_err() {
+                    delta_sender = None;
                 }
             }
         }
@@ -1993,11 +2090,7 @@ pub async fn run_tool_call_loop(
                     .as_ref()
                     .and_then(|usage| record_tool_loop_cost_usage(provider_name, model, usage));
 
-                let mut response_text = if tool_specs.is_empty() {
-                    strip_think_tags(resp.text_or_empty())
-                } else {
-                    resp.text_or_empty().to_string()
-                };
+                let response_text = strip_think_tags(resp.text_or_empty());
                 // First try native structured tool calls (OpenAI-format).
                 // Fall back to text-based parsing (XML tags, markdown blocks,
                 // GLM format) only if the model_provider returned no native calls —
@@ -2018,10 +2111,6 @@ pub async fn run_tool_call_loop(
                         .collect()
                 };
                 let mut parsed_text = String::new();
-
-                if strict_tool_parsing && calls.is_empty() {
-                    response_text = strip_think_tags(&response_text);
-                }
 
                 if calls.is_empty()
                     && !tool_specs.is_empty()
@@ -6224,6 +6313,7 @@ mod tests {
     enum NativeStreamTurn {
         ToolCall(ToolCall),
         Text(String),
+        TextChunks(Vec<String>),
         /// Emit a single text delta with associated reasoning content. Used by
         /// regression tests for issue #6059 (DeepSeek V4 thinking-mode replay).
         TextWithReasoning {
@@ -6326,6 +6416,14 @@ mod tests {
                     Ok(StreamEvent::TextDelta(StreamChunk::delta(text))),
                     Ok(StreamEvent::Final),
                 ])),
+                NativeStreamTurn::TextChunks(chunks) => {
+                    let mut events: Vec<_> = chunks
+                        .into_iter()
+                        .map(|text| Ok(StreamEvent::TextDelta(StreamChunk::delta(text))))
+                        .collect();
+                    events.push(Ok(StreamEvent::Final));
+                    Box::pin(futures_util::stream::iter(events))
+                }
                 NativeStreamTurn::TextWithReasoning { text, reasoning } => {
                     Box::pin(futures_util::stream::iter(vec![
                         Ok(StreamEvent::TextDelta(StreamChunk::reasoning(reasoning))),
@@ -9318,11 +9416,14 @@ This is an example, not an invocation."#;
     }
 
     #[tokio::test]
-    async fn run_tool_call_loop_relays_native_tool_call_text_via_on_delta() {
+    async fn run_tool_call_loop_sanitizes_native_tool_call_text_before_display_and_history() {
         let model_provider = ScriptedModelProvider {
             responses: Arc::new(Mutex::new(VecDeque::from(vec![
                 ChatResponse {
-                    text: Some("Task started. Waiting 30 seconds before checking status.".into()),
+                    text: Some(
+                        "<think>private chain of thought</think>Task started. Waiting 30 seconds before checking status."
+                            .into(),
+                    ),
                     tool_calls: vec![ToolCall {
                         id: "call_wait".into(),
                         name: "count_tool".into(),
@@ -9330,7 +9431,7 @@ This is an example, not an invocation."#;
                         extra_content: None,
                     }],
                     usage: None,
-                    reasoning_content: None,
+                    reasoning_content: Some("provider reasoning".into()),
                 },
                 ChatResponse {
                     text: Some("Final answer".into()),
@@ -9401,7 +9502,7 @@ This is an example, not an invocation."#;
             deltas
                 .iter()
                 .any(|delta| matches!(delta, StreamDelta::Text(t) if t == "Task started. Waiting 30 seconds before checking status.\n")),
-            "native assistant text should be relayed to on_delta"
+            "native assistant text should be sanitized and relayed to on_delta"
         );
         assert!(
             deltas
@@ -9413,6 +9514,35 @@ This is an example, not an invocation."#;
             result, "Final answer",
             "final delivered result should not include intermediate tool-call narration"
         );
+        assert!(!result.contains("private chain of thought"));
+        assert!(!result.contains("<think>"));
+        assert!(
+            deltas.iter().all(|delta| match delta {
+                StreamDelta::Status(text) | StreamDelta::Text(text) =>
+                    !text.contains("private chain of thought") && !text.contains("<think>"),
+            }),
+            "draft deltas must not expose inline think tags: {deltas:?}"
+        );
+        let assistant_tool_history = history
+            .iter()
+            .find(|message| message.content.contains("\"tool_calls\""))
+            .expect("native tool-call turn should persist assistant history");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&assistant_tool_history.content).unwrap();
+        assert_eq!(
+            parsed["content"].as_str(),
+            Some("Task started. Waiting 30 seconds before checking status.")
+        );
+        assert_eq!(
+            parsed["reasoning_content"].as_str(),
+            Some("provider reasoning")
+        );
+        assert!(
+            !assistant_tool_history
+                .content
+                .contains("private chain of thought")
+        );
+        assert!(!assistant_tool_history.content.contains("<think>"));
         assert_eq!(invocations.load(Ordering::SeqCst), 1);
     }
 
@@ -10425,6 +10555,53 @@ This is an example, not an invocation."#;
         );
         assert_eq!(model_provider.chat_calls.load(Ordering::SeqCst), 0);
         assert_eq!(visible_deltas, "done");
+    }
+
+    #[tokio::test]
+    async fn consume_provider_streaming_response_strips_split_think_tags_before_forwarding() {
+        let model_provider =
+            StreamingNativeToolEventModelProvider::with_turns(vec![NativeStreamTurn::TextChunks(
+                vec![
+                    "<thi".to_string(),
+                    "nk>private stream reasoning</thi".to_string(),
+                    "nk>visible answer".to_string(),
+                ],
+            )]);
+        let messages = vec![ChatMessage::user("hi")];
+        let tools = [crate::tools::ToolSpec {
+            name: "count_tool".to_string(),
+            description: "Count values".to_string(),
+            parameters: serde_json::json!({"type": "object"}),
+        }];
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<DraftEvent>(8);
+
+        let outcome = consume_provider_streaming_response(
+            &model_provider,
+            &messages,
+            Some(&tools),
+            "mock-model",
+            Some(0.0),
+            None,
+            Some(&tx),
+            true,
+        )
+        .await
+        .expect("streaming should finish");
+        drop(tx);
+
+        let mut visible_deltas = String::new();
+        while let Some(delta) = rx.recv().await {
+            if let StreamDelta::Text(text) = delta {
+                visible_deltas.push_str(&text);
+            }
+        }
+
+        assert_eq!(outcome.response_text, "visible answer");
+        assert_eq!(visible_deltas, "visible answer");
+        assert!(!outcome.response_text.contains("private stream reasoning"));
+        assert!(!outcome.response_text.contains("<think>"));
+        assert!(!visible_deltas.contains("private stream reasoning"));
+        assert!(!visible_deltas.contains("<think>"));
     }
 
     #[tokio::test]
