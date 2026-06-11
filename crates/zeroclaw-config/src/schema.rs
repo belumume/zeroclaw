@@ -12046,6 +12046,10 @@ pub struct WhatsAppConfig {
     #[tab(Behavior)]
     #[serde(default)]
     pub mention_only: bool,
+    /// Cancel an in-flight response from this channel sender when a newer
+    /// WhatsApp message arrives. Default: `false`.
+    #[serde(default)]
+    pub interrupt_on_new_message: bool,
     /// Usage mode for WhatsApp Web: "business" (default) or "personal".
     /// In personal mode the bot applies dm_policy, group_policy, and
     /// self_chat_mode to decide which chats to respond in.
@@ -20137,6 +20141,20 @@ bot_token = "xoxb-tok"
     }
 
     #[test]
+    async fn whatsapp_config_default_interrupt_on_new_message_is_false() {
+        let json = r#"{"session_path":"/tmp/zeroclaw-whatsapp-session.db"}"#;
+        let parsed: WhatsAppConfig = serde_json::from_str(json).unwrap();
+        assert!(!parsed.interrupt_on_new_message);
+    }
+
+    #[test]
+    async fn whatsapp_config_deserializes_interrupt_on_new_message_true() {
+        let json = r#"{"session_path":"/tmp/zeroclaw-whatsapp-session.db","interrupt_on_new_message":true}"#;
+        let parsed: WhatsAppConfig = serde_json::from_str(json).unwrap();
+        assert!(parsed.interrupt_on_new_message);
+    }
+
+    #[test]
     async fn webhook_config_with_secret() {
         let json = r#"{"port":8080,"secret":"my-secret-key"}"#;
         let parsed: WebhookConfig = serde_json::from_str(json).unwrap();
@@ -20212,6 +20230,7 @@ bot_token = "xoxb-tok"
             pair_code: None,
             ws_url: None,
             mention_only: false,
+            interrupt_on_new_message: false,
             mode: WhatsAppWebMode::default(),
             dm_policy: WhatsAppChatPolicy::default(),
             group_policy: WhatsAppChatPolicy::default(),
@@ -20244,6 +20263,7 @@ bot_token = "xoxb-tok"
             pair_code: None,
             ws_url: None,
             mention_only: false,
+            interrupt_on_new_message: false,
             mode: WhatsAppWebMode::default(),
             dm_policy: WhatsAppChatPolicy::default(),
             group_policy: WhatsAppChatPolicy::default(),
@@ -20299,6 +20319,7 @@ allowed_numbers = ["+1", "+2"]
             pair_code: None,
             ws_url: None,
             mention_only: false,
+            interrupt_on_new_message: false,
             mode: WhatsAppWebMode::default(),
             dm_policy: WhatsAppChatPolicy::default(),
             group_policy: WhatsAppChatPolicy::default(),
@@ -20328,6 +20349,7 @@ allowed_numbers = ["+1", "+2"]
             pair_code: None,
             ws_url: None,
             mention_only: false,
+            interrupt_on_new_message: false,
             mode: WhatsAppWebMode::default(),
             dm_policy: WhatsAppChatPolicy::default(),
             group_policy: WhatsAppChatPolicy::default(),
@@ -20369,6 +20391,7 @@ allowed_numbers = ["+1", "+2"]
                     pair_code: None,
                     ws_url: None,
                     mention_only: false,
+                    interrupt_on_new_message: false,
                     mode: WhatsAppWebMode::default(),
                     dm_policy: WhatsAppChatPolicy::default(),
                     group_policy: WhatsAppChatPolicy::default(),
