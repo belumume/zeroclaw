@@ -10099,7 +10099,7 @@ impl Default for SchedulerConfig {
 pub struct ModelRouteConfig {
     /// Task hint name (e.g. "reasoning", "fast", "code", "summarize")
     pub hint: String,
-    /// Dotted provider profile ref to route to (must resolve to providers.models.<type>.<alias>)
+    /// Dotted provider profile ref to route to (must resolve to `providers.models.<type>.<alias>`)
     pub model_provider: String,
     /// Provider-local model identifier to use with that provider profile
     pub model: String,
