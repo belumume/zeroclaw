@@ -5841,7 +5841,7 @@ fn build_channel_by_id(
                     .context("WhatsApp channel is not configured")?;
                 if !wa.is_web_config() {
                     anyhow::bail!(
-                        "WhatsApp channel send requires Web mode (session_path must be set)"
+                        "WhatsApp channel send requires Web mode (set session_path, pair_phone, or mode = personal)"
                     );
                 }
                 let alias = "default".to_string();
@@ -6986,7 +6986,7 @@ fn collect_configured_channels(
                 WARN,
                 ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
                     .with_outcome(::zeroclaw_log::EventOutcome::Unknown),
-                "WhatsApp config has both phone_number_id and session_path set; preferring Cloud API mode. Remove one selector to avoid ambiguity."
+                "WhatsApp config has both phone_number_id (Cloud) and a Web selector (session_path/pair_phone/pair_code/ws_url/mode=personal) set; preferring Cloud API mode. Remove one selector to avoid ambiguity."
             );
         }
         // Runtime negotiation: detect backend type from config
