@@ -3033,7 +3033,9 @@ impl RpcDispatcher {
                     has_picker,
                     completed,
                     ready: false,
-                    group: String::new(),
+                    group: zeroclaw_config::sections::section_group_for_key(&key)
+                        .label()
+                        .to_string(),
                     is_quickstart: wizard.is_some(),
                     shape: wizard.map(Section::shape),
                     label,
