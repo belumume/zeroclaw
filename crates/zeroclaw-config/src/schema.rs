@@ -2001,6 +2001,33 @@ pub struct VeniceModelProviderConfig {
     pub base: ModelProviderConfig,
 }
 
+// ── NEAR AI Cloud ──
+
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, zeroclaw_macros::ConfigEnum,
+)]
+#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum NearaiEndpoint {
+    #[default]
+    Default,
+}
+impl ModelEndpoint for NearaiEndpoint {
+    fn uri(&self) -> &'static str {
+        match self {
+            Self::Default => "https://cloud-api.near.ai/v1",
+        }
+    }
+}
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Configurable)]
+#[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
+#[prefix = "providers.models.nearai"]
+pub struct NearaiModelProviderConfig {
+    #[nested]
+    #[serde(flatten)]
+    pub base: ModelProviderConfig,
+}
+
 // ── Novita ──
 
 #[derive(
@@ -3119,6 +3146,7 @@ impl_default_family_endpoint! {
     AvianModelProviderConfig,
     DeepmystModelProviderConfig,
     VeniceModelProviderConfig,
+    NearaiModelProviderConfig,
     NovitaModelProviderConfig,
     NvidiaModelProviderConfig,
     TelnyxModelProviderConfig,
