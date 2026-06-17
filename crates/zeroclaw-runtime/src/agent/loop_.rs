@@ -1489,6 +1489,7 @@ pub async fn run(
                 eff_compact_context,
                 eff_max_system_prompt_chars,
                 true,
+                config.channels.show_tool_calls,
             );
 
         // Append structured tool-use instructions with schemas (only for non-native model_providers)
@@ -2912,6 +2913,7 @@ pub async fn process_message(
                 eff_compact_context,
                 eff_max_system_prompt_chars,
                 false,
+                config.channels.show_tool_calls,
             );
         if expose_text_tool_protocol {
             system_prompt.push_str(&build_tool_instructions_for_names(
