@@ -6,6 +6,7 @@ use serde_json::json;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
+use zeroclaw_api::platform::is_android;
 use zeroclaw_api::tool::{Tool, ToolResult, with_ephemeral_workspace_warning};
 
 /// Maximum output size in bytes (1MB).
@@ -352,6 +353,20 @@ impl Tool for ShellTool {
             }
         }
 
+        // Android: platform tools (sh, getprop, am, dumpsys, content, pm, ...)
+        // live in /system/bin and /system/xbin. The cleared+rebuilt PATH above
+        // may omit them, leaving the shell unable to resolve any platform tool.
+        // Detect Android at runtime (works for bionic and musl builds).
+        if is_android() {
+            let ambient = std::env::var("PATH").unwrap_or_default();
+            let tui_path = self
+                .tui_env
+                .as_ref()
+                .and_then(|env| env.get("PATH"))
+                .map(String::as_str);
+            cmd.env("PATH", android_child_path(tui_path, &ambient));
+        }
+
         let timeout_secs = self.timeout_secs;
         // Run in own process group so `ChildGroupGuard` can reap the
         // whole subtree (backgrounded jobs, subshells) on any exit path.
@@ -481,8 +496,42 @@ where
     buf
 }
 
+/// Compose the child `PATH` for an Android shell: the platform tool dirs
+/// (`/system/bin:/system/xbin`) are prefixed onto the curated PATH, with a
+/// TUI-provided PATH winning over the daemon's ambient PATH. Yields the bare
+/// platform dirs when the resolved base is empty.
+fn android_child_path(tui_path: Option<&str>, ambient_path: &str) -> String {
+    let base = tui_path.unwrap_or(ambient_path);
+    if base.is_empty() {
+        "/system/bin:/system/xbin".to_string()
+    } else {
+        format!("/system/bin:/system/xbin:{base}")
+    }
+}
+
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn android_child_path_prefixes_platform_dirs_with_tui_path_winning() {
+        assert_eq!(
+            super::android_child_path(Some("/usr/local/bin"), "/daemon"),
+            "/system/bin:/system/xbin:/usr/local/bin"
+        );
+        assert_eq!(
+            super::android_child_path(None, "/daemon"),
+            "/system/bin:/system/xbin:/daemon"
+        );
+        assert_eq!(
+            super::android_child_path(None, ""),
+            "/system/bin:/system/xbin"
+        );
+    }
+
+    #[test]
+    fn is_android_returns_bool_without_panicking() {
+        let _ = zeroclaw_api::platform::is_android();
+    }
     use super::*;
     use crate::platform::{NativeRuntime, RuntimeAdapter};
     use crate::security::{AutonomyLevel, SecurityPolicy};
