@@ -13585,6 +13585,13 @@ pub struct LarkConfig {
     #[serde(default)]
     pub per_user_session: bool,
 
+    /// Override for the top-level `ack_reactions` setting. When `None`, the
+    /// channel falls back to `[channels].ack_reactions`. When set
+    /// explicitly, it takes precedence.
+    #[tab(Behavior)]
+    #[serde(default)]
+    pub ack_reactions: Option<bool>,
+
     /// Streaming mode for the LLM response: `off` (default) routes every
     /// response through `send()`; `partial` opens a Feishu interactive
     /// card and edits it incrementally via `update_draft` /
@@ -21008,6 +21015,7 @@ default_temperature = 0.7
                 excluded_tools: vec![],
                 approval_timeout_secs: 300,
                 per_user_session: false,
+                ack_reactions: None,
                 stream_mode: StreamMode::default(),
                 draft_update_interval_ms: default_draft_update_interval_ms(),
             },
@@ -23349,6 +23357,7 @@ default_model = "legacy-model"
                 excluded_tools: vec![],
                 approval_timeout_secs: 300,
                 per_user_session: false,
+                ack_reactions: None,
                 stream_mode: StreamMode::default(),
                 draft_update_interval_ms: default_draft_update_interval_ms(),
             },
@@ -23916,6 +23925,7 @@ api_token = "tok"
             excluded_tools: vec![],
             approval_timeout_secs: 300,
             per_user_session: false,
+            ack_reactions: None,
             stream_mode: StreamMode::default(),
             draft_update_interval_ms: default_draft_update_interval_ms(),
         };
@@ -23944,6 +23954,7 @@ api_token = "tok"
             excluded_tools: vec![],
             approval_timeout_secs: 300,
             per_user_session: false,
+            ack_reactions: None,
             stream_mode: StreamMode::default(),
             draft_update_interval_ms: default_draft_update_interval_ms(),
         };
