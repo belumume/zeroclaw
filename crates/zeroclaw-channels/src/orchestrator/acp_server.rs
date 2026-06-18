@@ -581,6 +581,7 @@ impl AcpServer {
             true,
             self.sop_engine.clone(),
             self.sop_audit.clone(),
+            self.canvas_store.clone(),
         )
         .await
         .map_err(|e| RpcError {
@@ -793,6 +794,7 @@ impl AcpServer {
             true,
             self.sop_engine.clone(),
             self.sop_audit.clone(),
+            self.canvas_store.clone(),
         )
         .await
         .map_err(|e| RpcError {
@@ -994,6 +996,7 @@ impl AcpServer {
             true,
             self.sop_engine.clone(),
             self.sop_audit.clone(),
+            self.canvas_store.clone(),
         )
         .await
         .map_err(|e| RpcError {

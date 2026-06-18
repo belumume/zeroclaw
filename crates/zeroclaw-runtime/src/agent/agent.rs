@@ -974,6 +974,7 @@ impl Agent {
             None,
             None,
             None,
+            None,
         )
         .await
     }
@@ -996,6 +997,7 @@ impl Agent {
         exclude_memory: bool,
         sop_engine: Option<Arc<std::sync::Mutex<SopEngine>>>,
         sop_audit: Option<Arc<SopAuditLogger>>,
+        canvas_store: Option<tools::CanvasStore>,
     ) -> Result<Self> {
         Self::from_config_with_session_cwd_and_mcp_approval_mode(
             config,
@@ -1007,6 +1009,7 @@ impl Agent {
             None,
             sop_engine,
             sop_audit,
+            canvas_store,
         )
         .await
     }
@@ -1035,6 +1038,7 @@ impl Agent {
             tui_env,
             sop_engine,
             sop_audit,
+            None,
         )
         .await
     }
@@ -1049,6 +1053,7 @@ impl Agent {
         tui_env: Option<std::collections::HashMap<String, String>>,
         sop_engine: Option<Arc<std::sync::Mutex<SopEngine>>>,
         sop_audit: Option<Arc<SopAuditLogger>>,
+        canvas_store: Option<tools::CanvasStore>,
     ) -> Result<Self> {
         let agent_cfg = config
             .agent(agent_alias)
@@ -1173,7 +1178,7 @@ impl Agent {
             &config.agents,
             agent_model_provider.and_then(|e| e.api_key.as_deref()),
             config,
-            None,
+            canvas_store,
             false,
             tui_env,
             sop_engine,
