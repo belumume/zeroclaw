@@ -1010,7 +1010,7 @@ pub async fn run(
             &security,
             &risk_profile,
             agent_alias,
-            runtime,
+            runtime.clone(),
             mem.clone(),
             composio_key,
             composio_entity_id,
@@ -1356,11 +1356,12 @@ pub async fn run(
             .cloned()
             .chain(mcp_elevation_arcs.iter().cloned())
             .collect();
-        tools::register_skill_tools_with_context(
+        tools::register_skill_tools_with_context_and_runtime(
             &mut tools_registry,
             &skills,
             security.clone(),
             &skill_resolution_registry,
+            runtime,
         );
 
         let mut tool_descs: Vec<(&str, &str)> = vec![
@@ -2554,7 +2555,7 @@ pub async fn process_message(
             &security,
             &risk_profile,
             agent_alias,
-            runtime,
+            runtime.clone(),
             mem.clone(),
             composio_key,
             composio_entity_id,
@@ -2806,11 +2807,12 @@ pub async fn process_message(
             .cloned()
             .chain(mcp_elevation_arcs.iter().cloned())
             .collect();
-        tools::register_skill_tools_with_context(
+        tools::register_skill_tools_with_context_and_runtime(
             &mut tools_registry,
             &skills,
             security.clone(),
             &skill_resolution_registry,
+            runtime,
         );
 
         let mut tool_descs: Vec<(&str, &str)> = vec![
