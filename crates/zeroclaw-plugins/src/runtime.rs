@@ -63,6 +63,66 @@ struct PluginToolResult {
 
 // ── Host function implementations ─────────────────────────────────
 
+struct SafeTarget {
+    host: String,
+    addrs: Vec<std::net::SocketAddr>,
+}
+
+fn reject_ssrf_url(raw_url: &str) -> Result<SafeTarget, Error> {
+    let parsed = reqwest::Url::parse(raw_url)
+        .map_err(|e| Error::msg(format!("invalid HTTP request URL: {e}")))?;
+    let scheme = parsed.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err(Error::msg(format!(
+            "blocked HTTP request URL scheme: {scheme}"
+        )));
+    }
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| Error::msg("HTTP request URL has no host"))?
+        .to_string();
+    if zeroclaw_infra::net_guard::is_private_or_local_host(&host) {
+        return Err(Error::msg(
+            "blocked HTTP request to a private or local host",
+        ));
+    }
+    let addrs: Vec<std::net::SocketAddr> = parsed
+        // Scheme validated to http/https above, whose default ports the url
+        // crate knows, so the `|| None` default-port fallback is unreachable.
+        .socket_addrs(|| None)
+        .map_err(|e| Error::msg(format!("failed to resolve HTTP request host: {e}")))?;
+    for addr in &addrs {
+        if zeroclaw_infra::net_guard::is_private_or_local_host(&addr.ip().to_string()) {
+            return Err(Error::msg(
+                "blocked HTTP request resolving to a private or local address",
+            ));
+        }
+    }
+    Ok(SafeTarget { host, addrs })
+}
+
+/// Build the SSRF-hardened blocking HTTP client for a validated target. Two
+/// invariants the SSRF defense depends on, isolated here so a regression that
+/// removes either is testable without a live request:
+///
+/// 1. `redirect(Policy::none())` — a public URL cannot 30x into a private or
+///    local target without re-validation.
+/// 2. `resolve(host, addr)` for every validated address — pins the connection
+///    to the addresses checked above so a second DNS lookup inside reqwest
+///    cannot rebind the host to a private address (DNS rebinding).
+///
+/// 120s ceiling covers legitimate slow cases (large downloads, slow inference).
+/// Runs inside spawn_blocking, so a stalled request holds a blocking-pool thread.
+fn build_guarded_client(target: &SafeTarget) -> reqwest::Result<reqwest::blocking::Client> {
+    let mut builder = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .redirect(reqwest::redirect::Policy::none());
+    for addr in &target.addrs {
+        builder = builder.resolve(&target.host, *addr);
+    }
+    builder.build()
+}
+
 fn handle_http_request(
     plugin: &mut CurrentPlugin,
     inputs: &[Val],
@@ -84,15 +144,9 @@ fn handle_http_request(
     let req: HttpRequest = serde_json::from_str(&request_json)
         .map_err(|e| Error::msg(format!("invalid HTTP request JSON: {e}")))?;
 
-    // 120s ceiling covers legitimate slow cases: large file downloads and slow
-    // model-inference endpoints (fal.ai image generation routinely takes 20-60s
-    // on cold models). A per-plugin override or tighter default is a candidate
-    // follow-up — see ADR-003 §"Known gaps". Note: this runs inside
-    // spawn_blocking, so a stalled request holds a blocking-pool thread for
-    // the full duration.
-    let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(120))
-        .build()
+    let target = reject_ssrf_url(&req.url)?;
+
+    let client = build_guarded_client(&target)
         .map_err(|e| Error::msg(format!("failed to create HTTP client: {e}")))?;
 
     let mut builder = match req.method.to_uppercase().as_str() {
@@ -243,6 +297,124 @@ pub fn call_execute(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reject_ssrf_url_blocks_loopback_and_metadata() {
+        assert!(reject_ssrf_url("http://127.0.0.1/").is_err());
+        assert!(reject_ssrf_url("http://localhost:8080/admin").is_err());
+        assert!(reject_ssrf_url("http://169.254.169.254/latest/meta-data/").is_err());
+        assert!(reject_ssrf_url("http://10.0.0.5/internal").is_err());
+        assert!(reject_ssrf_url("http://[::1]/").is_err());
+    }
+
+    #[test]
+    fn reject_ssrf_url_blocks_all_rfc1918_and_ipv6_local_ranges() {
+        // Each RFC 1918 sub-range and IPv6 local form, exercised end-to-end at
+        // the reject_ssrf_url call site (not only in net_guard unit tests), so a
+        // regression in the host-string / resolved-address wiring is caught.
+        for url in [
+            "http://172.16.0.1/",        // RFC 1918 172.16/12
+            "http://192.168.1.1/",       // RFC 1918 192.168/16
+            "http://[fe80::1]/",         // IPv6 link-local
+            "http://[fd00::1]/",         // IPv6 ULA
+            "http://[::ffff:10.0.0.1]/", // IPv4-mapped IPv6 -> non-global v4
+        ] {
+            assert!(reject_ssrf_url(url).is_err(), "{url} must be blocked");
+        }
+    }
+
+    #[test]
+    fn reject_ssrf_url_blocks_non_http_scheme() {
+        assert!(reject_ssrf_url("file:///etc/passwd").is_err());
+        assert!(reject_ssrf_url("gopher://example.com/").is_err());
+    }
+
+    #[test]
+    fn reject_ssrf_url_returns_validated_addrs_for_public_literal() {
+        let target = reject_ssrf_url("http://8.8.8.8/").expect("public literal allowed");
+        assert_eq!(target.host, "8.8.8.8");
+        assert!(target.addrs.iter().all(|a| !a.ip().is_loopback()));
+        assert!(!target.addrs.is_empty());
+    }
+
+    #[test]
+    fn build_guarded_client_pins_validated_addrs_and_builds() {
+        // Structure-only: proves the guarded client builds with the pinned
+        // address set from a validated public target. The build configures
+        // redirect::Policy::none() and resolve() for each addr; a regression
+        // removing either defense changes this construction path.
+        let target = reject_ssrf_url("http://8.8.8.8/").expect("public literal allowed");
+        assert!(!target.addrs.is_empty(), "validated target must pin addrs");
+        let client = build_guarded_client(&target);
+        assert!(
+            client.is_ok(),
+            "guarded client must build for a validated target"
+        );
+    }
+
+    /// Serve a single HTTP/1.1 response on a fresh loopback listener and return
+    /// its bound address. The closure receives nothing; it always returns the
+    /// raw response bytes. The thread handles exactly one connection.
+    fn spawn_one_shot_http(response: &'static [u8]) -> std::net::SocketAddr {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                use std::io::{Read, Write};
+                let mut buf = [0u8; 1024];
+                let _ = stream.read(&mut buf);
+                let _ = stream.write_all(response);
+                let _ = stream.flush();
+            }
+        });
+        addr
+    }
+
+    // Behavioral: a guarded client must NOT follow redirects. The server
+    // returns a 302 to a dead target; with Policy::none() the client surfaces
+    // the 302 itself. This fails if `.redirect(Policy::none())` is removed
+    // (the client would try to follow to the dead Location and error/differ).
+    #[test]
+    fn guarded_client_does_not_follow_redirects() {
+        let addr = spawn_one_shot_http(
+            b"HTTP/1.1 302 Found\r\nLocation: http://127.0.0.1:1/internal\r\nContent-Length: 0\r\n\r\n",
+        );
+        let target = SafeTarget {
+            host: addr.ip().to_string(),
+            addrs: vec![addr],
+        };
+        let client = build_guarded_client(&target).expect("client builds");
+        let resp = client
+            .get(format!("http://{addr}/"))
+            .send()
+            .expect("request reaches the one-shot server");
+        assert_eq!(
+            resp.status().as_u16(),
+            302,
+            "guarded client must surface the redirect, not follow it"
+        );
+    }
+
+    // Behavioral: resolve()-pinning must route an arbitrary hostname to the
+    // prevalidated socket address. We pin a name that does not resolve in DNS
+    // to the loopback listener; the request only succeeds because of the
+    // resolve() loop. This fails if the pinning loop is removed (the bogus
+    // hostname would fail to resolve).
+    #[test]
+    fn guarded_client_pins_host_to_validated_address() {
+        let addr = spawn_one_shot_http(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+        let host = "ssrf-pin-test.invalid";
+        let target = SafeTarget {
+            host: host.to_string(),
+            addrs: vec![addr],
+        };
+        let client = build_guarded_client(&target).expect("client builds");
+        let resp = client
+            .get(format!("http://{host}:{}/", addr.port()))
+            .send()
+            .expect("pinned hostname reaches the validated address");
+        assert_eq!(resp.status().as_u16(), 200);
+    }
 
     #[test]
     fn host_context_permission_check() {
