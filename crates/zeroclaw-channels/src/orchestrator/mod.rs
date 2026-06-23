@@ -861,6 +861,14 @@ fn channel_delivery_instructions(channel_name: &str) -> Option<&'static str> {
              - Do not use http://, https://, data:, file:, or any other URL scheme in WhatsApp Web media markers.\n\
              - Keep normal text outside markers and never wrap markers in code fences.\n",
         ),
+        "lark" | "feishu" => Some(
+            "When responding on Lark/Feishu:\n\
+             - Be concise and direct\n\
+             - For media attachments use markers: [IMAGE:<path>], [DOCUMENT:<path>], [VIDEO:<path>], [AUDIO:<path>], or [VOICE:<path>]\n\
+             - Marker paths must refer to local files inside the configured workspace directory. Absolute paths and workspace-relative paths are accepted when they stay inside that workspace.\n\
+             - Do not use http://, https://, data:, file:, or any other URL scheme in Lark/Feishu media markers.\n\
+             - Keep normal text outside markers and never wrap markers in code fences.\n",
+        ),
         "telegram" => Some(
             "When responding on Telegram:\n\
              - Include media markers for files or URLs that should be sent as attachments\n\
@@ -5782,6 +5790,7 @@ fn maybe_restart_managed_daemon_service() -> Result<bool> {
 #[cfg(any(
     test,
     feature = "channel-discord",
+    feature = "channel-lark",
     feature = "channel-matrix",
     feature = "channel-slack",
     feature = "channel-telegram",
@@ -6100,6 +6109,9 @@ fn build_channel_by_id(
                 };
                 Ok(Arc::new(
                     LarkChannel::from_config(lk, alias, peer_resolver)
+                        .with_workspace_dir(one_shot_channel_workspace_dir(
+                            &config, "lark", "default",
+                        ))
                         .with_approval_timeout_secs(lk.approval_timeout_secs)
                         .with_per_user_session(lk.per_user_session)
                         .with_ack_reactions(
@@ -7760,6 +7772,7 @@ fn collect_configured_channels(
             alias: Some(alias.clone()),
             channel: Arc::new(
                 LarkChannel::from_config(lk, alias.clone(), peer_resolver)
+                    .with_workspace_dir(config.channel_workspace_dir(&format!("lark.{alias}")))
                     .with_approval_timeout_secs(lk.approval_timeout_secs)
                     .with_per_user_session(lk.per_user_session)
                     .with_ack_reactions(lk.ack_reactions.unwrap_or(config.channels.ack_reactions))
@@ -9766,6 +9779,7 @@ pub async fn deliver_announcement(
             let peer_resolver: Arc<dyn Fn() -> Vec<String> + Send + Sync> =
                 Arc::new(move || peers.clone());
             let ch = LarkChannel::from_config(lk, alias, peer_resolver)
+                .with_workspace_dir(config.channel_workspace_dir(&format!("lark.{alias}")))
                 .with_approval_timeout_secs(lk.approval_timeout_secs)
                 .with_per_user_session(lk.per_user_session)
                 .with_ack_reactions(lk.ack_reactions.unwrap_or(config.channels.ack_reactions))
