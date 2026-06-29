@@ -19,6 +19,7 @@ use super::types::{
     SopRun, SopRunAction, SopRunStatus, SopStep, SopStepKind, SopStepResult, SopStepStatus,
     SopTrigger, SopTriggerSource,
 };
+use crate::calendar::{CALENDAR_NO_SHOW_TOPIC, CalendarNoShowEvent};
 use serde_json::Value;
 use zeroclaw_config::schema::SopConfig;
 
@@ -1783,10 +1784,45 @@ fn trigger_matches(trigger: &SopTrigger, event: &SopEvent) -> bool {
             event.topic.as_deref().is_some_and(|t| t == expression)
         }
 
+        (
+            SopTrigger::Calendar {
+                calendar_source,
+                calendar_ids,
+            },
+            SopTriggerSource::Calendar,
+        ) => calendar_trigger_matches(calendar_source, calendar_ids, event),
+
         (SopTrigger::Manual, SopTriggerSource::Manual) => true,
 
         _ => false,
     }
+}
+
+fn calendar_trigger_matches(
+    calendar_source: &str,
+    calendar_ids: &[String],
+    event: &SopEvent,
+) -> bool {
+    if event.topic.as_deref() != Some(CALENDAR_NO_SHOW_TOPIC) {
+        return false;
+    }
+
+    let Some(payload) = event.payload.as_deref() else {
+        return false;
+    };
+    let Ok(payload) = serde_json::from_str::<CalendarNoShowEvent>(payload) else {
+        return false;
+    };
+
+    if payload.calendar_source != calendar_source {
+        return false;
+    }
+
+    if calendar_ids.is_empty() {
+        return true;
+    }
+
+    calendar_ids.iter().any(|id| id == &payload.calendar_id)
 }
 
 /// Simple MQTT topic matching with `+` (single-level) and `#` (multi-level) wildcards.
@@ -2257,6 +2293,146 @@ mod tests {
         assert!(mqtt_topic_matches("#", "a/b/c"));
         assert!(mqtt_topic_matches("a/#", "a/b/c"));
         assert!(!mqtt_topic_matches("b/#", "a/b/c"));
+    }
+
+    // ── Calendar trigger matching ─────────────────────
+
+    fn calendar_event(topic: Option<&str>, calendar_source: &str, calendar_id: &str) -> SopEvent {
+        let now = chrono::Utc::now();
+        SopEvent {
+            source: SopTriggerSource::Calendar,
+            topic: topic.map(str::to_string),
+            payload: Some(
+                serde_json::json!({
+                    "event_id": "evt-1",
+                    "event_title": "Standup",
+                    "expected_start": now,
+                    "detected_at": now,
+                    "calendar_source": calendar_source,
+                    "calendar_id": calendar_id,
+                })
+                .to_string(),
+            ),
+            timestamp: now_iso8601(),
+        }
+    }
+
+    #[test]
+    fn calendar_trigger_matches_source_and_any_calendar_when_ids_empty() {
+        let sop = Sop {
+            triggers: vec![SopTrigger::Calendar {
+                calendar_source: "microsoft365".into(),
+                calendar_ids: Vec::new(),
+            }],
+            ..test_sop("calendar-sop", SopExecutionMode::Auto, SopPriority::Normal)
+        };
+        let engine = engine_with_sops(vec![sop]);
+
+        let matches = engine.match_trigger(&calendar_event(
+            Some(CALENDAR_NO_SHOW_TOPIC),
+            "microsoft365",
+            "team",
+        ));
+
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].name, "calendar-sop");
+    }
+
+    #[test]
+    fn calendar_trigger_filters_calendar_ids_and_source() {
+        let sop = Sop {
+            triggers: vec![SopTrigger::Calendar {
+                calendar_source: "microsoft365".into(),
+                calendar_ids: vec!["primary".into()],
+            }],
+            ..test_sop("calendar-sop", SopExecutionMode::Auto, SopPriority::Normal)
+        };
+        let engine = engine_with_sops(vec![sop]);
+
+        assert_eq!(
+            engine
+                .match_trigger(&calendar_event(
+                    Some(CALENDAR_NO_SHOW_TOPIC),
+                    "microsoft365",
+                    "primary"
+                ))
+                .len(),
+            1
+        );
+        assert!(
+            engine
+                .match_trigger(&calendar_event(
+                    Some(CALENDAR_NO_SHOW_TOPIC),
+                    "microsoft365",
+                    "team"
+                ))
+                .is_empty()
+        );
+        assert!(
+            engine
+                .match_trigger(&calendar_event(
+                    Some(CALENDAR_NO_SHOW_TOPIC),
+                    "google",
+                    "primary"
+                ))
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn calendar_trigger_requires_no_show_topic_and_valid_payload() {
+        let sop = Sop {
+            triggers: vec![SopTrigger::Calendar {
+                calendar_source: "microsoft365".into(),
+                calendar_ids: Vec::new(),
+            }],
+            ..test_sop("calendar-sop", SopExecutionMode::Auto, SopPriority::Normal)
+        };
+        let engine = engine_with_sops(vec![sop]);
+
+        assert!(
+            engine
+                .match_trigger(&calendar_event(
+                    Some("calendar.updated"),
+                    "microsoft365",
+                    "primary"
+                ))
+                .is_empty()
+        );
+
+        let invalid_payload_event = SopEvent {
+            source: SopTriggerSource::Calendar,
+            topic: Some(CALENDAR_NO_SHOW_TOPIC.into()),
+            payload: Some("not json".into()),
+            timestamp: now_iso8601(),
+        };
+        assert!(engine.match_trigger(&invalid_payload_event).is_empty());
+
+        let missing_payload_event = SopEvent {
+            source: SopTriggerSource::Calendar,
+            topic: Some(CALENDAR_NO_SHOW_TOPIC.into()),
+            payload: None,
+            timestamp: now_iso8601(),
+        };
+        assert!(engine.match_trigger(&missing_payload_event).is_empty());
+
+        let malformed_payload_event = SopEvent {
+            source: SopTriggerSource::Calendar,
+            topic: Some(CALENDAR_NO_SHOW_TOPIC.into()),
+            payload: Some(
+                serde_json::json!({
+                    "event_id": "evt-1",
+                    "event_title": "Standup",
+                    "expected_start": chrono::Utc::now(),
+                    "detected_at": chrono::Utc::now(),
+                    "calendar_source": "microsoft365",
+                    "calendar_id": 17,
+                })
+                .to_string(),
+            ),
+            timestamp: now_iso8601(),
+        };
+        assert!(engine.match_trigger(&malformed_payload_event).is_empty());
     }
 
     // ── Webhook trigger matching ─────────────────────

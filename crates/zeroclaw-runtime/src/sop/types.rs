@@ -87,6 +87,11 @@ pub enum SopTrigger {
         #[serde(default)]
         condition: Option<String>,
     },
+    Calendar {
+        calendar_source: String,
+        #[serde(default)]
+        calendar_ids: Vec<String>,
+    },
     Manual,
 }
 
@@ -97,6 +102,9 @@ impl fmt::Display for SopTrigger {
             Self::Webhook { path } => write!(f, "webhook:{path}"),
             Self::Cron { expression } => write!(f, "cron:{expression}"),
             Self::Peripheral { board, signal, .. } => write!(f, "peripheral:{board}/{signal}"),
+            Self::Calendar {
+                calendar_source, ..
+            } => write!(f, "calendar:{calendar_source}"),
             Self::Manual => write!(f, "manual"),
         }
     }
@@ -279,6 +287,7 @@ pub enum SopTriggerSource {
     Webhook,
     Cron,
     Peripheral,
+    Calendar,
     Manual,
 }
 
@@ -289,6 +298,7 @@ impl fmt::Display for SopTriggerSource {
             Self::Webhook => write!(f, "webhook"),
             Self::Cron => write!(f, "cron"),
             Self::Peripheral => write!(f, "peripheral"),
+            Self::Calendar => write!(f, "calendar"),
             Self::Manual => write!(f, "manual"),
         }
     }
@@ -504,6 +514,12 @@ mod tests {
         };
         assert_eq!(mqtt.to_string(), "mqtt:sensors/temp");
 
+        let calendar = SopTrigger::Calendar {
+            calendar_source: "microsoft365".into(),
+            calendar_ids: vec!["primary".into()],
+        };
+        assert_eq!(calendar.to_string(), "calendar:microsoft365");
+
         let manual = SopTrigger::Manual;
         assert_eq!(manual.to_string(), "manual");
     }
@@ -522,6 +538,40 @@ mod tests {
         assert_eq!(json, "\"priority_based\"");
         let parsed: SopExecutionMode = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed, SopExecutionMode::PriorityBased);
+    }
+
+    #[test]
+    fn calendar_trigger_serde_roundtrip() {
+        let trigger = SopTrigger::Calendar {
+            calendar_source: "microsoft365".into(),
+            calendar_ids: vec!["primary".into()],
+        };
+
+        let json = serde_json::to_string(&trigger).unwrap();
+        let parsed: SopTrigger = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed, trigger);
+        assert_eq!(SopTriggerSource::Calendar.to_string(), "calendar");
+        assert_eq!(
+            serde_json::to_string(&SopTriggerSource::Calendar).unwrap(),
+            "\"calendar\""
+        );
+    }
+
+    #[test]
+    fn calendar_trigger_toml_roundtrip() {
+        let toml_str = r#"
+type = "calendar"
+calendar_source = "microsoft365"
+calendar_ids = ["primary", "team"]
+"#;
+        let trigger: SopTrigger = toml::from_str(toml_str).unwrap();
+
+        assert!(
+            matches!(trigger, SopTrigger::Calendar { ref calendar_source, ref calendar_ids }
+                if calendar_source == "microsoft365"
+                    && calendar_ids.as_slice() == ["primary", "team"])
+        );
     }
 
     #[test]
