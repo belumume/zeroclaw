@@ -1499,7 +1499,7 @@ mod tests {
             )
             .unwrap()
         {
-            ResolveOutcome::Resumed(action) => action,
+            ResolveOutcome::Resumed(action) => *action,
             other => panic!("expected Resumed, got {other:?}"),
         }
     }
@@ -1539,6 +1539,7 @@ mod tests {
                     requires_confirmation: false,
                     kind: SopStepKind::default(),
                     schema: None,
+                    ..SopStep::default()
                 },
                 SopStep {
                     number: 2,
@@ -1548,6 +1549,7 @@ mod tests {
                     requires_confirmation: false,
                     kind: SopStepKind::default(),
                     schema: None,
+                    ..SopStep::default()
                 },
             ],
             cooldown_secs: 0,
@@ -2674,6 +2676,7 @@ mod tests {
                     requires_confirmation: false,
                     kind: SopStepKind::Execute,
                     schema: None,
+                    ..SopStep::default()
                 },
                 SopStep {
                     number: 2,
@@ -2683,6 +2686,7 @@ mod tests {
                     requires_confirmation: false,
                     kind: SopStepKind::Checkpoint,
                     schema: None,
+                    ..SopStep::default()
                 },
                 SopStep {
                     number: 3,
@@ -2692,6 +2696,7 @@ mod tests {
                     requires_confirmation: false,
                     kind: SopStepKind::Execute,
                     schema: None,
+                    ..SopStep::default()
                 },
             ],
             cooldown_secs: 0,
@@ -2773,6 +2778,7 @@ mod tests {
                 requires_confirmation: false,
                 kind: SopStepKind::Execute,
                 schema: None,
+                ..SopStep::default()
             },
             SopStep {
                 number: 2,
@@ -2782,6 +2788,7 @@ mod tests {
                 requires_confirmation: false,
                 kind: SopStepKind::Execute,
                 schema: None,
+                ..SopStep::default()
             },
         ];
         let mut engine = engine_with_sops(vec![sop]);
@@ -2889,6 +2896,7 @@ type = "manual"
                     requires_confirmation: false,
                     kind: SopStepKind::Execute,
                     schema: None,
+                    ..SopStep::default()
                 },
                 SopStep {
                     number: 2,
@@ -2898,6 +2906,7 @@ type = "manual"
                     requires_confirmation: false,
                     kind: SopStepKind::Execute,
                     schema: None,
+                    ..SopStep::default()
                 },
             ],
             cooldown_secs: 0,

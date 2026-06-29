@@ -6231,6 +6231,7 @@ mod tests {
                     requires_confirmation: false,
                     kind: crate::sop::SopStepKind::default(),
                     schema: None,
+                    ..crate::sop::SopStep::default()
                 },
                 crate::sop::SopStep {
                     number: 2,
@@ -6240,6 +6241,7 @@ mod tests {
                     requires_confirmation: false,
                     kind: crate::sop::SopStepKind::default(),
                     schema: None,
+                    ..crate::sop::SopStep::default()
                 },
             ],
             cooldown_secs: 0,
