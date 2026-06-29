@@ -7009,6 +7009,16 @@ pub struct BrowserConfig {
     #[serde(default)]
     #[nested]
     pub computer_use: BrowserComputerUseConfig,
+    /// Private/internal hosts allowed to bypass SSRF protection.
+    /// Exact and subdomain matches are supported; `["*"]` permits **all** private/local
+    /// hosts (RFC 1918, loopback, link-local, `.local`). Default: empty (deny).
+    /// Listed hosts also bypass `allowed_domains`. Both the `browser` tool and
+    /// `browser_open` accept `http://` for listed hosts — internal services
+    /// frequently lack a public TLS cert.
+    /// Warning: `["*"]` also reaches link-local addresses, including the cloud metadata
+    /// endpoint (`169.254.169.254`) — list specific hosts unless you accept that exposure.
+    #[serde(default)]
+    pub allowed_private_hosts: Vec<String>,
 }
 
 fn default_browser_allowed_domains() -> Vec<String> {
@@ -7035,6 +7045,7 @@ impl Default for BrowserConfig {
             native_webdriver_url: default_browser_webdriver_url(),
             native_chrome_path: None,
             computer_use: BrowserComputerUseConfig::default(),
+            allowed_private_hosts: vec![],
         }
     }
 }
@@ -24109,6 +24120,7 @@ default_temperature = 0.7
                 max_coordinate_x: Some(3840),
                 max_coordinate_y: Some(2160),
             },
+            allowed_private_hosts: vec![],
         };
         let toml_str = toml::to_string(&b).unwrap();
         let parsed: BrowserConfig = toml::from_str(&toml_str).unwrap();
