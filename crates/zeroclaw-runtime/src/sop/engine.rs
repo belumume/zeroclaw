@@ -21,7 +21,7 @@ use super::types::{
 };
 use crate::calendar::{CALENDAR_NO_SHOW_TOPIC, CalendarNoShowEvent};
 use serde_json::Value;
-use zeroclaw_config::schema::SopConfig;
+use zeroclaw_config::schema::{ApprovalMode, SopConfig};
 
 /// Central SOP orchestrator: loads SOPs, matches triggers, manages run lifecycle.
 pub struct SopEngine {
@@ -176,6 +176,35 @@ impl SopEngine {
                         ::serde_json::json!({"run_id": run.run_id, "error": e.to_string()})
                     ),
                 "SOP engine: failed to persist terminal run"
+            );
+        }
+    }
+
+    fn record_transition_event(
+        &self,
+        run_id: &str,
+        kind: &str,
+        reason: Option<String>,
+        payload: serde_json::Value,
+    ) {
+        let ev = SopEventRecord {
+            run_id: run_id.to_string(),
+            seq: 0,
+            ts: now_iso8601(),
+            kind: kind.to_string(),
+            actor: None,
+            reason,
+            payload,
+        };
+        if let Err(e) = self.store.append_event(&ev) {
+            ::zeroclaw_log::record!(
+                WARN,
+                ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
+                    .with_outcome(::zeroclaw_log::EventOutcome::Unknown)
+                    .with_attrs(
+                        ::serde_json::json!({"run_id": run_id, "kind": kind, "error": e.to_string()})
+                    ),
+                "SOP engine: failed to append transition event"
             );
         }
     }
@@ -422,11 +451,21 @@ impl SopEngine {
         if result.status == SopStepStatus::Completed {
             let output = step_result_value(&result);
             if let Err(reason) = self.validate_step_output(&current_step, &output) {
-                recorded.status = SopStepStatus::Failed;
-                recorded.output = format!(
+                let full_reason = format!(
                     "Step {} output schema validation failed: {reason}",
                     current_step.number
                 );
+                self.record_transition_event(
+                    run_id,
+                    "step_schema_reject",
+                    Some(full_reason.clone()),
+                    ::serde_json::json!({
+                        "step": current_step.number,
+                        "phase": "output",
+                    }),
+                );
+                recorded.status = SopStepStatus::Failed;
+                recorded.output = full_reason;
             }
         }
 
@@ -503,6 +542,15 @@ impl SopEngine {
         reason: String,
     ) -> SopRunAction {
         let reason = format!("Step {step_number} {phase} schema validation failed: {reason}");
+        self.record_transition_event(
+            run_id,
+            "step_schema_reject",
+            Some(reason.clone()),
+            ::serde_json::json!({
+                "step": step_number,
+                "phase": phase,
+            }),
+        );
         ::zeroclaw_log::record!(
             WARN,
             ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Fail)
@@ -628,6 +676,15 @@ impl SopEngine {
                 if let Some(action) = self.visit_bound_failure(run_id, step_number)? {
                     return Ok(action);
                 }
+                self.record_transition_event(
+                    run_id,
+                    "step_promoted",
+                    None,
+                    ::serde_json::json!({
+                        "from_step": current_step_number,
+                        "to_step": step_number,
+                    }),
+                );
                 if deterministic {
                     let input = routed_input.unwrap_or_default();
                     self.dispatch_deterministic_step(run_id, sop, step_number, input)
@@ -639,6 +696,14 @@ impl SopEngine {
                 if let Some(action) = self.visit_bound_failure(run_id, current_step_number)? {
                     return Ok(action);
                 }
+                self.record_transition_event(
+                    run_id,
+                    "step_retry",
+                    None,
+                    ::serde_json::json!({
+                        "step": current_step_number,
+                    }),
+                );
                 if deterministic {
                     self.dispatch_deterministic_step(
                         run_id,
@@ -750,7 +815,13 @@ impl SopEngine {
                 .ok_or_else(|| anyhow::Error::msg(format!("Active run not found: {run_id}")))?;
             format_step_context(sop, run, &step)
         };
-        let action = resolve_step_action(sop, &step, run_id.to_string(), context);
+        let action = resolve_step_action(
+            sop,
+            &step,
+            run_id.to_string(),
+            context,
+            self.config.approval_mode,
+        );
         if matches!(action, SopRunAction::WaitApproval { .. })
             && let Some(run) = self.active_runs.get_mut(run_id)
         {
@@ -841,6 +912,15 @@ impl SopEngine {
                     "reason": reason,
                 })),
             "SOP run pending on step dependencies"
+        );
+        self.record_transition_event(
+            run_id,
+            "step_skipped",
+            Some(reason.clone()),
+            ::serde_json::json!({
+                "step": step_number,
+                "status": "pending",
+            }),
         );
         self.persist_active(run_id);
         SopRunAction::Pending {
@@ -1195,16 +1275,26 @@ impl SopEngine {
         let mut last_status = SopStepStatus::Completed;
         if let Err(reason) = self.validate_step_output(&current_step, &step_output) {
             last_status = SopStepStatus::Failed;
+            let full_reason = format!(
+                "Step {} output schema validation failed: {reason}",
+                current_step.number
+            );
+            self.record_transition_event(
+                run_id,
+                "step_schema_reject",
+                Some(full_reason.clone()),
+                ::serde_json::json!({
+                    "step": current_step.number,
+                    "phase": "output",
+                }),
+            );
             if let Some(recorded) = self
                 .active_runs
                 .get_mut(run_id)
                 .and_then(|run| run.step_results.last_mut())
             {
                 recorded.status = SopStepStatus::Failed;
-                recorded.output = format!(
-                    "Step {} output schema validation failed: {reason}",
-                    current_step.number
-                );
+                recorded.output = full_reason;
             }
         } else if let Some(run) = self.active_runs.get_mut(run_id) {
             // Each deterministic step saves one LLM call only when the step
@@ -1857,18 +1947,8 @@ fn mqtt_topic_matches(pattern: &str, topic: &str) -> bool {
 
 // ── Execution mode resolution ───────────────────────────────────
 
-/// Determine the action for a step based on SOP execution mode.
-fn resolve_step_action(sop: &Sop, step: &SopStep, run_id: String, context: String) -> SopRunAction {
-    // Steps with requires_confirmation always need approval
-    if step.requires_confirmation {
-        return SopRunAction::WaitApproval {
-            run_id,
-            step: step.clone(),
-            context,
-        };
-    }
-
-    let needs_approval = match sop.execution_mode {
+fn execution_mode_needs_approval(mode: SopExecutionMode, sop: &Sop, step: &SopStep) -> bool {
+    match mode {
         // Deterministic mode is handled via start_deterministic_run;
         // if we reach here via the standard path, treat as Auto.
         SopExecutionMode::Auto | SopExecutionMode::Deterministic => false,
@@ -1886,7 +1966,32 @@ fn resolve_step_action(sop: &Sop, step: &SopStep, run_id: String, context: Strin
                 step.number == 1
             }
         },
-    };
+    }
+}
+
+/// Determine the action for a step based on the effective execution mode.
+fn resolve_step_action(
+    sop: &Sop,
+    step: &SopStep,
+    run_id: String,
+    context: String,
+    approval_mode: ApprovalMode,
+) -> SopRunAction {
+    // Steps with requires_confirmation always need approval
+    if step.requires_confirmation {
+        return SopRunAction::WaitApproval {
+            run_id,
+            step: step.clone(),
+            context,
+        };
+    }
+
+    let effective_mode = step.mode.unwrap_or(sop.execution_mode);
+    let sop_needs_approval = execution_mode_needs_approval(sop.execution_mode, sop, step);
+    let mut needs_approval = execution_mode_needs_approval(effective_mode, sop, step);
+    if approval_mode == ApprovalMode::OutOfBandRequired && sop_needs_approval && !needs_approval {
+        needs_approval = true;
+    }
 
     if needs_approval {
         SopRunAction::WaitApproval {
@@ -2749,10 +2854,17 @@ mod tests {
         };
 
         let action = engine.start_run("schema-in", event).unwrap();
+        let run_id = extract_run_id(&action).to_string();
 
         assert!(
             matches!(action, SopRunAction::Failed { ref reason, .. } if reason.contains("input schema validation failed"))
         );
+        let events = engine.run_events(&run_id).unwrap();
+        assert!(events.iter().any(|event| {
+            event.kind == "step_schema_reject"
+                && event.payload["step"] == serde_json::json!(1)
+                && event.payload["phase"] == serde_json::json!("input")
+        }));
         assert!(engine.active_runs().is_empty());
         assert_eq!(engine.finished_runs(None)[0].status, SopRunStatus::Failed);
     }
@@ -2784,6 +2896,12 @@ mod tests {
         assert!(
             matches!(action, SopRunAction::Failed { ref reason, .. } if reason.contains("output schema validation failed"))
         );
+        let events = engine.run_events(&run_id).unwrap();
+        assert!(events.iter().any(|event| {
+            event.kind == "step_schema_reject"
+                && event.payload["step"] == serde_json::json!(1)
+                && event.payload["phase"] == serde_json::json!("output")
+        }));
         assert!(engine.active_runs().is_empty());
         assert_eq!(engine.finished_runs(None)[0].status, SopRunStatus::Failed);
     }
@@ -2851,6 +2969,12 @@ mod tests {
             matches!(action, SopRunAction::ExecuteStep { ref step, .. } if step.number == 3),
             "explicit routing should select step 3 instead of the linear step 2"
         );
+        let events = engine.run_events(&run_id).unwrap();
+        assert!(events.iter().any(|event| {
+            event.kind == "step_promoted"
+                && event.payload["from_step"] == serde_json::json!(1)
+                && event.payload["to_step"] == serde_json::json!(3)
+        }));
         assert_eq!(engine.active_runs()[&run_id].current_step, 3);
     }
 
@@ -2879,6 +3003,10 @@ mod tests {
             matches!(action, SopRunAction::ExecuteStep { ref step, .. } if step.number == 1),
             "initial failed attempt should allow the first retry of step 1"
         );
+        let events = engine.run_events(&run_id).unwrap();
+        assert!(events.iter().any(|event| {
+            event.kind == "step_retry" && event.payload["step"] == serde_json::json!(1)
+        }));
         assert_eq!(engine.active_runs()[&run_id].current_step, 1);
 
         let action = engine
@@ -2976,6 +3104,12 @@ mod tests {
                 .iter()
                 .any(|result| result.step_number == 2 && result.status == SopStepStatus::Skipped)
         );
+        let events = engine.run_events(&run_id).unwrap();
+        assert!(events.iter().any(|event| {
+            event.kind == "step_skipped"
+                && event.payload["step"] == serde_json::json!(2)
+                && event.payload["status"] == serde_json::json!("pending")
+        }));
     }
 
     #[test]
@@ -3207,6 +3341,45 @@ mod tests {
         let mut engine = engine_with_sops(vec![sop]);
         let action = engine.start_run("s1", manual_event()).unwrap();
         // Even in Auto mode, requires_confirmation forces WaitApproval
+        assert!(matches!(action, SopRunAction::WaitApproval { .. }));
+    }
+
+    #[test]
+    fn step_mode_can_tighten_auto_step() {
+        let mut sop = test_sop("s1", SopExecutionMode::Auto, SopPriority::Normal);
+        sop.steps[0].mode = Some(SopExecutionMode::StepByStep);
+        let mut engine = engine_with_sops(vec![sop]);
+
+        let action = engine.start_run("s1", manual_event()).unwrap();
+
+        assert!(matches!(action, SopRunAction::WaitApproval { .. }));
+    }
+
+    #[test]
+    fn step_mode_can_relax_step_by_step_step() {
+        let mut sop = test_sop("s1", SopExecutionMode::StepByStep, SopPriority::Normal);
+        sop.steps[0].mode = Some(SopExecutionMode::Auto);
+        let mut engine = engine_with_sops(vec![sop]);
+
+        let action = engine.start_run("s1", manual_event()).unwrap();
+
+        assert!(matches!(action, SopRunAction::ExecuteStep { .. }));
+    }
+
+    #[test]
+    fn out_of_band_required_prevents_step_auto_relaxing_gate() {
+        let mut sop = test_sop("s1", SopExecutionMode::StepByStep, SopPriority::Normal);
+        sop.steps[0].mode = Some(SopExecutionMode::Auto);
+        let mut engine = engine_with_config_sops(
+            SopConfig {
+                approval_mode: ApprovalMode::OutOfBandRequired,
+                ..SopConfig::default()
+            },
+            vec![sop],
+        );
+
+        let action = engine.start_run("s1", manual_event()).unwrap();
+
         assert!(matches!(action, SopRunAction::WaitApproval { .. }));
     }
 
