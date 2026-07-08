@@ -13192,6 +13192,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeroclaw-commands"
+version = "0.8.2"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "zeroclaw-config"
 version = "0.8.2"
 dependencies = [
