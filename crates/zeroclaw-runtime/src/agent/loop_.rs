@@ -1142,6 +1142,7 @@ pub async fn run(
         let eff_compact_context = agent.resolved.compact_context;
         let eff_max_system_prompt_chars = agent.resolved.max_system_prompt_chars;
         let eff_model_context_window = agent.resolved.model_context_window;
+        let eff_prompt_injection_mode = agent.resolved.prompt_injection_mode;
         let base_observer = observability::create_observer(&config.observability);
         let observer: Arc<dyn Observer> = Arc::from(base_observer);
         let turn_id = uuid::Uuid::new_v4().to_string();
@@ -1470,7 +1471,7 @@ pub async fn run(
             ),
         ];
         if matches!(
-            config.skills.prompt_injection_mode,
+            eff_prompt_injection_mode,
             zeroclaw_config::schema::SkillsPromptInjectionMode::Compact
         ) {
             tool_descs.push((
@@ -1591,7 +1592,7 @@ pub async fn run(
             &prompt_excluded_tools,
             activated_handle.as_ref(),
             agent.resolved.strict_tool_parsing,
-            config.skills.prompt_injection_mode,
+            eff_prompt_injection_mode,
             eff_compact_context,
             eff_max_system_prompt_chars,
             true,
@@ -1686,7 +1687,7 @@ pub async fn run(
                 &excluded_tools,
                 activated_handle.as_ref(),
                 agent.resolved.strict_tool_parsing,
-                config.skills.prompt_injection_mode,
+                eff_prompt_injection_mode,
                 eff_compact_context,
                 eff_max_system_prompt_chars,
                 true,
@@ -1789,7 +1790,7 @@ pub async fn run(
                         &excluded_tools,
                         activated_handle.as_ref(),
                         agent.resolved.strict_tool_parsing,
-                        config.skills.prompt_injection_mode,
+                        eff_prompt_injection_mode,
                         eff_compact_context,
                         eff_max_system_prompt_chars,
                         true,
@@ -2346,7 +2347,7 @@ pub async fn run(
                             &excluded_tools,
                             activated_handle.as_ref(),
                             agent.resolved.strict_tool_parsing,
-                            config.skills.prompt_injection_mode,
+                            eff_prompt_injection_mode,
                             eff_compact_context,
                             eff_max_system_prompt_chars,
                             true,
@@ -2806,6 +2807,7 @@ pub async fn process_message(
         // See `Config::resolved_agent_config` for precedence rules.
         let eff_compact_context = agent.resolved.compact_context;
         let eff_max_system_prompt_chars = agent.resolved.max_system_prompt_chars;
+        let eff_prompt_injection_mode = agent.resolved.prompt_injection_mode;
 
         let observer: Arc<dyn Observer> =
             Arc::from(observability::create_observer(&config.observability));
@@ -3013,7 +3015,7 @@ pub async fn process_message(
             ("image_info", "Read image metadata."),
         ];
         if matches!(
-            config.skills.prompt_injection_mode,
+            eff_prompt_injection_mode,
             zeroclaw_config::schema::SkillsPromptInjectionMode::Compact
         ) {
             tool_descs.push((
@@ -3128,7 +3130,7 @@ pub async fn process_message(
                 bootstrap_max_chars,
                 Some(&risk_profile),
                 native_tool_specs_present,
-                config.skills.prompt_injection_mode,
+                eff_prompt_injection_mode,
                 eff_compact_context,
                 eff_max_system_prompt_chars,
                 false,
