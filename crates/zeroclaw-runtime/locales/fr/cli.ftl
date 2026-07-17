@@ -904,6 +904,15 @@ cli-bundle-warn-archive = avertissement : échec de l'archivage du répertoire d
 cli-bundle-deleted = skill_bundles.{$alias} supprimé (retiré de {$count} agent(s))
 cli-bundle-warn-move = avertissement : échec du déplacement du répertoire de bundle : {$error}
 cli-bundle-renamed = skill_bundles.{$from} → skill_bundles.{$to} renommé
+
+# ── Indications de redémarrage du tableau de bord web — RestartInfo.hint (PR #8173) ──
+# Les quatre premières sont des modèles de commande shell affichés tels quels ; non traduits.
+cli-gateway-restart-hint-kubernetes = kubectl rollout restart deployment/zeroclaw
+cli-gateway-restart-hint-container = docker compose restart
+cli-gateway-restart-hint-systemd = systemctl restart zeroclaw
+cli-gateway-restart-hint-launchd = launchctl kickstart -k <your-zeroclaw-label>
+cli-gateway-restart-hint-process = redémarrez le processus `zeroclaw daemon`
+
 cli-daemon-gateway-already-running = Une passerelle ZeroClaw est déjà en cours d'exécution sur {$host}:{$port}. Le démon supervise sa propre passerelle et ne démarrera pas une seconde passerelle sur la même adresse. Arrêtez cette passerelle (ou pointez le démon vers un port libre avec `zeroclaw config set gateway.port <port>`), puis relancez le démon.
 cli-daemon-gateway-port-occupied = L'adresse de passerelle {$host}:{$port} est déjà utilisée par un autre processus. Libérez le port ou pointez le démon vers un port libre (`zeroclaw config set gateway.port <port>`), puis relancez le démon.
 cli-agent-context-bar = ctx: {$used} / {$max}  {$bar}  {$pct}%

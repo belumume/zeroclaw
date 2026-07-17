@@ -901,6 +901,15 @@ cli-bundle-warn-archive = advertencia: falló el archivado del directorio del bu
 cli-bundle-deleted = eliminado skill_bundles.{$alias} (eliminado de {$count} agente(s))
 cli-bundle-warn-move = advertencia: falló el movimiento del directorio del bundle: {$error}
 cli-bundle-renamed = renombrado skill_bundles.{$from} → skill_bundles.{$to}
+
+# ── Sugerencias de reinicio del panel web — RestartInfo.hint mostrado tras una actualización en la app (PR #8173) ──
+# Las primeras cuatro son plantillas de comando de shell que se muestran tal cual; no se traducen.
+cli-gateway-restart-hint-kubernetes = kubectl rollout restart deployment/zeroclaw
+cli-gateway-restart-hint-container = docker compose restart
+cli-gateway-restart-hint-systemd = systemctl restart zeroclaw
+cli-gateway-restart-hint-launchd = launchctl kickstart -k <your-zeroclaw-label>
+cli-gateway-restart-hint-process = reinicie el proceso `zeroclaw daemon`
+
 cli-daemon-gateway-already-running = Ya hay un gateway de ZeroClaw ejecutándose en {$host}:{$port}. El daemon supervisa su propio gateway y no iniciará un segundo en la misma dirección. Detén ese gateway (o apunta el daemon a un puerto libre con `zeroclaw config set gateway.port <port>`) y luego vuelve a ejecutar el daemon.
 cli-daemon-gateway-port-occupied = La dirección del gateway {$host}:{$port} ya está en uso por otro proceso. Libera el puerto o apunta el daemon a un puerto libre (`zeroclaw config set gateway.port <port>`) y luego vuelve a ejecutar el daemon.
 cli-agent-context-bar = ctx: {$used} / {$max}  {$bar}  {$pct}%
