@@ -13174,6 +13174,12 @@ pub struct TelegramConfig {
     #[tab(Behavior)]
     #[serde(default = "default_draft_update_interval_ms")]
     pub draft_update_interval_ms: u64,
+    /// Inbound message debounce window in milliseconds for this Telegram alias.
+    /// When set, overrides the global `[channels].debounce_ms` for this channel
+    /// only. `0` or unset falls back to the global value.
+    #[tab(Behavior)]
+    #[serde(default)]
+    pub debounce_ms: Option<u64>,
     /// When true, a newer Telegram message from the same sender in the same chat
     /// cancels the in-flight request and starts a fresh response with preserved history.
     #[tab(Behavior)]
@@ -13235,6 +13241,7 @@ impl Default for TelegramConfig {
             excluded_tools: Vec::new(),
             reply_min_interval_secs: 0,
             reply_queue_depth_max: 0,
+            debounce_ms: None,
         }
     }
 }
@@ -23651,6 +23658,7 @@ auto_save = true
                         api_base_url: default_telegram_api_base_url(),
                         stream_mode: StreamMode::default(),
                         draft_update_interval_ms: default_draft_update_interval_ms(),
+                        debounce_ms: None,
                         interrupt_on_new_message: false,
                         mention_only: false,
                         ack_reactions: None,
@@ -24945,6 +24953,7 @@ default_temperature = 0.7
             excluded_tools: vec![],
             reply_min_interval_secs: 0,
             reply_queue_depth_max: 0,
+            debounce_ms: None,
         };
         let json = serde_json::to_string(&tc).unwrap();
         let parsed: TelegramConfig = serde_json::from_str(&json).unwrap();
@@ -29030,6 +29039,7 @@ high_entropy_tokens = false
                 excluded_tools: vec![],
                 reply_min_interval_secs: 0,
                 reply_queue_depth_max: 0,
+                debounce_ms: None,
             },
         );
 
