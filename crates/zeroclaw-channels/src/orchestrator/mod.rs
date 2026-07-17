@@ -6910,7 +6910,7 @@ pub fn bind_channel_identity_into(
     if !channel_alias_configured(config, channel_type, alias) {
         anyhow::bail!(
             "{channel_type} channel alias `{alias}` is not configured. Run \
-             `zeroclaw config set channels.{channel_type}.{alias}.bot-token=<token>` first \
+             `zeroclaw config set channels.{channel_type}.{alias}.bot_token <token>` \
              (see docs/book/src/channels/overview.md for the full field list)."
         );
     }

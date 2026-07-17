@@ -9188,6 +9188,36 @@ mod tests {
         );
     }
 
+    #[test]
+    #[cfg(feature = "agent-runtime")]
+    fn config_set_materializes_missing_channel_alias() {
+        let mut config = Config::default();
+        let path = "channels.telegram.default.bot_token";
+
+        assert!(
+            !config.channels.telegram.contains_key("default"),
+            "fresh config should not already contain the default channel alias"
+        );
+
+        let created = ensure_map_key_for_prop_path(&mut config, path)
+            .expect("known channel path should be materialized");
+
+        assert!(created, "missing channel alias should be created");
+        config
+            .set_prop_persistent(path, "test-token")
+            .expect("materialized channel path should be writable");
+        assert_eq!(
+            config
+                .channels
+                .telegram
+                .get("default")
+                .unwrap()
+                .bot_token
+                .as_str(),
+            "test-token"
+        );
+    }
+
     #[tokio::test]
     #[cfg(feature = "agent-runtime")]
     async fn sop_maintenance_tick_dispatches_cached_cron_triggers() {
