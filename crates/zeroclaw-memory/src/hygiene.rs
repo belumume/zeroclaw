@@ -88,10 +88,9 @@ pub fn run_if_due(config: &MemoryConfig, workspace_dir: &Path) -> Result<()> {
     report.pruned_daily_rows += budget_report.daily_rows;
     report.pruned_core_rows += budget_report.core_rows;
 
-    // Prune audit entries if audit is enabled.
-    if config.audit_enabled
-        && let Err(e) = prune_audit_entries(workspace_dir, config.audit_retention_days)
-    {
+    // Retention cleanup is independent from new audit collection: disabling
+    // audit stops new rows, but existing sensitive rows still honor retention.
+    if let Err(e) = prune_audit_entries(workspace_dir, config.audit_retention_days) {
         ::zeroclaw_log::record!(
             DEBUG,
             ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
@@ -926,5 +925,93 @@ mod tests {
         let d = memory_date_from_filename("2026-03-28.md");
         assert!(d.is_some(), "YYYY-MM-DD.md should be parsed");
         assert_eq!(d.unwrap(), NaiveDate::from_ymd_opt(2026, 3, 28).unwrap());
+    }
+
+    fn seed_audit_db(workspace: &Path) -> PathBuf {
+        fs::create_dir_all(workspace.join("memory")).unwrap();
+        let db_path = workspace.join("memory").join("audit.db");
+        let conn = Connection::open(&db_path).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS memory_audit (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                 operation TEXT NOT NULL,
+                 key TEXT,
+                 namespace TEXT,
+                 session_id TEXT,
+                 timestamp TEXT NOT NULL,
+                 metadata TEXT
+             );",
+        )
+        .unwrap();
+        let stale = (Local::now() - Duration::days(45)).to_rfc3339();
+        let fresh = Local::now().to_rfc3339();
+        conn.execute(
+            "INSERT INTO memory_audit (operation, timestamp) VALUES ('store', ?1)",
+            params![stale],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO memory_audit (operation, timestamp) VALUES ('store', ?1)",
+            params![fresh],
+        )
+        .unwrap();
+        db_path
+    }
+
+    fn audit_row_count(db_path: &Path) -> i64 {
+        let conn = Connection::open(db_path).unwrap();
+        conn.query_row("SELECT COUNT(*) FROM memory_audit", [], |row| row.get(0))
+            .unwrap()
+    }
+
+    #[test]
+    fn prunes_stale_audit_rows_when_audit_enabled() {
+        let tmp = TempDir::new().unwrap();
+        let workspace = tmp.path();
+        let db_path = seed_audit_db(workspace);
+
+        let mut cfg = default_cfg();
+        cfg.audit_enabled = true;
+        assert_eq!(cfg.audit_retention_days, 30);
+        run_if_due(&cfg, workspace).unwrap();
+
+        assert_eq!(
+            audit_row_count(&db_path),
+            1,
+            "audit rows past audit_retention_days must be pruned"
+        );
+    }
+
+    #[test]
+    fn prunes_existing_audit_rows_when_audit_disabled() {
+        let tmp = TempDir::new().unwrap();
+        let workspace = tmp.path();
+        let db_path = seed_audit_db(workspace);
+
+        let cfg = default_cfg();
+        assert!(!cfg.audit_enabled);
+        run_if_due(&cfg, workspace).unwrap();
+
+        assert_eq!(
+            audit_row_count(&db_path),
+            1,
+            "disabling collection must not disable retention for existing audit rows"
+        );
+    }
+
+    #[test]
+    fn disabled_audit_does_not_create_missing_audit_db_for_pruning() {
+        let tmp = TempDir::new().unwrap();
+        let workspace = tmp.path();
+        let audit_db = workspace.join("memory").join("audit.db");
+
+        let cfg = default_cfg();
+        assert!(!cfg.audit_enabled);
+        run_if_due(&cfg, workspace).unwrap();
+
+        assert!(
+            !audit_db.exists(),
+            "default-off audit must not create an audit db just to prune"
+        );
     }
 }
