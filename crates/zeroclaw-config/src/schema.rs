@@ -10387,8 +10387,24 @@ pub struct MarkdownStorageConfig {
 #[prefix = "storage_lucid"]
 #[serde(default)]
 pub struct LucidStorageConfig {
-    /// Optional path to the lucid-memory binary.
+    /// Optional path to the lucid-memory binary. When unset, the bare `lucid`
+    /// executable is resolved on `PATH`. A blank or whitespace-only value is
+    /// rejected at config validation and remains invalid if startup continues,
+    /// so an invalid explicit selector never falls through to `PATH`.
     pub binary_path: Option<String>,
+    /// Recall (context) timeout override, in milliseconds. Lucid CLI cold
+    /// starts (loading the local embedding model) can exceed 1.5s on ARM
+    /// hosts; raise this if recalls still time out on your hardware.
+    /// Unset falls back to the built-in default (3000ms). `0` is rejected
+    /// at config validation; because startup warns and continues after
+    /// validation errors, a `0` that reaches the runtime is treated as
+    /// unset and falls back to the default.
+    pub recall_timeout_ms: Option<u64>,
+    /// Store timeout override, in milliseconds. Same cold-start
+    /// consideration as `recall_timeout_ms`. Unset falls back to the
+    /// built-in default (3000ms); `0` is rejected at validation and, if
+    /// startup continues after the warning, is likewise treated as unset.
+    pub store_timeout_ms: Option<u64>,
 }
 
 fn default_storage_schema() -> String {
@@ -19105,6 +19121,37 @@ impl Config {
             }
         }
 
+        let mut lucid_aliases: Vec<&String> = self.storage.lucid.keys().collect();
+        lucid_aliases.sort();
+        for alias in lucid_aliases {
+            let lucid = &self.storage.lucid[alias];
+            if lucid
+                .binary_path
+                .as_ref()
+                .is_some_and(|path| path.trim().is_empty())
+            {
+                validation_bail!(
+                    RequiredFieldEmpty,
+                    format!("storage.lucid.{alias}.binary_path"),
+                    "storage.lucid.{alias}.binary_path must not be empty"
+                );
+            }
+            if matches!(lucid.recall_timeout_ms, Some(0)) {
+                validation_bail!(
+                    InvalidNumericRange,
+                    format!("storage.lucid.{alias}.recall_timeout_ms"),
+                    "storage.lucid.{alias}.recall_timeout_ms must be greater than 0"
+                );
+            }
+            if matches!(lucid.store_timeout_ms, Some(0)) {
+                validation_bail!(
+                    InvalidNumericRange,
+                    format!("storage.lucid.{alias}.store_timeout_ms"),
+                    "storage.lucid.{alias}.store_timeout_ms must be greater than 0"
+                );
+            }
+        }
+
         // Reply-pacing bounds — both `reply_min_interval_secs` and
         // `reply_queue_depth_max` walk through one entry list so adding
         // a new paced channel only requires extending `reply_pacing_entries`.
@@ -24809,6 +24856,71 @@ connect_timeout_secs = 12
         assert_eq!(pg.schema, "public");
         assert_eq!(pg.table, "memories");
         assert_eq!(pg.connect_timeout_secs, Some(12));
+    }
+
+    #[test]
+    async fn storage_lucid_timeout_overrides_deserialize() {
+        let raw = r#"
+default_temperature = 0.7
+
+[storage.lucid.default]
+binary_path = "/opt/lucid/bin/lucid"
+recall_timeout_ms = 5000
+store_timeout_ms = 4000
+"#;
+
+        let parsed = parse_test_config(raw);
+        let lucid = parsed
+            .storage
+            .lucid
+            .get("default")
+            .expect("lucid.default present");
+        assert_eq!(lucid.binary_path.as_deref(), Some("/opt/lucid/bin/lucid"));
+        assert_eq!(lucid.recall_timeout_ms, Some(5000));
+        assert_eq!(lucid.store_timeout_ms, Some(4000));
+    }
+
+    #[test]
+    async fn validate_rejects_zero_lucid_timeouts_with_alias_qualified_paths() {
+        for field in ["recall_timeout_ms", "store_timeout_ms"] {
+            let raw = format!(
+                r#"
+default_temperature = 0.7
+
+[storage.lucid.edge_arm]
+{field} = 0
+"#
+            );
+            let parsed = parse_test_config(&raw);
+            let error = parsed
+                .validate()
+                .expect_err("zero Lucid timeout must fail validation");
+            let expected_path = format!("storage.lucid.edge_arm.{field}");
+            assert!(
+                error.to_string().contains(&expected_path),
+                "validation error must name {expected_path}: {error:#}"
+            );
+        }
+    }
+
+    #[test]
+    async fn validate_rejects_blank_lucid_binary_with_alias_qualified_path() {
+        let raw = r#"
+default_temperature = 0.7
+
+[storage.lucid.edge_arm]
+binary_path = "   "
+"#;
+        let parsed = parse_test_config(raw);
+        let error = parsed
+            .validate()
+            .expect_err("blank Lucid binary path must fail validation");
+        assert!(
+            error
+                .to_string()
+                .contains("storage.lucid.edge_arm.binary_path"),
+            "validation error must name the alias-qualified binary path: {error:#}"
+        );
     }
 
     #[test]
