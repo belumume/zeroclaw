@@ -906,6 +906,11 @@ turn-interrupted-by-user = [interrupted by user]
 # on this path, so the wording names the channel, not a user.
 turn-cancelled-client-rpc = [turn cancelled via client]
 turn-stream-interrupted = [stream interrupted]
+# Trailing notice appended (and streamed as a final chunk) when the resilient
+# provider wrapper served the turn with a different model or provider than the
+# one requested, so silent model downgrades stay visible on direct-turn
+# surfaces (WS, RPC/ZeroCode, ACP).
+turn-model-fallback-notice = ⚡ { $requested_model } ({ $requested_provider }) was unavailable; this reply was served by { $actual_model } ({ $actual_provider }).
 # Shown at the end of agent output when the tool call loop exhausted its
 # iteration budget and the agent cannot continue without exceeding limits.
 turn-max-iterations-reached = *Turn stopped: reached maximum tool iterations ({ $max_iterations }).*
