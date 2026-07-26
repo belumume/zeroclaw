@@ -14509,9 +14509,11 @@ impl ChannelConfig for SignalConfig {
 
 /// WhatsApp Web usage mode.
 ///
-/// `Personal` treats the account as a personal phone — the bot only responds to
-/// incoming messages that pass the DM/group/self-chat policy filters.
-/// `Business` (default) responds to all incoming messages, subject only to the
+/// Selects the self-chat behavior and the intended deployment shape. `dm_policy`
+/// and `group_policy` apply in BOTH modes; only `self_chat_mode` is personal-only.
+/// `Personal` treats the account as a personal phone, so the self-chat exception
+/// is available. `Business` (default) is an unattended account with no self-chat
+/// exception. In either mode a message must pass the chat-type policy and the
 /// `allowed_numbers` allowlist.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, zeroclaw_macros::ConfigEnum)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
@@ -14524,8 +14526,8 @@ pub enum WhatsAppWebMode {
     Personal,
 }
 
-/// Policy for a particular WhatsApp chat type (DMs or groups) when
-/// `mode = "personal"`.
+/// Policy for a particular WhatsApp chat type (DMs or groups). Applies in BOTH
+/// `business` and `personal` mode.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, zeroclaw_macros::ConfigEnum)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -14617,17 +14619,18 @@ pub struct WhatsAppConfig {
     #[serde(default)]
     pub interrupt_on_new_message: bool,
     /// Usage mode for WhatsApp Web: "business" (default) or "personal".
-    /// In personal mode the bot applies dm_policy, group_policy, and
-    /// self_chat_mode to decide which chats to respond in.
+    /// `dm_policy` and `group_policy` apply in BOTH modes. The mode selects
+    /// only whether `self_chat_mode` is available, which is personal-only.
     #[tab(Advanced)]
     #[serde(default)]
     pub mode: WhatsAppWebMode,
-    /// Policy for direct messages when mode = "personal".
-    /// "allowlist" (default) | "ignore" | "all".
+    /// Policy for direct messages. Applies in BOTH `business` and `personal`
+    /// mode. "allowlist" (default) | "ignore" | "all".
     #[tab(Advanced)]
     #[serde(default)]
     pub dm_policy: WhatsAppChatPolicy,
-    /// Policy for group chats when mode = "personal".
+    /// Policy for group chats. Applies in BOTH `business` and `personal` mode,
+    /// and decides what an empty `allowed_groups` means.
     /// "allowlist" (default) | "ignore" | "all".
     #[tab(Advanced)]
     #[serde(default)]
@@ -14651,8 +14654,10 @@ pub struct WhatsAppConfig {
     #[tab(Advanced)]
     #[serde(default)]
     pub group_mention_patterns: Vec<String>,
-    /// Allowed group chats by JID (Web mode). An empty list (the default)
-    /// permits all groups; a non-empty list drops every group message whose
+    /// Allowed group chats by JID (Web mode). An empty list (the default) is
+    /// interpreted by `group_policy`: under `allowlist` or `ignore` it permits NO
+    /// group, and only an explicit `group_policy = "all"` permits every group.
+    /// A non-empty list drops every group message whose
     /// chat JID matches no entry. Each entry matches either the full group
     /// JID (`123456789012345@g.us`) or the JID user part - the segment before
     /// `@` (`123456789012345`) - compared exactly, not as a string prefix.
