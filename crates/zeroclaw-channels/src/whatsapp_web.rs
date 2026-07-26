@@ -1304,11 +1304,14 @@ fn empty_group_list_is_newly_closed(
     group_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
 ) -> bool {
     use zeroclaw_config::schema::{WhatsAppChatPolicy as Policy, WhatsAppWebMode as Mode};
-    match (mode, group_policy) {
-        (_, Policy::All) => false,
-        (Mode::Personal, Policy::Ignore) => false,
-        _ => true,
-    }
+    // The two exclusions, spelled out because they are the whole rule:
+    // `all` is the explicit opt-in to open access under either mode, and
+    // personal + `ignore` already dropped every group before this change.
+    // Everything else is a capability the operator is losing here.
+    !matches!(
+        (mode, group_policy),
+        (_, Policy::All) | (Mode::Personal, Policy::Ignore)
+    )
 }
 
 fn is_group_chat_allowed(
