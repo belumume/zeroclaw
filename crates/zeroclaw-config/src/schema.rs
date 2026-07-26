@@ -10849,7 +10849,27 @@ pub fn validate_whatsapp_semantics(
         }
     }
 
-    if wa.allowed_groups.is_empty() {
+    // An empty allowed_groups only creates UNINTENDED open access where the
+    // effective policy would otherwise have consulted the list. Two personal-mode
+    // configurations must stay quiet:
+    //
+    //   group_policy = "ignore"    the channel gate drops every group message
+    //                              downstream, so nothing is permitted. Warning here
+    //                              also told the operator to set exactly this, and
+    //                              then kept firing after they did.
+    //   group_policy = "all"       an explicit opt-in to open group access. Warning
+    //                              here reports a deliberate choice as unsafe.
+    //
+    // So the warning applies to business mode (where the list is consulted no matter
+    // what group_policy says) and to personal mode with group_policy = "allowlist"
+    // (where an empty list is an allowlist that admits everything).
+    let empty_list_permits_all = if wa.mode == WhatsAppWebMode::Personal {
+        wa.group_policy == WhatsAppChatPolicy::Allowlist
+    } else {
+        true
+    };
+
+    if wa.allowed_groups.is_empty() && empty_list_permits_all {
         out.push(crate::validation_warnings::ValidationWarning::new(
             "whatsapp_empty_group_allowlist_permits_all",
             format!(
@@ -34463,6 +34483,91 @@ allowed_groups = ["123@g.us"]
 "#;
         let cfg: Config = toml::from_str(toml).unwrap();
         assert!(warnings_with_code(&cfg, WA_OPEN_GROUPS_WARNING).is_empty());
+    }
+
+    /// The remediation the warning itself recommends must SILENCE the warning.
+    /// Under personal mode the channel gate drops every group message when
+    /// group_policy = "ignore", so an empty list permits nothing. Warning here
+    /// told the operator to set exactly this and then kept firing after they
+    /// did, which is the defect this test pins.
+    #[test]
+    async fn whatsapp_personal_ignore_groups_is_not_flagged() {
+        let toml = r#"
+[channels.whatsapp.shop]
+enabled = true
+mode = "personal"
+session_path = "/tmp/wa-session"
+group_policy = "ignore"
+"#;
+        let cfg: Config = toml::from_str(toml).unwrap();
+        assert!(
+            warnings_with_code(&cfg, WA_OPEN_GROUPS_WARNING).is_empty(),
+            "group_policy = \"ignore\" drops every group message, so an empty \
+             allowed_groups permits nothing and the warning must not fire"
+        );
+    }
+
+    /// group_policy = "all" is the explicit opt-in to open group access. An
+    /// empty list is then consistent with a deliberate choice, not an accident,
+    /// and reporting it as unsafe would flag intent as error.
+    #[test]
+    async fn whatsapp_personal_all_groups_is_not_flagged() {
+        let toml = r#"
+[channels.whatsapp.shop]
+enabled = true
+mode = "personal"
+session_path = "/tmp/wa-session"
+group_policy = "all"
+"#;
+        let cfg: Config = toml::from_str(toml).unwrap();
+        assert!(
+            warnings_with_code(&cfg, WA_OPEN_GROUPS_WARNING).is_empty(),
+            "group_policy = \"all\" is an explicit opt-in to open groups and must \
+             not be reported as an unintended configuration"
+        );
+    }
+
+    /// Business mode never consults group_policy, so the list is the only gate
+    /// and an empty one really does admit every group. This is the positive
+    /// case that must survive narrowing the warning.
+    #[test]
+    async fn whatsapp_business_empty_allowed_groups_is_flagged() {
+        let toml = r#"
+[channels.whatsapp.shop]
+enabled = true
+mode = "business"
+session_path = "/tmp/wa-session"
+"#;
+        let cfg: Config = toml::from_str(toml).unwrap();
+        let warnings = warnings_with_code(&cfg, WA_OPEN_GROUPS_WARNING);
+        assert_eq!(
+            warnings.len(),
+            1,
+            "business mode with an empty allowed_groups must still warn: {warnings:?}"
+        );
+        assert_eq!(warnings[0].path, "channels.whatsapp.shop.allowed_groups");
+    }
+
+    /// Business mode ignores group_policy entirely, so even the value that
+    /// silences the warning under personal mode must NOT silence it here.
+    /// Without this, narrowing the check could be over-applied and reopen the
+    /// original bug from the other side.
+    #[test]
+    async fn whatsapp_business_ignore_group_policy_still_flagged() {
+        let toml = r#"
+[channels.whatsapp.shop]
+enabled = true
+mode = "business"
+session_path = "/tmp/wa-session"
+group_policy = "ignore"
+"#;
+        let cfg: Config = toml::from_str(toml).unwrap();
+        assert_eq!(
+            warnings_with_code(&cfg, WA_OPEN_GROUPS_WARNING).len(),
+            1,
+            "group_policy is inert under business mode, so it must not silence \
+             the open-groups warning"
+        );
     }
 
     const SEMANTIC_MEMORY_WARNING: &str = "memory_semantic_search_without_embedder";
