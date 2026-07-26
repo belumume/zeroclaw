@@ -65,6 +65,35 @@ session_path = "/var/lib/zeroclaw/wa.db"
 allowed_groups = ["120363012345678901@g.us", "120363098765432109"]
 ```
 
+## Tool approval over chat (`approval_timeout_secs`)
+
+When a tool needs approval (it is in `always_ask`, or the risk profile does not
+auto-approve it), the agent posts the request into the chat the message came from
+and waits for a reply. Answer with the token from the prompt:
+
+```
+a1b2c3 yes
+a1b2c3 no
+a1b2c3 always
+```
+
+`approval_timeout_secs` bounds that wait. **The default is 300 seconds, and `0`
+denies immediately** rather than disabling approval, so a zero is a way to refuse
+every gated tool, not a way to wait forever. On timeout the request is denied and
+the token is discarded, so a late reply cannot approve a call nobody is waiting
+on any more.
+
+**Who may answer.** The token is a correlator, not a password: it travels in
+plaintext into the chat, so in a group every member can read it. A reply is
+therefore only honoured when it comes from the same chat the prompt was posted
+into **and** from a number on `allowed_numbers`. A reply that fails either check
+is logged and ignored, and the request stays open so the operator can still
+answer it. In a group the prompt says so, because otherwise there is no way to
+tell why a bystander's reply did nothing.
+
+Both modes behave the same here. Web mode resolves the reply on its own inbound
+path; Cloud API mode resolves it in the webhook handler.
+
 ## Configuration surfaces
 
 {{#config-fields channels.whatsapp}}
