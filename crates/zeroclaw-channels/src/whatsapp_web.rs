@@ -93,7 +93,7 @@ impl Drop for PendingApprovalGuard {
         // thread is unwinding. Spawn the removal instead; the entry is gone
         // before any realistic reply, and a reply that beats it still finds a
         // dead receiver and cannot be reported as accepted.
-        tokio::spawn(async move {
+        zeroclaw_spawn::spawn!(async move {
             PENDING_APPROVALS.lock().await.remove(&token);
         });
     }
