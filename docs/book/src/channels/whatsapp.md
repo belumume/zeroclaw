@@ -84,15 +84,23 @@ the token is discarded, so a late reply cannot approve a call nobody is waiting
 on any more.
 
 **Who may answer.** The token is a correlator, not a password: it travels in
-plaintext into the chat, so in a group every member can read it. A reply is
-therefore only honoured when it comes from the same chat the prompt was posted
-into **and** from a number on `allowed_numbers`. A reply that fails either check
-is logged and ignored, and the request stays open so the operator can still
-answer it. In a group the prompt says so, because otherwise there is no way to
-tell why a bystander's reply did nothing.
+plaintext into the chat, so in a group every member can read it.
 
-Both modes behave the same here. Web mode resolves the reply on its own inbound
-path; Cloud API mode resolves it in the webhook handler.
+**The two modes differ, and the difference is a security boundary rather than an
+implementation detail.**
+
+In **Web mode**, a reply is honoured only when it comes from the same chat the
+prompt was posted into **and** from a number on `allowed_numbers`. A reply that
+fails either check is logged and ignored, and the request stays open so the
+operator can still answer it. In a group the prompt says so, because otherwise
+there is no way to tell why a bystander's reply did nothing.
+
+In **Cloud API mode**, neither check is applied. The pending entry stores only
+the token and the sender it was issued to, so the webhook treats possession of
+the token as authority. In a group that means any member who can read the
+prompt can answer it, including from a different chat. Until that path is
+hardened, treat a Cloud-mode approval as authenticating the *chat*, not the
+responder, and prefer Web mode wherever the responder identity matters.
 
 ## Configuration surfaces
 

@@ -25,6 +25,17 @@ use zeroclaw_runtime::i18n;
 #[cfg(feature = "whatsapp-web")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ApprovalBinding {
+    /// The configured alias that ISSUED this request.
+    ///
+    /// The map below is process-wide, so without this the binding is only
+    /// (token, chat) and the reply path evaluates `allowed_numbers` using
+    /// whichever instance happened to receive the reply. Two aliases sharing a
+    /// contact or group then leak authority across the boundary an operator
+    /// drew between them: a responder alias A denies can approve alias A's tool
+    /// call by replying through alias B, because B's allowlist is the one
+    /// consulted. Binding the issuer and enforcing it on resolve keeps each
+    /// alias's approvals answerable only under its own policy.
+    alias: String,
     /// The chat JID the prompt was posted into. A reply carrying a valid token
     /// from a DIFFERENT chat is not this request's answer.
     chat: String,
@@ -37,6 +48,55 @@ struct ApprovalBinding {
 struct PendingApproval {
     responder: tokio::sync::oneshot::Sender<ChannelApprovalResponse>,
     binding: ApprovalBinding,
+}
+
+/// Removes a parked token when the requesting future goes away.
+///
+/// Every explicit cleanup path lives INSIDE the async body: send-failure and
+/// the channel's own timeout both remove the token before returning. None of
+/// that code runs if the future is CANCELLED or DROPPED, which the routed
+/// approval timeout and the orchestrator's cancellation branch both do. The
+/// entry then outlives its receiver, and a late reply passes every
+/// authorization gate, removes the entry, and is logged as accepted while the
+/// oneshot is already gone, so no tool call can ever receive that decision. An
+/// approval recorded as granted that nothing acted on is worse than a denial:
+/// the log says the operator approved and the system disagrees.
+///
+/// `Drop` is the only hook that survives cancellation, so registration is made
+/// cancellation-safe by tying the entry's lifetime to a guard rather than to
+/// any code path. The guard is disarmed once the decision has been taken, so
+/// the normal path still owns its own removal.
+#[cfg(feature = "whatsapp-web")]
+struct PendingApprovalGuard {
+    token: Option<String>,
+}
+
+#[cfg(feature = "whatsapp-web")]
+impl PendingApprovalGuard {
+    fn new(token: String) -> Self {
+        Self { token: Some(token) }
+    }
+
+    /// The decision was taken through a normal path; stop guarding.
+    fn disarm(&mut self) {
+        self.token = None;
+    }
+}
+
+#[cfg(feature = "whatsapp-web")]
+impl Drop for PendingApprovalGuard {
+    fn drop(&mut self) {
+        let Some(token) = self.token.take() else {
+            return;
+        };
+        // Drop is not async, and blocking here would stall whatever runtime
+        // thread is unwinding. Spawn the removal instead; the entry is gone
+        // before any realistic reply, and a reply that beats it still finds a
+        // dead receiver and cannot be reported as accepted.
+        tokio::spawn(async move {
+            PENDING_APPROVALS.lock().await.remove(&token);
+        });
+    }
 }
 
 #[cfg(feature = "whatsapp-web")]
@@ -67,6 +127,17 @@ enum ApprovalRefusal {
     /// The reply came from the right chat, but the responder is not on
     /// `allowed_numbers`. This is the gate the other transports omit.
     UnauthorizedResponder,
+    /// The reply cleared every authorization gate, but the requesting future
+    /// was already cancelled or dropped, so the oneshot receiver is gone and
+    /// no tool call can receive the decision. Reporting this as accepted would
+    /// record an approval that nothing acted on.
+    ReceiverGone,
+    /// A valid token replied to through a DIFFERENT configured alias than the
+    /// one that issued it. Distinct from `ForeignChat` because two aliases can
+    /// legitimately share a chat, so the chat can match while the issuer does
+    /// not, and answering under the wrong alias means the wrong
+    /// `allowed_numbers` decides.
+    ForeignAlias,
 }
 
 /// Decide whether an approval reply may resolve `token`, and resolve it if so.
@@ -85,6 +156,7 @@ enum ApprovalRefusal {
 async fn resolve_approval_reply(
     token: &str,
     response: ChannelApprovalResponse,
+    from_alias: &str,
     from_chat: &str,
     responder_is_allowlisted: bool,
 ) -> std::result::Result<(), ApprovalRefusal> {
@@ -92,6 +164,15 @@ async fn resolve_approval_reply(
     let Some(pending) = map.get(token) else {
         return Err(ApprovalRefusal::UnknownToken);
     };
+    // The issuing alias is checked FIRST, before the chat and before the
+    // allowlist. `responder_is_allowlisted` is computed by whichever instance
+    // received the reply, so evaluating it against another alias's request is
+    // the bypass itself: alias B's allowlist would decide alias A's approval.
+    // Two aliases can legitimately share a contact or a group, which is what
+    // makes the chat check alone insufficient here.
+    if pending.binding.alias != from_alias {
+        return Err(ApprovalRefusal::ForeignAlias);
+    }
     if pending.binding.chat != from_chat {
         return Err(ApprovalRefusal::ForeignChat);
     }
@@ -105,7 +186,18 @@ async fn resolve_approval_reply(
     let pending = map
         .remove(token)
         .expect("token was present under this same lock");
-    let _ = pending.responder.send(response);
+    // Report acceptance ONLY when the decision reached a live receiver.
+    //
+    // `send` fails when the oneshot receiver is already gone, which happens
+    // when the requesting future was cancelled or dropped. Discarding that
+    // error would log the reply as accepted while no tool call can ever act on
+    // it, so the record would say the operator approved and the system would
+    // disagree. A stale token is a refusal, not an approval, and the caller
+    // logs each refusal distinctly.
+    pending
+        .responder
+        .send(response)
+        .map_err(|_| ApprovalRefusal::ReceiverGone)?;
     Ok(())
 }
 
@@ -2140,6 +2232,42 @@ impl Channel for WhatsAppWebChannel {
                                     .text_content()
                                     .and_then(crate::util::parse_approval_reply)
                                 {
+                                    // Re-check group admission HERE, against the
+                                    // CURRENT allowlist, before the token can be
+                                    // resolved.
+                                    //
+                                    // Interception sits ahead of agent dispatch so
+                                    // a control message is not also handled as
+                                    // conversation, which is correct. But ahead of
+                                    // DISPATCH is not ahead of ADMISSION: the group
+                                    // gate below runs later, so without this an
+                                    // operator who removes a group while a prompt
+                                    // is pending has not revoked anything for the
+                                    // length of the approval window. A reply from
+                                    // the now-removed group still authorizes the
+                                    // tool call. Revoking access has to revoke
+                                    // in-flight authority too, or the revocation is
+                                    // advisory.
+                                    //
+                                    // The resolver is called fresh rather than
+                                    // reusing a value captured at request time,
+                                    // because the whole point is that the config
+                                    // may have changed since the prompt was posted.
+                                    if is_group
+                                        && !is_group_chat_allowed(
+                                            &chat,
+                                            &allowed_groups_resolver(),
+                                        )
+                                    {
+                                        ::zeroclaw_log::record!(
+                                            WARN,
+                                            ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
+                                                .with_outcome(::zeroclaw_log::EventOutcome::Unknown)
+                                                .with_attrs(::serde_json::json!({ "chat": chat })),
+                                            "approval reply refused: group is no longer admitted"
+                                        );
+                                        return;
+                                    }
                                     // `normalized` is Some only when a sender
                                     // candidate matched allowed_numbers, so it IS
                                     // the authorization signal, already computed
@@ -2147,6 +2275,7 @@ impl Channel for WhatsAppWebChannel {
                                     match resolve_approval_reply(
                                         &token,
                                         response,
+                                        &alias,
                                         &reply_target,
                                         normalized.is_some(),
                                     )
@@ -2749,8 +2878,8 @@ impl Channel for WhatsAppWebChannel {
     ///
     /// Before this existed the channel inherited the trait default of
     /// `Ok(None)`, so an `always_ask` tool failed closed immediately and
-    /// `approval_timeout_secs` was accepted by the config and never read
-    /// (issue #9366). Failing closed was safe, but it made configured
+    /// `approval_timeout_secs` was accepted by the config and never read.
+    /// Failing closed was safe, but it made configured
     /// interactive approval unavailable on this transport.
     ///
     /// The request half mirrors the Cloud transport: token, prompt, wait,
@@ -2765,9 +2894,13 @@ impl Channel for WhatsAppWebChannel {
         let token = crate::util::new_approval_token();
         let (responder, rx) = tokio::sync::oneshot::channel();
 
-        // Bind the token to the chat it is about to be posted into, so a reply
-        // from anywhere else cannot answer it.
+        // Bind the token to the issuing alias AND the chat it is about to be
+        // posted into, so a reply from anywhere else cannot answer it. The
+        // alias matters because the map is process-wide: without it, a second
+        // configured alias sharing this chat would resolve this request under
+        // ITS allowlist rather than ours.
         let binding = ApprovalBinding {
+            alias: self.alias.clone(),
             chat: Self::compute_reply_target(recipient),
             is_group: recipient.contains("@g.us"),
         };
@@ -2781,6 +2914,9 @@ impl Channel for WhatsAppWebChannel {
                 },
             );
         }
+        // Armed immediately after the insert, so there is no window in which
+        // the entry exists without something responsible for removing it.
+        let mut guard = PendingApprovalGuard::new(token.clone());
 
         let mut text = format!(
             "APPROVAL REQUIRED [{}]\nTool: {}\nArgs: {}\n\nReply: \"{} yes\", \"{} no\", or \"{} always\"",
@@ -2790,9 +2926,7 @@ impl Channel for WhatsAppWebChannel {
             // Say so in the prompt. The token is now readable by everyone in
             // this group, and the reason a stranger's reply will bounce is not
             // obvious from the prompt alone.
-            text.push_str(
-                "\n\nThis is a group chat: only numbers on allowed_numbers can answer.",
-            );
+            text.push_str("\n\nThis is a group chat: only numbers on allowed_numbers can answer.");
         }
 
         if let Err(e) = self.send(&SendMessage::new(text, recipient)).await {
@@ -2800,6 +2934,7 @@ impl Channel for WhatsAppWebChannel {
             // delivered; it would sit until the timeout and deny anyway, but
             // with no operator ever having seen it.
             PENDING_APPROVALS.lock().await.remove(&token);
+            guard.disarm();
             return Err(e);
         }
 
@@ -2823,6 +2958,12 @@ impl Channel for WhatsAppWebChannel {
                 ChannelApprovalResponse::Deny
             }
         };
+        // Both arms above reached a decision through a normal path and own their
+        // own removal, so the guard has nothing left to clean up. Disarming only
+        // HERE is deliberate: every path that skips this line is a path where
+        // the entry would otherwise be orphaned, which is exactly what the
+        // guard exists to cover.
+        guard.disarm();
         Ok(Some(response))
     }
 }
@@ -4207,7 +4348,7 @@ mod tests {
         ));
     }
 
-    // -- #9366: request_approval on WhatsApp Web --
+    // -- request_approval on WhatsApp Web --
     //
     // The five cases the triage asked for (approve, deny, always, timeout,
     // zero-timeout) plus the authorization cases, which are the half the Cloud
@@ -4225,9 +4366,20 @@ mod tests {
         }
     }
 
-    /// Park a token bound to `chat` and hand back the receiver.
+    /// Park a token bound to `chat` under the default test alias.
     #[cfg(feature = "whatsapp-web")]
     async fn park_token(
+        token: &str,
+        chat: &str,
+        is_group: bool,
+    ) -> tokio::sync::oneshot::Receiver<ChannelApprovalResponse> {
+        park_token_as("default", token, chat, is_group).await
+    }
+
+    /// Park a token bound to a NAMED alias, for the cross-alias cases.
+    #[cfg(feature = "whatsapp-web")]
+    async fn park_token_as(
+        alias: &str,
         token: &str,
         chat: &str,
         is_group: bool,
@@ -4238,12 +4390,112 @@ mod tests {
             PendingApproval {
                 responder,
                 binding: ApprovalBinding {
+                    alias: alias.to_string(),
                     chat: chat.to_string(),
                     is_group,
                 },
             },
         );
         rx
+    }
+
+    /// A cancelled request must not leave a live token behind.
+    ///
+    /// Every explicit cleanup path lives inside the request future, so none of
+    /// them run when that future is dropped. The guard's `Drop` is the only
+    /// hook that survives cancellation. Without it the entry outlives its
+    /// receiver, and the second half of this test is why that matters: a late
+    /// reply would clear every authorization gate and be logged as ACCEPTED
+    /// while the oneshot is already gone, recording an approval that no tool
+    /// call can ever act on.
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn cancelled_request_leaves_no_live_token() {
+        // Park a token, then drop the receiver to simulate the requesting
+        // future being cancelled by the routed timeout or the orchestrator.
+        let rx = park_token_as("alias-a", "aaa011", "1@s.whatsapp.net", false).await;
+        drop(rx);
+
+        // A reply that clears every gate must still NOT be reported as
+        // accepted, because there is nobody left to receive the decision.
+        let out = resolve_approval_reply(
+            "aaa011",
+            ChannelApprovalResponse::Approve,
+            "alias-a",
+            "1@s.whatsapp.net",
+            true,
+        )
+        .await;
+        assert_eq!(
+            out,
+            Err(ApprovalRefusal::ReceiverGone),
+            "a decision that reaches no live receiver must be refused rather \
+             than logged as accepted: the record would claim an approval that \
+             nothing acted on"
+        );
+        assert!(
+            !PENDING_APPROVALS.lock().await.contains_key("aaa011"),
+            "the entry must not survive a reply that found a dead receiver"
+        );
+    }
+
+    /// Two aliases, one shared group, disjoint allowlists.
+    ///
+    /// `PENDING_APPROVALS` is process-wide, so before the alias was part of the
+    /// binding this was a real authorization bypass rather than a tidiness
+    /// issue: the reply path evaluates `allowed_numbers` using whichever
+    /// instance received the reply. A responder alias A refuses could therefore
+    /// approve alias A's tool call by answering through alias B, because B's
+    /// allowlist decided. Two aliases sharing a group is a supported
+    /// configuration, which is why binding the chat alone did not close it.
+    ///
+    /// The second half is the part worth pinning: the refusal must leave the
+    /// request PENDING, so the legitimate operator can still answer. A refusal
+    /// that consumed the token would hand any bystander a way to cancel an
+    /// approval by replying to it badly.
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn approval_reply_from_another_alias_is_refused() {
+        const SHARED_GROUP: &str = "shared-group@g.us";
+        let _rx = park_token_as("alias-a", "aaa010", SHARED_GROUP, true).await;
+
+        // Alias B replies, and B's OWN allowlist says this responder is fine.
+        // That is exactly the bypass: B's policy must not decide A's request.
+        let out = resolve_approval_reply(
+            "aaa010",
+            ChannelApprovalResponse::Approve,
+            "alias-b",
+            SHARED_GROUP,
+            true,
+        )
+        .await;
+        assert_eq!(
+            out,
+            Err(ApprovalRefusal::ForeignAlias),
+            "alias B must not resolve alias A's token, even in a shared chat \
+             and even when B's own allowlist would admit the responder"
+        );
+        assert!(
+            PENDING_APPROVALS.lock().await.contains_key("aaa010"),
+            "a refused cross-alias reply must leave the request PENDING so the \
+             real operator can still answer it"
+        );
+
+        // The issuing alias still resolves it normally.
+        let out = resolve_approval_reply(
+            "aaa010",
+            ChannelApprovalResponse::Approve,
+            "alias-a",
+            SHARED_GROUP,
+            true,
+        )
+        .await;
+        assert_eq!(
+            out,
+            Ok(()),
+            "the issuing alias must still be able to answer"
+        );
+        PENDING_APPROVALS.lock().await.remove("aaa010");
     }
 
     #[tokio::test]
@@ -4253,6 +4505,7 @@ mod tests {
         let out = resolve_approval_reply(
             "aaa001",
             ChannelApprovalResponse::Approve,
+            "default",
             "1234@s.whatsapp.net",
             true,
         )
@@ -4269,6 +4522,7 @@ mod tests {
             resolve_approval_reply(
                 "aaa002",
                 ChannelApprovalResponse::Deny,
+                "default",
                 "1234@s.whatsapp.net",
                 true,
             )
@@ -4286,6 +4540,7 @@ mod tests {
             resolve_approval_reply(
                 "aaa003",
                 ChannelApprovalResponse::AlwaysApprove,
+                "default",
                 "1234@s.whatsapp.net",
                 true,
             )
@@ -4306,6 +4561,7 @@ mod tests {
             resolve_approval_reply(
                 "aaa004",
                 ChannelApprovalResponse::Approve,
+                "default",
                 "999@g.us",
                 false,
             )
@@ -4320,6 +4576,7 @@ mod tests {
             resolve_approval_reply(
                 "aaa004",
                 ChannelApprovalResponse::Approve,
+                "default",
                 "999@g.us",
                 true,
             )
@@ -4339,6 +4596,7 @@ mod tests {
             resolve_approval_reply(
                 "aaa005",
                 ChannelApprovalResponse::Approve,
+                "default",
                 "222@s.whatsapp.net",
                 true,
             )
@@ -4356,6 +4614,7 @@ mod tests {
             resolve_approval_reply(
                 "zzz999",
                 ChannelApprovalResponse::Approve,
+                "default",
                 "1@s.whatsapp.net",
                 true,
             )
@@ -4442,6 +4701,7 @@ mod tests {
             resolve_approval_reply(
                 "aaa006",
                 ChannelApprovalResponse::Approve,
+                "default",
                 "1@s.whatsapp.net",
                 true,
             )
@@ -4462,12 +4722,10 @@ mod tests {
             ("no", ChannelApprovalResponse::Deny),
             ("always", ChannelApprovalResponse::AlwaysApprove),
         ] {
-            let (got_token, got) =
-                crate::util::parse_approval_reply(&format!("{token} {word}"))
-                    .expect("the prompt own instruction must parse");
+            let (got_token, got) = crate::util::parse_approval_reply(&format!("{token} {word}"))
+                .expect("the prompt own instruction must parse");
             assert_eq!(got_token, token.to_lowercase());
             assert_eq!(got, want);
         }
     }
-
 }
