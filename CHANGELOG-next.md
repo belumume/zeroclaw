@@ -95,6 +95,8 @@ This release is a large consolidation cycle spanning **379 commits** from **56 c
 - **Rust toolchain floor**: the workspace MSRV is now Rust 1.96.1, with CI, containers, and documentation aligned to that version (#8801).
 - **Removed the built-in ClawHub skill-install source** (`zeroclaw skills install clawhub:<slug>` and `clawhub.ai` URLs). Install skills from a local path, a Git URL (optionally `<git-url> --skill <name>` to select one skill from a catalog repo), or a registry name instead. SkillForge's default discovery sources no longer include the never-implemented `clawhub` source (#8638).
 
+- **WhatsApp Web: an empty `allowed_groups` no longer permits every group.** Under `group_policy = "allowlist"` (the default) or `"ignore"`, an empty list now admits no group, and open group access has to be named explicitly with `group_policy = "all"`. A non-empty list keeps its existing exact-JID filtering under every policy, so `"all"` widens only the empty case and does not override a list an operator wrote. Because `WhatsAppChatPolicy::default()` is already `Allowlist`, the affected deployment is a business-mode channel with no `allowed_groups` configured: it goes from answering every group the linked account belongs to, to answering none. Nothing errors, so the channel now logs a startup warning naming that exact condition rather than leaving the operator to notice the silence. Migration is one line per channel, either `group_policy = "all"` to restore the old behavior or the group JIDs listed in `allowed_groups`. Accepted by RFC #9397 (#9348, #9382).
+
 ## Contributors
 
 @alexandme

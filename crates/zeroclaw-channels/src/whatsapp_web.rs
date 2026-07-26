@@ -2014,6 +2014,33 @@ impl Channel for WhatsAppWebChannel {
             let wa_dm_mention_patterns = self.dm_mention_patterns.clone();
             let wa_group_mention_patterns = self.group_mention_patterns.clone();
             let allowed_groups_resolver = Arc::clone(&self.allowed_groups_resolver);
+
+            // Startup notice for the fail-closed default accepted in the RFC on
+            // #9348. The per-message drop further down is DEBUG, which is a poor
+            // discovery surface for a bot that has silently stopped answering in
+            // every group: the operator sees no error, just silence. Say it once
+            // here instead, where it is attributable to a channel.
+            //
+            // Only the newly-closed condition warns. `group_policy = "all"` is
+            // explicitly unchanged by that RFC, so a config that names open
+            // access stays quiet rather than nagging about a choice it made.
+            if !matches!(
+                wa_group_policy,
+                zeroclaw_config::schema::WhatsAppChatPolicy::All
+            ) && allowed_groups_resolver().is_empty()
+            {
+                ::zeroclaw_log::record!(
+                    WARN,
+                    ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
+                        .with_attrs(::serde_json::json!({
+                            "group_policy": format!("{wa_group_policy:?}"),
+                        })),
+                    "allowed_groups is empty and group_policy is not \"all\", so this channel \
+                     will answer no group. Set group_policy = \"all\" to restore open group \
+                     access, or list the group JIDs in allowed_groups."
+                );
+            }
+
             let persist_clone = self.persist.clone();
 
             let mut builder = Bot::builder()
@@ -2854,6 +2881,81 @@ mod tests {
             ),
             "group_policy = \"all\" is the explicit opt-in to open group access"
         );
+    }
+
+    /// The accepted contract from the RFC on #9348, as a table.
+    ///
+    /// The test above pins the two empty-list rows that motivated the RFC. This
+    /// one is the whole matrix, so a future change cannot satisfy the headline
+    /// case while quietly moving a row nobody was looking at. The rows are the
+    /// RFC's own, in its order.
+    #[test]
+    #[cfg(feature = "whatsapp-web")]
+    fn group_gate_matches_the_accepted_contract() {
+        use zeroclaw_config::schema::WhatsAppChatPolicy as Policy;
+
+        const GROUP: &str = "123456789012345@g.us";
+        const OTHER: &str = "999999999999999@g.us";
+        let listed = vec![GROUP.to_string()];
+
+        // Row 1: a non-empty list keeps exact-JID filtering under EVERY policy,
+        // so `all` widens the empty case rather than overriding a list an
+        // operator deliberately wrote. That second half is the one worth
+        // pinning: `all` must not become a wildcard that ignores the list.
+        for policy in [Policy::Allowlist, Policy::Ignore, Policy::All] {
+            assert!(
+                super::is_group_chat_allowed(GROUP, &listed, &policy),
+                "a listed group must be admitted under {policy:?}"
+            );
+            assert!(
+                !super::is_group_chat_allowed(OTHER, &listed, &policy),
+                "an unlisted group must be dropped under {policy:?}, including \
+                 `all` -- `all` widens the EMPTY case, it does not override a \
+                 list the operator wrote"
+            );
+        }
+
+        // Rows 2-4: what an empty list means is decided by the policy.
+        assert!(
+            super::is_group_chat_allowed(GROUP, &[], &Policy::All),
+            "row 2: `all` + empty admits every group"
+        );
+        assert!(
+            !super::is_group_chat_allowed(GROUP, &[], &Policy::Allowlist),
+            "row 3: `allowlist` + empty admits no group"
+        );
+        assert!(
+            !super::is_group_chat_allowed(GROUP, &[], &Policy::Ignore),
+            "row 4: `ignore` + empty admits no group"
+        );
+
+        // The default is what makes business mode fail closed once the gate
+        // left the personal-mode branch. If this flips, the RFC's compatibility
+        // analysis is void and the migration note is wrong.
+        assert_eq!(
+            Policy::default(),
+            Policy::Allowlist,
+            "the accepted contract assumes the default policy is allowlist"
+        );
+    }
+
+    /// Whitespace-only entries are not permission either.
+    ///
+    /// A list of `[""]` is non-empty, so it takes the filtering path rather
+    /// than the policy path, and the filter must still admit nobody. Worth its
+    /// own test because it is the one way to construct a list that looks
+    /// configured, reaches the strict branch, and matches nothing.
+    #[test]
+    #[cfg(feature = "whatsapp-web")]
+    fn blank_allowed_groups_entries_admit_nobody() {
+        use zeroclaw_config::schema::WhatsAppChatPolicy as Policy;
+        let blanks = vec![String::new(), "   ".to_string()];
+        for policy in [Policy::Allowlist, Policy::Ignore, Policy::All] {
+            assert!(
+                !super::is_group_chat_allowed("123456789012345@g.us", &blanks, &policy),
+                "blank entries are not permission under {policy:?}"
+            );
+        }
     }
 
     /// The defect in #9348, pinned at the decision itself.
