@@ -1278,10 +1278,27 @@ fn fromme_outside_self_chat_is_operator_trigger(
     super::whatsapp::WhatsAppChannel::text_matches_patterns(applicable, text)
 }
 
+/// Whether a group chat may be processed.
+///
+/// An empty `allowed_groups` is NOT permission. A list that admits everything
+/// is indistinguishable from a list nobody configured, so open group access has
+/// to be asked for by name: `group_policy = "all"`. Under `"allowlist"` an empty
+/// list admits nothing, which is what an allowlist means everywhere else in this
+/// codebase, and under `"ignore"` the caller has already dropped the message.
+///
+/// A non-empty list still filters under every policy, so `"all"` widens the
+/// default rather than overriding an explicit list.
 #[cfg(feature = "whatsapp-web")]
-fn is_group_chat_allowed(chat_jid: &str, allowed_groups: &[String]) -> bool {
+fn is_group_chat_allowed(
+    chat_jid: &str,
+    allowed_groups: &[String],
+    group_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
+) -> bool {
     if allowed_groups.is_empty() {
-        return true;
+        return matches!(
+            group_policy,
+            zeroclaw_config::schema::WhatsAppChatPolicy::All
+        );
     }
     let chat_user = chat_jid
         .split_once('@')
@@ -2019,7 +2036,13 @@ impl Channel for WhatsAppWebChannel {
                                 let reply_target = Self::compute_reply_target(&chat);
 
                                 let allowed_groups = allowed_groups_resolver();
-                                if is_group && !is_group_chat_allowed(&chat, &allowed_groups) {
+                                if is_group
+                                    && !is_group_chat_allowed(
+                                        &chat,
+                                        &allowed_groups,
+                                        &wa_group_policy,
+                                    )
+                                {
                                     ::zeroclaw_log::record!(
                                         DEBUG,
                                         ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
@@ -2029,7 +2052,14 @@ impl Channel for WhatsAppWebChannel {
                                     return;
                                 }
 
-                                // ── Personal-mode chat-type policy filtering ──
+                                // ── Personal-mode sender semantics ──
+                                //
+                                // Self-chat and fromMe handling stay personal-only:
+                                // they describe a personal account talking to itself,
+                                // and a business account has no equivalent. The
+                                // chat-type policies further down are NOT personal-only
+                                // and run under both modes.
+                                let mut operator_self_chat = false;
                                 if wa_mode == zeroclaw_config::schema::WhatsAppWebMode::Personal {
                                     // Self-chat: the chat JID user part matches
                                     // the sender's user part (message to "Notes
@@ -2046,7 +2076,10 @@ impl Channel for WhatsAppWebChannel {
                                             ::zeroclaw_log::record!(DEBUG, ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note), "ignoring self-chat message (self_chat_mode=false)");
                                             return;
                                         }
-                                        // self_chat_mode=true: always process, skip further policy checks.
+                                        // self_chat_mode=true: the operator is talking
+                                        // to their own agent, so the chat-type policies
+                                        // below do not apply to this message.
+                                        operator_self_chat = true;
                                     } else if info.source.is_from_me
                                         && !fromme_outside_self_chat_is_operator_trigger(
                                             is_group,
@@ -2057,7 +2090,17 @@ impl Channel for WhatsAppWebChannel {
                                     {
                                         ::zeroclaw_log::record!(DEBUG, ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note).with_attrs(::serde_json::json!({"chat": chat, "sender": sender})), "ignoring fromMe message outside self-chat thread (chat=, sender=)");
                                         return;
-                                    } else if is_group {
+                                    }
+                                }
+
+                                // ── Chat-type policy, enforced under BOTH modes ──
+                                //
+                                // This block used to sit inside the personal-mode
+                                // branch above, so a business-mode deployment
+                                // validated dm_policy and group_policy and then never
+                                // consulted either one. See #9348.
+                                if !operator_self_chat {
+                                    if is_group {
                                         match wa_group_policy {
                                             zeroclaw_config::schema::WhatsAppChatPolicy::Ignore => {
                                                 ::zeroclaw_log::record!(DEBUG, ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note), "ignoring group message (group_policy=ignore)");
@@ -2759,9 +2802,27 @@ mod tests {
 
     #[test]
     #[cfg(feature = "whatsapp-web")]
-    fn allowed_groups_empty_permits_all() {
-        // Empty list is the default: every group passes (no behavior change).
-        assert!(super::is_group_chat_allowed("123456789012345@g.us", &[]));
+    fn allowed_groups_empty_is_not_permission() {
+        // An empty list is not permission. A list that admits everything cannot
+        // be told apart from a list nobody configured, so open group access has
+        // to be named: group_policy = "all".
+        assert!(
+            !super::is_group_chat_allowed(
+                "123456789012345@g.us",
+                &[],
+                &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
+            ),
+            "an empty allowed_groups under group_policy = \"allowlist\" must \
+             admit no group"
+        );
+        assert!(
+            super::is_group_chat_allowed(
+                "123456789012345@g.us",
+                &[],
+                &zeroclaw_config::schema::WhatsAppChatPolicy::All
+            ),
+            "group_policy = \"all\" is the explicit opt-in to open group access"
+        );
     }
 
     #[test]
@@ -2783,7 +2844,8 @@ mod tests {
         let groups = vec!["123456789012345@g.us".to_string()];
         assert!(super::is_group_chat_allowed(
             "123456789012345@g.us",
-            &groups
+            &groups,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
     }
 
@@ -2808,7 +2870,8 @@ mod tests {
         let groups = vec!["123456789012345".to_string()];
         assert!(super::is_group_chat_allowed(
             "123456789012345@g.us",
-            &groups
+            &groups,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
     }
 
@@ -2827,22 +2890,26 @@ mod tests {
         let groups = vec!["123456789012345".to_string()];
         assert!(!super::is_group_chat_allowed(
             "999999999999999@g.us",
-            &groups
+            &groups,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
         // Blank / whitespace-only entries never match.
         assert!(!super::is_group_chat_allowed(
             "123@g.us",
-            &["   ".to_string()]
+            &["   ".to_string()],
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
         // Prefix entries match the user part EXACTLY, not as a string prefix:
         // "123" must admit "123@g.us" but never "123999@g.us".
         assert!(super::is_group_chat_allowed(
             "123@g.us",
-            &["123".to_string()]
+            &["123".to_string()],
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
         assert!(!super::is_group_chat_allowed(
             "123999@g.us",
-            &["123".to_string()]
+            &["123".to_string()],
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
     }
 
@@ -2900,7 +2967,12 @@ mod tests {
         let groups = vec!["123456789012345".to_string()];
         let is_group = false;
         let dm_jid = "987654321098765@s.whatsapp.net";
-        let admitted = !is_group || super::is_group_chat_allowed(dm_jid, &groups);
+        let admitted = !is_group
+            || super::is_group_chat_allowed(
+                dm_jid,
+                &groups,
+                &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
+            );
         assert!(admitted);
     }
 
