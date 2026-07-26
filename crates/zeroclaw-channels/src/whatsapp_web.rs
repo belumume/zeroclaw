@@ -1289,6 +1289,28 @@ fn fromme_outside_self_chat_is_operator_trigger(
 /// A non-empty list still filters under every policy, so `"all"` widens the
 /// default rather than overriding an explicit list.
 #[cfg(feature = "whatsapp-web")]
+/// Whether an empty `allowed_groups` is a capability the operator is LOSING
+/// here, which is the only condition worth a startup warning.
+///
+/// "Closed" and "newly closed" are different sets, and warning on the larger
+/// one is noise. Personal mode with `ignore` already dropped every group before
+/// this change, so that operator loses nothing and has nothing to migrate. The
+/// warning-only slice stays deliberately quiet there for the same reason.
+///
+/// `all` is never a loss under any mode: it is the explicit opt-in to open
+/// group access, so a config that names it should not be nagged about it.
+fn empty_group_list_is_newly_closed(
+    mode: &zeroclaw_config::schema::WhatsAppWebMode,
+    group_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
+) -> bool {
+    use zeroclaw_config::schema::{WhatsAppChatPolicy as Policy, WhatsAppWebMode as Mode};
+    match (mode, group_policy) {
+        (_, Policy::All) => false,
+        (Mode::Personal, Policy::Ignore) => false,
+        _ => true,
+    }
+}
+
 fn is_group_chat_allowed(
     chat_jid: &str,
     allowed_groups: &[String],
@@ -2015,8 +2037,8 @@ impl Channel for WhatsAppWebChannel {
             let wa_group_mention_patterns = self.group_mention_patterns.clone();
             let allowed_groups_resolver = Arc::clone(&self.allowed_groups_resolver);
 
-            // Startup notice for the fail-closed default accepted in the RFC on
-            // #9348. The per-message drop further down is DEBUG, which is a poor
+            // Startup notice for the fail-closed empty-list default. The
+            // per-message drop further down is DEBUG, which is a poor
             // discovery surface for a bot that has silently stopped answering in
             // every group: the operator sees no error, just silence. Say it once
             // here instead, where it is attributable to a channel.
@@ -2024,10 +2046,8 @@ impl Channel for WhatsAppWebChannel {
             // Only the newly-closed condition warns. `group_policy = "all"` is
             // explicitly unchanged by that RFC, so a config that names open
             // access stays quiet rather than nagging about a choice it made.
-            if !matches!(
-                wa_group_policy,
-                zeroclaw_config::schema::WhatsAppChatPolicy::All
-            ) && allowed_groups_resolver().is_empty()
+            if empty_group_list_is_newly_closed(&wa_mode, &wa_group_policy)
+                && allowed_groups_resolver().is_empty()
             {
                 ::zeroclaw_log::record!(
                     WARN,
@@ -2119,11 +2139,26 @@ impl Channel for WhatsAppWebChannel {
                                         &wa_group_policy,
                                     )
                                 {
+                                    // This gate runs before the chat-type policy below, so
+                                    // under `ignore` it would otherwise absorb the drop and
+                                    // report it as a list miss. The ordering is deliberate
+                                    // and stays: the narrower check runs first. Only the
+                                    // REASON is attributed to whichever rule actually
+                                    // decided it, so `ignore` keeps the distinct reason its
+                                    // coverage advertises.
+                                    let reason = if matches!(
+                                        wa_group_policy,
+                                        zeroclaw_config::schema::WhatsAppChatPolicy::Ignore
+                                    ) {
+                                        "ignoring group message (group_policy=ignore)"
+                                    } else {
+                                        "dropping group message: chat not in allowed_groups"
+                                    };
                                     ::zeroclaw_log::record!(
                                         DEBUG,
                                         ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
                                             .with_attrs(::serde_json::json!({ "chat": chat })),
-                                        "dropping group message: chat not in allowed_groups"
+                                        reason
                                     );
                                     return;
                                 }
@@ -2174,7 +2209,7 @@ impl Channel for WhatsAppWebChannel {
                                 // This block used to sit inside the personal-mode
                                 // branch above, so a business-mode deployment
                                 // validated dm_policy and group_policy and then never
-                                // consulted either one. See #9348.
+                                // consulted either one.
                                 if !operator_self_chat {
                                     match chat_type_policy_decision(
                                         is_group,
@@ -2883,7 +2918,7 @@ mod tests {
         );
     }
 
-    /// The accepted contract from the RFC on #9348, as a table.
+    /// The accepted empty-list contract, as a table.
     ///
     /// The test above pins the two empty-list rows that motivated the RFC. This
     /// one is the whole matrix, so a future change cannot satisfy the headline
@@ -2939,6 +2974,123 @@ mod tests {
         );
     }
 
+    /// The startup warning fires only where a capability is actually lost.
+    ///
+    /// The first predicate warned on every closed case rather than every NEWLY
+    /// closed one, which are different sets. Personal mode with `ignore` sits in
+    /// the difference: it already dropped every group before this change, so the
+    /// operator loses nothing and has nothing to migrate. All six cells are
+    /// pinned rather than just that one, so a future edit cannot fix the noisy
+    /// cell while silently dropping a warning someone does need.
+    #[test]
+    #[cfg(feature = "whatsapp-web")]
+    fn startup_warning_fires_only_for_newly_closed_configs() {
+        use zeroclaw_config::schema::{WhatsAppChatPolicy as Policy, WhatsAppWebMode as Mode};
+
+        for (mode, policy, expected, why) in [
+            (
+                Mode::Business,
+                Policy::Allowlist,
+                true,
+                "the headline case: business mode used to answer every group",
+            ),
+            (
+                Mode::Business,
+                Policy::Ignore,
+                true,
+                "business mode never consulted `ignore` before, so this closes now",
+            ),
+            (
+                Mode::Personal,
+                Policy::Allowlist,
+                true,
+                "an empty list used to permit every group here too",
+            ),
+            (
+                Mode::Personal,
+                Policy::Ignore,
+                false,
+                "ALREADY dropped every group before this change: nothing is lost, so warning is noise",
+            ),
+            (
+                Mode::Business,
+                Policy::All,
+                false,
+                "`all` is the explicit opt-in to open access, never a loss",
+            ),
+            (
+                Mode::Personal,
+                Policy::All,
+                false,
+                "`all` is the explicit opt-in to open access, never a loss",
+            ),
+        ] {
+            assert_eq!(
+                super::empty_group_list_is_newly_closed(&mode, &policy),
+                expected,
+                "{mode:?} + {policy:?} should {} warn -- {why}",
+                if expected { "" } else { "NOT" }
+            );
+        }
+    }
+
+    /// The mode-independence of the admission path, pinned structurally.
+    ///
+    /// Every other test here drives `chat_type_policy_decision` directly, and
+    /// that helper takes no mode, so all of them would still pass if its call
+    /// site were moved back inside the personal-mode branch. That move is the
+    /// original vulnerability, so the thing worth pinning is not the helper's
+    /// behavior but WHERE it is invoked from.
+    ///
+    /// Reading the source is the honest way to assert that while the decision
+    /// lives inside a large async closure: a behavioral test cannot see the
+    /// difference, because the helper behaves identically either way. The
+    /// assertion is narrow on purpose. It does not care about formatting or
+    /// line numbers, only that the sole production call sits under the
+    /// self-chat guard rather than under a mode check.
+    #[test]
+    #[cfg(feature = "whatsapp-web")]
+    fn policy_decision_is_not_reachable_only_under_personal_mode() {
+        let src = include_str!("whatsapp_web.rs");
+        let production = src
+            .split("mod tests")
+            .next()
+            .expect("source has a production region before the test module");
+
+        // The needle also matches the DECLARATION `fn chat_type_policy_decision(`,
+        // which is not a call. Counting it made the first run report two sites,
+        // which reads exactly like a real second admission path and is not one.
+        let call = "chat_type_policy_decision(";
+        let sites: Vec<usize> = production
+            .match_indices(call)
+            .filter(|(i, _)| !production[..*i].trim_end().ends_with("fn"))
+            .map(|(i, _)| i)
+            .collect();
+        assert_eq!(
+            sites.len(),
+            1,
+            "expected exactly one production call site for {call}; a second one \
+             means the admission decision has more than one path and this guard \
+             no longer covers all of them"
+        );
+
+        // The 400 chars before the call cover its enclosing guard and comment.
+        let start = sites[0].saturating_sub(400);
+        let preamble = &production[start..sites[0]];
+        assert!(
+            preamble.contains("if !operator_self_chat"),
+            "the policy decision must be guarded by the self-chat exception \
+             ONLY. Its actual guard was:\n{preamble}"
+        );
+        assert!(
+            !preamble.contains("WhatsAppWebMode") && !preamble.contains("Personal"),
+            "the policy decision is enclosed by a MODE check, which is the \
+             original vulnerability: business-mode deployments validate \
+             dm_policy and group_policy and then never consult either one. \
+             Guard was:\n{preamble}"
+        );
+    }
+
     /// Whitespace-only entries are not permission either.
     ///
     /// A list of `[""]` is non-empty, so it takes the filtering path rather
@@ -2958,7 +3110,7 @@ mod tests {
         }
     }
 
-    /// The defect in #9348, pinned at the decision itself.
+    /// The mode-independence invariant, pinned at the decision itself.
     ///
     /// Business mode used to skip this decision entirely, so an unlisted sender
     /// was admitted no matter what `dm_policy` said. The policy default is
@@ -3009,8 +3161,8 @@ mod tests {
     /// than sampling is that the group and DM halves must agree row for row.
     ///
     /// Mode does not appear here, which is the fix: the decision takes no
-    /// `WhatsAppWebMode`, so it cannot depend on one. Before #9348 this whole
-    /// decision was reachable only under personal mode.
+    /// `WhatsAppWebMode`, so it cannot depend on one. This decision was
+    /// previously reachable only under personal mode.
     #[test]
     #[cfg(feature = "whatsapp-web")]
     fn decision_surface_is_total_and_mode_free() {
