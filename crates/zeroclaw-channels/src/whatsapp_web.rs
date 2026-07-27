@@ -1299,19 +1299,14 @@ fn fromme_outside_self_chat_is_operator_trigger(
 ///
 /// `all` is never a loss under any mode: it is the explicit opt-in to open
 /// group access, so a config that names it should not be nagged about it.
+/// The startup notice and the `config validate` warning must agree about which
+/// configurations this change closes, so both read the same predicate rather
+/// than each carrying its own copy of the rule.
 fn empty_group_list_is_newly_closed(
     mode: &zeroclaw_config::schema::WhatsAppWebMode,
     group_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
 ) -> bool {
-    use zeroclaw_config::schema::{WhatsAppChatPolicy as Policy, WhatsAppWebMode as Mode};
-    // The two exclusions, spelled out because they are the whole rule:
-    // `all` is the explicit opt-in to open access under either mode, and
-    // personal + `ignore` already dropped every group before this change.
-    // Everything else is a capability the operator is losing here.
-    !matches!(
-        (mode, group_policy),
-        (_, Policy::All) | (Mode::Personal, Policy::Ignore)
-    )
+    zeroclaw_config::schema::whatsapp_empty_group_list_is_newly_closed(mode, group_policy)
 }
 
 fn is_group_chat_allowed(
