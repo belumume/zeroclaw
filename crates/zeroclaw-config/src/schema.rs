@@ -14601,10 +14601,12 @@ impl ChannelConfig for SignalConfig {
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum WhatsAppWebMode {
-    /// Respond to all messages passing the allowlist (default).
+    /// Unattended account with no self-chat exception (default). `dm_policy` and
+    /// `group_policy` are enforced here exactly as in `personal`.
     #[default]
     Business,
-    /// Apply per-chat-type policies (dm_policy, group_policy, self_chat_mode).
+    /// Personal phone, which additionally makes the `self_chat_mode` exception
+    /// available. `dm_policy` and `group_policy` are enforced in both modes.
     Personal,
 }
 
@@ -14614,12 +14616,16 @@ pub enum WhatsAppWebMode {
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum WhatsAppChatPolicy {
-    /// Only respond to senders on the `allowed_numbers` list (default).
+    /// Consult the allowlist for this chat type (default). Senders are gated by
+    /// `allowed_numbers`; group chats are additionally gated by `allowed_groups`,
+    /// where an empty list admits no group rather than every group.
     #[default]
     Allowlist,
     /// Ignore all messages in this chat type.
     Ignore,
-    /// Respond to every message regardless of allowlist.
+    /// Respond to every message in this chat type, bypassing the allowlist. For
+    /// groups this is the only value that admits every group when
+    /// `allowed_groups` is empty.
     All,
 }
 
