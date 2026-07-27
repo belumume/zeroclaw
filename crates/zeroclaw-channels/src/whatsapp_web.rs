@@ -1278,17 +1278,6 @@ fn fromme_outside_self_chat_is_operator_trigger(
     super::whatsapp::WhatsAppChannel::text_matches_patterns(applicable, text)
 }
 
-/// Whether a group chat may be processed.
-///
-/// An empty `allowed_groups` is NOT permission. A list that admits everything
-/// is indistinguishable from a list nobody configured, so open group access has
-/// to be asked for by name: `group_policy = "all"`. Under `"allowlist"` an empty
-/// list admits nothing, which is what an allowlist means everywhere else in this
-/// codebase, and under `"ignore"` the caller has already dropped the message.
-///
-/// A non-empty list still filters under every policy, so `"all"` widens the
-/// default rather than overriding an explicit list.
-#[cfg(feature = "whatsapp-web")]
 /// Whether an empty `allowed_groups` is a capability the operator is LOSING
 /// here, which is the only condition worth a startup warning.
 ///
@@ -1309,6 +1298,17 @@ fn empty_group_list_is_newly_closed(
     zeroclaw_config::schema::whatsapp_empty_group_list_is_newly_closed(mode, group_policy)
 }
 
+/// Whether a group chat may be processed.
+///
+/// An empty `allowed_groups` is NOT permission. A list that admits everything
+/// is indistinguishable from a list nobody configured, so open group access has
+/// to be asked for by name: `group_policy = "all"`. Under `"allowlist"` an empty
+/// list admits nothing, which is what an allowlist means everywhere else in this
+/// codebase; `"ignore"` also admits nothing.
+///
+/// A non-empty list still filters under every policy, so `"all"` widens the
+/// default rather than overriding an explicit list.
+#[cfg(feature = "whatsapp-web")]
 fn is_group_chat_allowed(
     chat_jid: &str,
     allowed_groups: &[String],
@@ -1376,6 +1376,26 @@ fn chat_type_policy_decision(
                 ChatPolicyDecision::DropUnrecognizedSender
             }
         }
+    }
+}
+
+/// Compose the mode-specific self-chat exception with the cross-mode policy.
+///
+/// The policy decision is always evaluated for business mode. Personal mode
+/// may bypass it only for an operator self-chat that was recognized upstream.
+#[cfg(feature = "whatsapp-web")]
+fn composed_chat_policy_decision(
+    mode: &zeroclaw_config::schema::WhatsAppWebMode,
+    operator_self_chat: bool,
+    is_group: bool,
+    group_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
+    dm_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
+    sender_recognized: bool,
+) -> ChatPolicyDecision {
+    if *mode == zeroclaw_config::schema::WhatsAppWebMode::Personal && operator_self_chat {
+        ChatPolicyDecision::Admit
+    } else {
+        chat_type_policy_decision(is_group, group_policy, dm_policy, sender_recognized)
     }
 }
 
@@ -2208,30 +2228,30 @@ impl Channel for WhatsAppWebChannel {
                                 // branch above, so a business-mode deployment
                                 // validated dm_policy and group_policy and then never
                                 // consulted either one.
-                                if !operator_self_chat {
-                                    match chat_type_policy_decision(
-                                        is_group,
-                                        &wa_group_policy,
-                                        &wa_dm_policy,
-                                        normalized.is_some(),
-                                    ) {
-                                        ChatPolicyDecision::Admit => {}
-                                        ChatPolicyDecision::DropGroupIgnored => {
-                                            ::zeroclaw_log::record!(DEBUG, ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note), "ignoring group message (group_policy=ignore)");
-                                            return;
-                                        }
-                                        ChatPolicyDecision::DropDmIgnored => {
-                                            ::zeroclaw_log::record!(DEBUG, ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note), "ignoring DM (dm_policy=ignore)");
-                                            return;
-                                        }
-                                        ChatPolicyDecision::DropUnrecognizedSender => {
-                                            let lid_diag = Self::lid_rejection_diagnostic(
-                                                &sender_jid,
-                                                mapped_phone.as_deref(),
-                                            );
-                                            ::zeroclaw_log::record!(WARN, ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note).with_outcome(::zeroclaw_log::EventOutcome::Unknown), &format!("message from unrecognized sender not in allowed list (candidates_count={}){}", sender_candidates.len(), lid_diag));
-                                            return;
-                                        }
+                                match composed_chat_policy_decision(
+                                    &wa_mode,
+                                    operator_self_chat,
+                                    is_group,
+                                    &wa_group_policy,
+                                    &wa_dm_policy,
+                                    normalized.is_some(),
+                                ) {
+                                    ChatPolicyDecision::Admit => {}
+                                    ChatPolicyDecision::DropGroupIgnored => {
+                                        ::zeroclaw_log::record!(DEBUG, ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note), "ignoring group message (group_policy=ignore)");
+                                        return;
+                                    }
+                                    ChatPolicyDecision::DropDmIgnored => {
+                                        ::zeroclaw_log::record!(DEBUG, ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note), "ignoring DM (dm_policy=ignore)");
+                                        return;
+                                    }
+                                    ChatPolicyDecision::DropUnrecognizedSender => {
+                                        let lid_diag = Self::lid_rejection_diagnostic(
+                                            &sender_jid,
+                                            mapped_phone.as_deref(),
+                                        );
+                                        ::zeroclaw_log::record!(WARN, ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note).with_outcome(::zeroclaw_log::EventOutcome::Unknown), &format!("message from unrecognized sender not in allowed list (candidates_count={}){}", sender_candidates.len(), lid_diag));
+                                        return;
                                     }
                                 }
 
@@ -3032,60 +3052,52 @@ mod tests {
         }
     }
 
-    /// The mode-independence of the admission path, pinned structurally.
-    ///
-    /// Every other test here drives `chat_type_policy_decision` directly, and
-    /// that helper takes no mode, so all of them would still pass if its call
-    /// site were moved back inside the personal-mode branch. That move is the
-    /// original vulnerability, so the thing worth pinning is not the helper's
-    /// behavior but WHERE it is invoked from.
-    ///
-    /// Reading the source is the honest way to assert that while the decision
-    /// lives inside a large async closure: a behavioral test cannot see the
-    /// difference, because the helper behaves identically either way. The
-    /// assertion is narrow on purpose. It does not care about formatting or
-    /// line numbers, only that the sole production call sits under the
-    /// self-chat guard rather than under a mode check.
+    /// Both modes enforce chat policies; only a personal self-chat bypasses.
     #[test]
     #[cfg(feature = "whatsapp-web")]
-    fn policy_decision_is_not_reachable_only_under_personal_mode() {
-        let src = include_str!("whatsapp_web.rs");
-        let production = src
-            .split("mod tests")
-            .next()
-            .expect("source has a production region before the test module");
+    fn composed_policy_decision_enforces_both_modes() {
+        use zeroclaw_config::schema::{WhatsAppChatPolicy as Policy, WhatsAppWebMode as Mode};
 
-        // The needle also matches the DECLARATION `fn chat_type_policy_decision(`,
-        // which is not a call. Counting it made the first run report two sites,
-        // which reads exactly like a real second admission path and is not one.
-        let call = "chat_type_policy_decision(";
-        let sites: Vec<usize> = production
-            .match_indices(call)
-            .filter(|(i, _)| !production[..*i].trim_end().ends_with("fn"))
-            .map(|(i, _)| i)
-            .collect();
+        for mode in [Mode::Business, Mode::Personal] {
+            for is_group in [false, true] {
+                assert_eq!(
+                    super::composed_chat_policy_decision(
+                        &mode,
+                        false,
+                        is_group,
+                        &Policy::Allowlist,
+                        &Policy::Allowlist,
+                        false,
+                    ),
+                    super::ChatPolicyDecision::DropUnrecognizedSender,
+                    "{mode:?} must enforce the default policy (is_group={is_group})"
+                );
+            }
+        }
+
         assert_eq!(
-            sites.len(),
-            1,
-            "expected exactly one production call site for {call}; a second one \
-             means the admission decision has more than one path and this guard \
-             no longer covers all of them"
+            super::composed_chat_policy_decision(
+                &Mode::Personal,
+                true,
+                false,
+                &Policy::Allowlist,
+                &Policy::Allowlist,
+                false,
+            ),
+            super::ChatPolicyDecision::Admit,
+            "a recognized personal self-chat bypasses chat-type policy"
         );
-
-        // The 400 chars before the call cover its enclosing guard and comment.
-        let start = sites[0].saturating_sub(400);
-        let preamble = &production[start..sites[0]];
-        assert!(
-            preamble.contains("if !operator_self_chat"),
-            "the policy decision must be guarded by the self-chat exception \
-             ONLY. Its actual guard was:\n{preamble}"
-        );
-        assert!(
-            !preamble.contains("WhatsAppWebMode") && !preamble.contains("Personal"),
-            "the policy decision is enclosed by a MODE check, which is the \
-             original vulnerability: business-mode deployments validate \
-             dm_policy and group_policy and then never consult either one. \
-             Guard was:\n{preamble}"
+        assert_eq!(
+            super::composed_chat_policy_decision(
+                &Mode::Business,
+                true,
+                false,
+                &Policy::Allowlist,
+                &Policy::Allowlist,
+                false,
+            ),
+            super::ChatPolicyDecision::DropUnrecognizedSender,
+            "business mode cannot acquire the personal self-chat exception"
         );
     }
 

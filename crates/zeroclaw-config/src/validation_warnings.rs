@@ -10,16 +10,13 @@ use serde::{Deserialize, Serialize};
 /// Stable codes (extend as new warnings are added):
 /// - `memory_semantic_search_without_embedder`: `memory.search_mode` requests
 ///   vector search on sqlite memory, but no effective embedder is configured.
-/// - `whatsapp_chat_policy_inert`: a WhatsApp Web `dm_policy` / `group_policy` /
-///   `self_chat_mode` is set but the transport only consults them under
-///   `mode = "personal"`, so it currently has no effect.
-/// - `whatsapp_empty_group_allowlist_permits_all`: `allowed_groups` is empty in
-///   a configuration where that list is the only group gate, so it permits every
-///   group the linked account belongs to. Raised for `mode = "business"` (which
-///   never consults `group_policy`) and for `mode = "personal"` with
-///   `group_policy = "allowlist"`. Personal mode with `group_policy = "ignore"`
-///   already drops every group message, and `group_policy = "all"` is an explicit
-///   opt-in to open access, so neither is reported.
+/// - `whatsapp_chat_policy_inert`: a business-mode WhatsApp Web channel enables
+///   `self_chat_mode`, which is consulted only in personal mode.
+/// - `whatsapp_empty_group_allowlist_admits_none`: `allowed_groups` is empty in
+///   a configuration newly closed by the cross-mode policy contract, so the
+///   channel serves no group. Personal mode with `group_policy = "ignore"` was
+///   already closed, and `group_policy = "all"` explicitly preserves open access,
+///   so neither is reported.
 /// - `memory_config_knob_inert`: a `[memory]` knob is set to a non-default
 ///   value but has no runtime consumer yet, so it currently has no effect
 ///   (see `validate_memory_semantics` in `schema.rs` for the current list).
