@@ -46,8 +46,17 @@ struct ApprovalBinding {
 
 #[cfg(feature = "whatsapp-web")]
 struct PendingApproval {
+    registration_id: uuid::Uuid,
     responder: tokio::sync::oneshot::Sender<ChannelApprovalResponse>,
     binding: ApprovalBinding,
+}
+
+#[cfg(feature = "whatsapp-web")]
+struct PendingApprovalRegistration {
+    token: String,
+    receiver: tokio::sync::oneshot::Receiver<ChannelApprovalResponse>,
+    binding: ApprovalBinding,
+    guard: PendingApprovalGuard,
 }
 
 /// Removes a parked token when the requesting future goes away.
@@ -69,12 +78,16 @@ struct PendingApproval {
 #[cfg(feature = "whatsapp-web")]
 struct PendingApprovalGuard {
     token: Option<String>,
+    registration_id: uuid::Uuid,
 }
 
 #[cfg(feature = "whatsapp-web")]
 impl PendingApprovalGuard {
-    fn new(token: String) -> Self {
-        Self { token: Some(token) }
+    fn new(token: String, registration_id: uuid::Uuid) -> Self {
+        Self {
+            token: Some(token),
+            registration_id,
+        }
     }
 
     /// The decision was taken through a normal path; stop guarding.
@@ -93,8 +106,9 @@ impl Drop for PendingApprovalGuard {
         // thread is unwinding. Spawn the removal instead; the entry is gone
         // before any realistic reply, and a reply that beats it still finds a
         // dead receiver and cannot be reported as accepted.
+        let registration_id = self.registration_id;
         zeroclaw_spawn::spawn!(async move {
-            PENDING_APPROVALS.lock().await.remove(&token);
+            remove_pending_approval_if_matches(&token, registration_id).await;
         });
     }
 }
@@ -112,6 +126,47 @@ static PENDING_APPROVALS: std::sync::LazyLock<Arc<PendingApprovalsMap>> =
     std::sync::LazyLock::new(|| {
         Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()))
     });
+
+#[cfg(feature = "whatsapp-web")]
+async fn remove_pending_approval_if_matches(token: &str, registration_id: uuid::Uuid) -> bool {
+    let mut pending = PENDING_APPROVALS.lock().await;
+    if pending
+        .get(token)
+        .is_some_and(|entry| entry.registration_id == registration_id)
+    {
+        pending.remove(token);
+        true
+    } else {
+        false
+    }
+}
+
+/// Reserve an unused reply token and tie its map entry to a cancellation guard.
+#[cfg(feature = "whatsapp-web")]
+async fn register_pending_approval(binding: ApprovalBinding) -> PendingApprovalRegistration {
+    loop {
+        let token = crate::util::new_approval_token();
+        let mut pending = PENDING_APPROVALS.lock().await;
+
+        if let std::collections::hash_map::Entry::Vacant(slot) = pending.entry(token.clone()) {
+            let registration_id = uuid::Uuid::new_v4();
+            let (responder, receiver) = tokio::sync::oneshot::channel();
+            slot.insert(PendingApproval {
+                registration_id,
+                responder,
+                binding: binding.clone(),
+            });
+            drop(pending);
+
+            return PendingApprovalRegistration {
+                token: token.clone(),
+                receiver,
+                binding,
+                guard: PendingApprovalGuard::new(token, registration_id),
+            };
+        }
+    }
+}
 
 /// Why a syntactically valid approval reply was refused.
 ///
@@ -138,6 +193,9 @@ enum ApprovalRefusal {
     /// not, and answering under the wrong alias means the wrong
     /// `allowed_numbers` decides.
     ForeignAlias,
+    /// The token belongs to a group that the live channel policy no longer
+    /// admits.
+    GroupNoLongerAllowed,
 }
 
 /// Decide whether an approval reply may resolve `token`, and resolve it if so.
@@ -199,6 +257,31 @@ async fn resolve_approval_reply(
         .send(response)
         .map_err(|_| ApprovalRefusal::ReceiverGone)?;
     Ok(())
+}
+
+/// Re-check live group admission before resolving a pending approval reply.
+#[cfg(feature = "whatsapp-web")]
+async fn resolve_approval_reply_with_group_admission(
+    token: &str,
+    response: ChannelApprovalResponse,
+    from_alias: &str,
+    from_chat: &str,
+    is_group: bool,
+    responder_is_allowlisted: bool,
+    allowed_groups_resolver: &(dyn Fn() -> Vec<String> + Send + Sync),
+) -> std::result::Result<(), ApprovalRefusal> {
+    if is_group && !is_group_chat_allowed(from_chat, &allowed_groups_resolver()) {
+        return Err(ApprovalRefusal::GroupNoLongerAllowed);
+    }
+
+    resolve_approval_reply(
+        token,
+        response,
+        from_alias,
+        from_chat,
+        responder_is_allowlisted,
+    )
+    .await
 }
 
 #[cfg(feature = "whatsapp-web")]
@@ -2232,52 +2315,18 @@ impl Channel for WhatsAppWebChannel {
                                     .text_content()
                                     .and_then(crate::util::parse_approval_reply)
                                 {
-                                    // Re-check group admission HERE, against the
-                                    // CURRENT allowlist, before the token can be
-                                    // resolved.
-                                    //
-                                    // Interception sits ahead of agent dispatch so
-                                    // a control message is not also handled as
-                                    // conversation, which is correct. But ahead of
-                                    // DISPATCH is not ahead of ADMISSION: the group
-                                    // gate below runs later, so without this an
-                                    // operator who removes a group while a prompt
-                                    // is pending has not revoked anything for the
-                                    // length of the approval window. A reply from
-                                    // the now-removed group still authorizes the
-                                    // tool call. Revoking access has to revoke
-                                    // in-flight authority too, or the revocation is
-                                    // advisory.
-                                    //
-                                    // The resolver is called fresh rather than
-                                    // reusing a value captured at request time,
-                                    // because the whole point is that the config
-                                    // may have changed since the prompt was posted.
-                                    if is_group
-                                        && !is_group_chat_allowed(
-                                            &chat,
-                                            &allowed_groups_resolver(),
-                                        )
-                                    {
-                                        ::zeroclaw_log::record!(
-                                            WARN,
-                                            ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
-                                                .with_outcome(::zeroclaw_log::EventOutcome::Unknown)
-                                                .with_attrs(::serde_json::json!({ "chat": chat })),
-                                            "approval reply refused: group is no longer admitted"
-                                        );
-                                        return;
-                                    }
                                     // `normalized` is Some only when a sender
                                     // candidate matched allowed_numbers, so it IS
                                     // the authorization signal, already computed
                                     // above for the message path.
-                                    match resolve_approval_reply(
+                                    match resolve_approval_reply_with_group_admission(
                                         &token,
                                         response,
                                         &alias,
                                         &reply_target,
+                                        is_group,
                                         normalized.is_some(),
+                                        allowed_groups_resolver.as_ref(),
                                     )
                                     .await
                                     {
@@ -2891,9 +2940,6 @@ impl Channel for WhatsAppWebChannel {
         recipient: &str,
         request: &ChannelApprovalRequest,
     ) -> Result<Option<ChannelApprovalResponse>> {
-        let token = crate::util::new_approval_token();
-        let (responder, rx) = tokio::sync::oneshot::channel();
-
         // Bind the token to the issuing alias AND the chat it is about to be
         // posted into, so a reply from anywhere else cannot answer it. The
         // alias matters because the map is process-wide: without it, a second
@@ -2904,19 +2950,12 @@ impl Channel for WhatsAppWebChannel {
             chat: Self::compute_reply_target(recipient),
             is_group: recipient.contains("@g.us"),
         };
-        {
-            let mut map = PENDING_APPROVALS.lock().await;
-            map.insert(
-                token.clone(),
-                PendingApproval {
-                    responder,
-                    binding: binding.clone(),
-                },
-            );
-        }
-        // Armed immediately after the insert, so there is no window in which
-        // the entry exists without something responsible for removing it.
-        let mut guard = PendingApprovalGuard::new(token.clone());
+        let PendingApprovalRegistration {
+            token,
+            receiver,
+            binding,
+            mut guard,
+        } = register_pending_approval(binding).await;
 
         let mut text = format!(
             "APPROVAL REQUIRED [{}]\nTool: {}\nArgs: {}\n\nReply: \"{} yes\", \"{} no\", or \"{} always\"",
@@ -2939,7 +2978,7 @@ impl Channel for WhatsAppWebChannel {
         }
 
         let timeout = std::time::Duration::from_secs(self.approval_timeout_secs);
-        let response = match tokio::time::timeout(timeout, rx).await {
+        let response = match tokio::time::timeout(timeout, receiver).await {
             Ok(Ok(response)) => response,
             // Timed out, or the sender was dropped. Either way deny, and drop
             // the token so a later reply cannot resolve a dead request.
@@ -4350,11 +4389,9 @@ mod tests {
 
     // -- request_approval on WhatsApp Web --
     //
-    // The five cases the triage asked for (approve, deny, always, timeout,
-    // zero-timeout) plus the authorization cases, which are the half the Cloud
-    // transport does not have. These drive `resolve_approval_reply` directly
-    // rather than a live socket, because the decision under test is the gate,
-    // not the transport.
+    // These drive the decision helpers directly rather than a live socket,
+    // because the authorization and lifecycle gates are the behavior under
+    // test.
 
     #[cfg(feature = "whatsapp-web")]
     fn approval_cfg(approval_timeout_secs: u64) -> zeroclaw_config::schema::WhatsAppConfig {
@@ -4388,6 +4425,7 @@ mod tests {
         PENDING_APPROVALS.lock().await.insert(
             token.to_string(),
             PendingApproval {
+                registration_id: uuid::Uuid::new_v4(),
                 responder,
                 binding: ApprovalBinding {
                     alias: alias.to_string(),
@@ -4399,122 +4437,123 @@ mod tests {
         rx
     }
 
-    /// A cancelled request must not leave a live token behind.
-    ///
-    /// Every explicit cleanup path lives inside the request future, so none of
-    /// them run when that future is dropped. The guard's `Drop` is the only
-    /// hook that survives cancellation. Without it the entry outlives its
-    /// receiver, and the second half of this test is why that matters: a late
-    /// reply would clear every authorization gate and be logged as ACCEPTED
-    /// while the oneshot is already gone, recording an approval that no tool
-    /// call can ever act on.
     #[tokio::test]
     #[cfg(feature = "whatsapp-web")]
     async fn cancelled_request_leaves_no_live_token() {
-        // Park a token, then drop the receiver to simulate the requesting
-        // future being cancelled by the routed timeout or the orchestrator.
-        let rx = park_token_as("alias-a", "aaa011", "1@s.whatsapp.net", false).await;
-        drop(rx);
+        let registration = register_pending_approval(ApprovalBinding {
+            alias: "alias-a".into(),
+            chat: "1@s.whatsapp.net".into(),
+            is_group: false,
+        })
+        .await;
+        let token = registration.token.clone();
+        assert!(PENDING_APPROVALS.lock().await.contains_key(&token));
 
-        // A reply that clears every gate must still NOT be reported as
-        // accepted, because there is nobody left to receive the decision.
+        let request = zeroclaw_spawn::spawn!(async move {
+            let _registration = registration;
+            std::future::pending::<()>().await;
+        });
+        request.abort();
+        let _ = request.await;
+
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while PENDING_APPROVALS.lock().await.contains_key(&token) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("dropping a registered request must remove its token");
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn approval_reply_to_dropped_receiver_is_refused() {
+        let receiver = park_token_as("alias-a", "aaa012", "1@s.whatsapp.net", false).await;
+        drop(receiver);
+
         let out = resolve_approval_reply(
-            "aaa011",
+            "aaa012",
             ChannelApprovalResponse::Approve,
             "alias-a",
             "1@s.whatsapp.net",
             true,
         )
         .await;
-        assert_eq!(
-            out,
-            Err(ApprovalRefusal::ReceiverGone),
-            "a decision that reaches no live receiver must be refused rather \
-             than logged as accepted: the record would claim an approval that \
-             nothing acted on"
-        );
-        assert!(
-            !PENDING_APPROVALS.lock().await.contains_key("aaa011"),
-            "the entry must not survive a reply that found a dead receiver"
-        );
+        assert_eq!(out, Err(ApprovalRefusal::ReceiverGone));
+        assert!(!PENDING_APPROVALS.lock().await.contains_key("aaa012"));
     }
 
-    /// Two aliases, one shared group, disjoint allowlists.
-    ///
-    /// Revoking a group revokes IN-FLIGHT approval authority too, pinned by
-    /// ORDER because order is the only thing that decides it.
-    ///
-    /// `resolve_approval_reply` takes no group state at all, so it behaves
-    /// identically whether or not the caller re-checked admission first. No
-    /// behavioral test of the resolver can see the difference, and the check
-    /// lives at the interception site inside the message loop where a unit test
-    /// cannot reach it. What the fix actually consists of is a check placed
-    /// between two specific points, so that placement is what is asserted.
-    ///
-    /// Bounded by the interception entry rather than a character window. The
-    /// first version of this used a fixed lookback and would have passed for
-    /// the wrong reason: the re-check sits 1239 characters before the resolve,
-    /// and a 1200-character window reports a missing check that is present.
-    ///
-    /// Two properties, and the second is the one a refactor loses quietly.
-    /// The check must run before the token can resolve, and it must read the
-    /// allowlist FRESH. A value captured when the prompt was posted cannot
-    /// observe the revocation this exists to catch, so reusing one would read
-    /// as a check while proving nothing.
-    #[test]
+    #[tokio::test]
     #[cfg(feature = "whatsapp-web")]
-    fn group_admission_is_rechecked_before_an_approval_reply_resolves() {
-        let src = include_str!("whatsapp_web.rs");
-        let production = src
-            .split("mod tests")
-            .next()
-            .expect("source has a production region before the test module");
+    async fn stale_cleanup_does_not_remove_reused_token() {
+        let old_registration_id = uuid::Uuid::new_v4();
+        let current_registration_id = uuid::Uuid::new_v4();
+        let (responder, _receiver) = tokio::sync::oneshot::channel();
+        PENDING_APPROVALS.lock().await.insert(
+            "aaa013".to_string(),
+            PendingApproval {
+                registration_id: current_registration_id,
+                responder,
+                binding: ApprovalBinding {
+                    alias: "default".into(),
+                    chat: "1@s.whatsapp.net".into(),
+                    is_group: false,
+                },
+            },
+        );
 
-        // A declaration is not a call site.
-        let call_sites = |needle: &str| -> Vec<usize> {
-            production
-                .match_indices(needle)
-                .filter(|(i, _)| !production[..*i].trim_end().ends_with("fn"))
-                .map(|(i, _)| i)
-                .collect()
-        };
-
-        let intercept = call_sites("parse_approval_reply");
-        let resolve = call_sites("resolve_approval_reply(");
-        assert_eq!(
-            resolve.len(),
-            1,
-            "expected exactly one production resolve site; a second one means \
-             an approval can be resolved by a path this guard does not cover"
+        assert!(
+            !remove_pending_approval_if_matches("aaa013", old_registration_id).await,
+            "cleanup from an older registration must not remove a reused token"
         );
         assert_eq!(
-            intercept.len(),
-            1,
-            "expected exactly one production interception site; this test \
-             bounds its search by that site, so a second one would leave part \
-             of the approval surface unchecked"
+            PENDING_APPROVALS
+                .lock()
+                .await
+                .get("aaa013")
+                .map(|entry| entry.registration_id),
+            Some(current_registration_id)
         );
-        assert!(
-            intercept[0] < resolve[0],
-            "the interception entry must precede the resolve it guards"
-        );
+        PENDING_APPROVALS.lock().await.remove("aaa013");
+    }
 
-        let span = &production[intercept[0]..resolve[0]];
-        assert!(
-            span.contains("is_group_chat_allowed("),
-            "group admission must be re-checked between intercepting an \
-             approval reply and resolving its token. Without it, an operator \
-             who removes a group while a prompt is pending has revoked \
-             nothing for the length of the approval window, and a reply from \
-             the removed group still authorizes the tool call. Span was:\n{span}"
-        );
-        assert!(
-            span.contains("allowed_groups_resolver()"),
-            "the re-check must resolve the allowlist FRESH at reply time \
-             rather than reuse a value captured when the prompt was posted, \
-             because the premise of the scenario is that the config changed \
-             after the prompt. Span was:\n{span}"
-        );
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn group_admission_is_rechecked_before_an_approval_reply_resolves() {
+        const GROUP: &str = "123@g.us";
+        let mut receiver = park_token("aaa011", GROUP, true).await;
+        let allowed_groups = Arc::new(parking_lot::RwLock::new(vec![GROUP.to_string()]));
+        let live_groups = Arc::clone(&allowed_groups);
+        let resolver = move || live_groups.read().clone();
+
+        *allowed_groups.write() = vec!["other@g.us".to_string()];
+        let refused = resolve_approval_reply_with_group_admission(
+            "aaa011",
+            ChannelApprovalResponse::Approve,
+            "default",
+            GROUP,
+            true,
+            true,
+            &resolver,
+        )
+        .await;
+        assert_eq!(refused, Err(ApprovalRefusal::GroupNoLongerAllowed));
+        assert!(receiver.try_recv().is_err());
+        assert!(PENDING_APPROVALS.lock().await.contains_key("aaa011"));
+
+        allowed_groups.write().push(GROUP.to_string());
+        let accepted = resolve_approval_reply_with_group_admission(
+            "aaa011",
+            ChannelApprovalResponse::Approve,
+            "default",
+            GROUP,
+            true,
+            true,
+            &resolver,
+        )
+        .await;
+        assert_eq!(accepted, Ok(()));
+        assert_eq!(receiver.await.unwrap(), ChannelApprovalResponse::Approve);
     }
 
     /// `PENDING_APPROVALS` is process-wide, so before the alias was part of the
