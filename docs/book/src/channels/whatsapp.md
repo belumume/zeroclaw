@@ -82,7 +82,7 @@ An empty list (the default) is not permission. A list that admits everything can
 
 A non-empty list keeps its exact-JID filtering under **every** policy, including `all`. `all` widens what an *empty* list means; it does not override a list you wrote.
 
-Because this change makes a default business-mode channel stop answering groups without erroring, the channel emits a startup warning naming that exact condition (empty `allowed_groups` with a policy other than `all`), so the silence is attributable rather than mysterious. A channel that names open access with `group_policy = "all"` is unchanged and stays quiet.
+Because this change can make a channel stop answering groups without erroring, the channel emits a startup warning only when the configuration newly loses group access: business mode with `allowlist` or `ignore`, and personal mode with `allowlist`. Personal mode with `ignore` was already closed, while `all` explicitly preserves open access, so both stay quiet.
 
 Each entry matches either the full group JID (`123456789012345@g.us`) or the JID user part - the segment before `@` (`123456789012345`) - compared **exactly**, not as a string prefix (so `123` admits `123@g.us` but never `123999@g.us`). This gates group *identity*, which `group_policy` (chat type) and the sender allowlist (sender) do not.
 

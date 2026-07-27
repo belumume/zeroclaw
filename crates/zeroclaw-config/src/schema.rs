@@ -10939,23 +10939,6 @@ pub fn validate_memory_semantics(
         .collect()
 }
 
-/// Surface WhatsApp chat-policy keys that are accepted but never consulted.
-///
-/// `dm_policy`, `group_policy` and `self_chat_mode` are read only by the Web
-/// transport inside its `mode == Personal` block, so under `mode = "business"`
-/// they validate cleanly and have no effect. That is easy to miss because
-/// `dm_policy` DEFAULTS to `Allowlist`: a business-mode Web channel reads as
-/// restrictive while answering every DM it receives.
-///
-/// `allowed_groups` is separate. `is_group_chat_allowed` returns true when the
-/// list is empty, and that gate does run in both modes, which makes an empty
-/// list the only group protection under `mode = "business"` and an open one.
-///
-/// Warnings only, no behaviour change: an operator who is relying on the
-/// current defaults keeps working, and learns about it at `config validate`.
-///
-/// Called from `Config::collect_warnings`, so this reaches the CLI and the
-/// gateway dashboard on the same path as the other warnings.
 /// Whether an empty `allowed_groups` is a capability the operator LOSES under the
 /// cross-mode contract, rather than one they never had.
 ///
@@ -10977,6 +10960,12 @@ pub fn whatsapp_empty_group_list_is_newly_closed(
     )
 }
 
+/// Surface WhatsApp Web settings whose effect is easy to miss.
+///
+/// Chat policies are enforced in both modes; only `self_chat_mode` remains
+/// personal-only. An empty `allowed_groups` now serves no group under newly
+/// closed configurations, so validation warns about the resulting silence.
+/// Called from `Config::collect_warnings` for CLI and gateway consumers.
 pub fn validate_whatsapp_semantics(
     alias: &str,
     wa: &WhatsAppConfig,
