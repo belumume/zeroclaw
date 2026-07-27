@@ -4441,6 +4441,82 @@ mod tests {
 
     /// Two aliases, one shared group, disjoint allowlists.
     ///
+    /// Revoking a group revokes IN-FLIGHT approval authority too, pinned by
+    /// ORDER because order is the only thing that decides it.
+    ///
+    /// `resolve_approval_reply` takes no group state at all, so it behaves
+    /// identically whether or not the caller re-checked admission first. No
+    /// behavioral test of the resolver can see the difference, and the check
+    /// lives at the interception site inside the message loop where a unit test
+    /// cannot reach it. What the fix actually consists of is a check placed
+    /// between two specific points, so that placement is what is asserted.
+    ///
+    /// Bounded by the interception entry rather than a character window. The
+    /// first version of this used a fixed lookback and would have passed for
+    /// the wrong reason: the re-check sits 1239 characters before the resolve,
+    /// and a 1200-character window reports a missing check that is present.
+    ///
+    /// Two properties, and the second is the one a refactor loses quietly.
+    /// The check must run before the token can resolve, and it must read the
+    /// allowlist FRESH. A value captured when the prompt was posted cannot
+    /// observe the revocation this exists to catch, so reusing one would read
+    /// as a check while proving nothing.
+    #[test]
+    #[cfg(feature = "whatsapp-web")]
+    fn group_admission_is_rechecked_before_an_approval_reply_resolves() {
+        let src = include_str!("whatsapp_web.rs");
+        let production = src
+            .split("mod tests")
+            .next()
+            .expect("source has a production region before the test module");
+
+        // A declaration is not a call site.
+        let call_sites = |needle: &str| -> Vec<usize> {
+            production
+                .match_indices(needle)
+                .filter(|(i, _)| !production[..*i].trim_end().ends_with("fn"))
+                .map(|(i, _)| i)
+                .collect()
+        };
+
+        let intercept = call_sites("parse_approval_reply");
+        let resolve = call_sites("resolve_approval_reply(");
+        assert_eq!(
+            resolve.len(),
+            1,
+            "expected exactly one production resolve site; a second one means \
+             an approval can be resolved by a path this guard does not cover"
+        );
+        assert_eq!(
+            intercept.len(),
+            1,
+            "expected exactly one production interception site; this test \
+             bounds its search by that site, so a second one would leave part \
+             of the approval surface unchecked"
+        );
+        assert!(
+            intercept[0] < resolve[0],
+            "the interception entry must precede the resolve it guards"
+        );
+
+        let span = &production[intercept[0]..resolve[0]];
+        assert!(
+            span.contains("is_group_chat_allowed("),
+            "group admission must be re-checked between intercepting an \
+             approval reply and resolving its token. Without it, an operator \
+             who removes a group while a prompt is pending has revoked \
+             nothing for the length of the approval window, and a reply from \
+             the removed group still authorizes the tool call. Span was:\n{span}"
+        );
+        assert!(
+            span.contains("allowed_groups_resolver()"),
+            "the re-check must resolve the allowlist FRESH at reply time \
+             rather than reuse a value captured when the prompt was posted, \
+             because the premise of the scenario is that the config changed \
+             after the prompt. Span was:\n{span}"
+        );
+    }
+
     /// `PENDING_APPROVALS` is process-wide, so before the alias was part of the
     /// binding this was a real authorization bypass rather than a tidiness
     /// issue: the reply path evaluates `allowed_numbers` using whichever
