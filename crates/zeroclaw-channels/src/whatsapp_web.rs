@@ -2965,14 +2965,31 @@ impl Channel for WhatsAppWebChannel {
             // Say so in the prompt. The token is now readable by everyone in
             // this group, and the reason a stranger's reply will bounce is not
             // obvious from the prompt alone.
-            text.push_str("\n\nThis is a group chat: only numbers on allowed_numbers can answer.");
+            //
+            // The authority named here has to match what the code consults,
+            // which is the canonical peer resolver backed by
+            // `[peer_groups.<name>].external_peers` scoped to this alias.
+            // V3 has no `allowed_numbers` field: that key was a V2 spelling
+            // and migrates into a peer group, so naming it would send an
+            // operator whose reply bounced to configure something that no
+            // longer exists.
+            text.push_str(
+                "\n\nThis is a group chat, so everyone here can see this code. \
+                 Only an authorized peer for this channel can answer.",
+            );
         }
 
         if let Err(e) = self.send(&SendMessage::new(text, recipient)).await {
             // Never leave a token pending for a prompt that was never
             // delivered; it would sit until the timeout and deny anyway, but
             // with no operator ever having seen it.
-            PENDING_APPROVALS.lock().await.remove(&token);
+            //
+            // Removal is generation-checked rather than by token alone. A
+            // resolver can take this entry out while this branch is still in
+            // flight, and a later request can then reserve the same
+            // six-character code, at which point an unconditional remove here
+            // would delete that unrelated request instead of ours.
+            remove_pending_approval_if_matches(&token, guard.registration_id).await;
             guard.disarm();
             return Err(e);
         }
@@ -2983,7 +3000,10 @@ impl Channel for WhatsAppWebChannel {
             // Timed out, or the sender was dropped. Either way deny, and drop
             // the token so a later reply cannot resolve a dead request.
             _ => {
-                PENDING_APPROVALS.lock().await.remove(&token);
+                // Generation-checked for the same reason as the send-error
+                // branch above: by the time this fires, the entry may already
+                // belong to a different request that reused the code.
+                remove_pending_approval_if_matches(&token, guard.registration_id).await;
                 ::zeroclaw_log::record!(
                     WARN,
                     ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
@@ -4435,6 +4455,80 @@ mod tests {
             },
         );
         rx
+    }
+
+    /// Drives the send-error branch of `request_approval` for real, rather than
+    /// calling the cleanup helper directly. A channel with no vendor client
+    /// fails `send` deterministically, which is the one production exit that
+    /// needs no cancellation and no reply to reach.
+    ///
+    /// WHAT IT DOES NOT COVER, stated first because the obvious reading is
+    /// wrong. This does NOT demonstrate the generation-scoped cleanup that the
+    /// same branch was just changed to use. It was written to, and it cannot:
+    /// `request_approval` mints its own random token, which never collides
+    /// with the sentinel parked below, so an unconditional `remove` of the
+    /// generated token leaves the sentinel alone too. Checked rather than
+    /// assumed, by reverting the branch to the unconditional removal and
+    /// re-running this test, which still passed. Proving that scoping from
+    /// outside needs the entry replaced while the branch is in flight, and
+    /// that needs the injectable send seam the timeout regressions also want.
+    ///
+    /// What it DOES pin is narrower and real: the send-error path is reachable
+    /// and terminates. A channel with no vendor client fails `send`
+    /// deterministically, so this drives the one production exit that needs
+    /// neither a reply nor a cancellation, and asserts the caller gets that
+    /// error back rather than a hang or a silent approval.
+    ///
+    /// It deliberately makes no assertion about the map's size or key set.
+    /// These tests share one process-global map and run in parallel, so a
+    /// whole-map assertion would be racing every other approval test.
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn request_approval_surfaces_a_send_failure_to_the_caller() {
+        let sentinel = "snt001";
+        let sentinel_id = uuid::Uuid::new_v4();
+        let (responder, _keep_alive) = tokio::sync::oneshot::channel();
+        PENDING_APPROVALS.lock().await.insert(
+            sentinel.to_string(),
+            PendingApproval {
+                registration_id: sentinel_id,
+                responder,
+                binding: ApprovalBinding {
+                    alias: "alias-a".to_string(),
+                    chat: "1@s.whatsapp.net".to_string(),
+                    is_group: false,
+                },
+            },
+        );
+
+        let cfg = zeroclaw_config::schema::WhatsAppConfig::default();
+        let channel =
+            WhatsAppWebChannel::new(&cfg, "alias-a", Arc::new(Vec::new), Arc::new(Vec::new));
+        let request = ChannelApprovalRequest {
+            tool_name: "shell".to_string(),
+            arguments_summary: "ls".to_string(),
+            raw_arguments: None,
+        };
+
+        let err = channel
+            .request_approval("1@s.whatsapp.net", &request)
+            .await
+            .expect_err("a channel with no client must fail at send");
+        assert!(
+            err.to_string().contains("not connected"),
+            "fixture must fail at the send, not somewhere earlier: {err}"
+        );
+
+        let pending = PENDING_APPROVALS.lock().await;
+        let entry = pending
+            .get(sentinel)
+            .expect("the send-error branch removed an unrelated registration");
+        assert_eq!(
+            entry.registration_id, sentinel_id,
+            "the unrelated registration must be the original one, not a replacement"
+        );
+        drop(pending);
+        PENDING_APPROVALS.lock().await.remove(sentinel);
     }
 
     #[tokio::test]
