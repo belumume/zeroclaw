@@ -1,6 +1,6 @@
 use crate::openai_codex::{
     ResponsesStreamApiError, ResponsesStreamState, ResponsesToolSpec, append_utf8_stream_chunk,
-    build_responses_input, convert_tools, first_nonempty, process_sse_chunk,
+    build_responses_input, convert_tools, first_nonempty, parse_responses_usage, process_sse_chunk,
 };
 use crate::stream_guard::AbortOnDrop;
 use crate::traits::{
@@ -21,6 +21,14 @@ pub(crate) const BASE_URL: &str = "https://api.openai.com/v1";
 
 /// Default endpoint for the OpenAI Responses API.
 const RESPONSES_URL: &str = "https://api.openai.com/v1/responses";
+
+/// Max wait for the next streaming body read before the connection is treated
+/// as stalled. Streaming clients omit reqwest's overall `.timeout()` (it kills
+/// long-running responses mid-stream), so without a per-read bound a connection
+/// that goes silent after the headers park `bytes_stream().next().await` forever
+/// and the turn hangs on "working". `read_timeout` caps the gap between reads and
+/// converts a silent stall into a retryable stream error.
+const STREAM_IDLE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(300);
 
 pub struct OpenAiModelProvider {
     /// `[providers.models.openai.<alias>]` config-key alias.
@@ -751,6 +759,8 @@ struct ResponsesApiBody {
     output: Vec<serde_json::Value>,
     #[serde(default)]
     output_text: Option<String>,
+    #[serde(default)]
+    usage: Option<serde_json::Value>,
 }
 
 fn extract_responses_api_text(body: &ResponsesApiBody) -> Option<String> {
@@ -1128,7 +1138,9 @@ impl OpenAiResponsesModelProvider {
 
     fn streaming_client(&self) -> Client {
         let default_headers = self.build_default_headers();
-        let mut builder = Client::builder().connect_timeout(std::time::Duration::from_secs(10));
+        let mut builder = Client::builder()
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .read_timeout(STREAM_IDLE_TIMEOUT);
         if !default_headers.is_empty() {
             builder = builder.default_headers(default_headers);
         }
@@ -1256,7 +1268,7 @@ impl ModelProvider for OpenAiResponsesModelProvider {
         Ok(ProviderChatResponse {
             text: extract_responses_api_text(&body),
             tool_calls: extract_responses_api_tool_calls(&body),
-            usage: None,
+            usage: parse_responses_usage(body.usage.as_ref()),
             reasoning_content: None,
         })
     }
@@ -1369,6 +1381,58 @@ impl ::zeroclaw_api::attribution::Attributable for OpenAiResponsesModelProvider 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn responses_chat_propagates_usage() {
+        use axum::{Json, Router, routing::post};
+        use tokio::net::TcpListener;
+
+        let app = Router::new().route(
+            "/responses",
+            post(|| async {
+                Json(serde_json::json!({
+                    "output_text": "ok",
+                    "output": [],
+                    "usage": {
+                        "input_tokens": 120,
+                        "input_tokens_details": {"cached_tokens": 45},
+                        "output_tokens": 30
+                    }
+                }))
+            }),
+        );
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server_handle = zeroclaw_spawn::spawn!(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+        let provider = OpenAiResponsesModelProvider::builder("test")
+            .api_url(&format!("http://{addr}"))
+            .credential(Some("test-key"))
+            .build();
+        let messages = vec![ChatMessage::user("hello")];
+
+        let response = provider
+            .chat(
+                ProviderChatRequest {
+                    messages: &messages,
+                    tools: None,
+                    thinking: None,
+                },
+                "gpt-4o-mini",
+                None,
+            )
+            .await
+            .expect("chat should succeed");
+
+        let usage = response
+            .usage
+            .expect("provider-reported usage should propagate");
+        assert_eq!(usage.input_tokens, Some(120));
+        assert_eq!(usage.cached_input_tokens, Some(45));
+        assert_eq!(usage.output_tokens, Some(30));
+        server_handle.abort();
+    }
 
     #[test]
     fn creates_with_key() {
