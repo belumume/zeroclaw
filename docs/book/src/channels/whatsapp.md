@@ -90,17 +90,35 @@ plaintext into the chat, so in a group every member can read it.
 implementation detail.**
 
 In **Web mode**, a reply is honoured only when it comes from the same chat the
-prompt was posted into **and** from a number on `allowed_numbers`. A reply that
-fails either check is logged and ignored, and the request stays open so the
-operator can still answer it. In a group the prompt says so, because otherwise
-there is no way to tell why a bystander's reply did nothing.
+prompt was posted into **and** from a peer this alias is authorized to take
+instructions from. A reply that fails either check is logged and ignored, and
+the request stays open so the operator can still answer it. In a group the
+prompt says so, because otherwise there is no way to tell why a bystander's
+reply did nothing.
 
-In **Cloud API mode**, neither check is applied. The pending entry stores only
-the token and the sender it was issued to, so the webhook treats possession of
-the token as authority. In a group that means any member who can read the
-prompt can answer it, including from a different chat. Until that path is
-hardened, treat a Cloud-mode approval as authenticating the *chat*, not the
-responder, and prefer Web mode wherever the responder identity matters.
+The authorized peers are the ones the canonical resolver returns for this
+alias, which is the peer group whose `channel` points at it:
+
+```toml
+[peer_groups.whatsapp_default]
+channel = "whatsapp.personal"   # this alias only; bare "whatsapp" covers every alias
+external_peers = ["+15550100"]
+```
+
+There is no `allowed_numbers` field to set. That was the v2 spelling, and
+migration folds it into a peer group like the one above, so a v2 config keeps
+working and a v3 config has nowhere to put the old key.
+
+See [Peer groups](./peer-groups.md) for the full field list and the identifier
+shape each channel matches against.
+
+In **Cloud API mode**, neither check is applied. Its pending entry is a bare
+responder keyed by the token, with no chat and no identity recorded alongside
+it, so the webhook treats possession of the token as authority. In a group that
+means any member who can read the prompt can answer it, including from a
+different chat. Until that path is hardened, a Cloud-mode approval is proof
+that someone possessed the token and nothing more. It authenticates neither the
+chat nor the responder, so prefer Web mode wherever either matters.
 
 ## Configuration surfaces
 
