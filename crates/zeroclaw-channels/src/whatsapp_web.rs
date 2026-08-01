@@ -5036,28 +5036,104 @@ mod tests {
         );
     }
 
-    /// Zero denies immediately rather than disabling approval. This is what an
-    /// already-elapsed `tokio::time::timeout` does, and it is the safer of the
-    /// two readings of zero.
+    /// The timeout arm of `request_approval`, driven end to end.
+    ///
+    /// This replaces two tests that could not fail for the reason their names
+    /// gave. One asserted that `tokio::time::timeout` elapses at zero, which is
+    /// a property of tokio and holds whatever this channel does. The other
+    /// parked a token, performed the removal ITSELF under a comment reading
+    /// "what the timeout arm of request_approval does", and then observed that
+    /// the token was gone - so it re-proved its own setup line and never
+    /// executed the arm. Checked rather than assumed: with the arm's cleanup
+    /// deleted AND its `Deny` flipped to `AlwaysApprove`, both stayed green,
+    /// along with the other 1522 tests in this crate. A timed-out request
+    /// silently granting blanket approval is the worst outcome this transport
+    /// has, and nothing in the suite noticed.
+    ///
+    /// The send hook is what makes the real arm reachable: it stands in for the
+    /// vendor client, so the prompt "delivers" and control reaches the timeout
+    /// instead of returning early at the send error. `approval_timeout_secs` is
+    /// 0 so the deadline is already elapsed and the test does not sleep.
+    ///
+    /// Both assertions below are load-bearing and fail for different reasons.
+    /// The decision assert pins that a timeout DENIES; deleting the cleanup
+    /// alone leaves it green. The removal assert pins that the arm drops its
+    /// own token so a late reply cannot resolve a request nobody is waiting
+    /// on; flipping the decision alone leaves it green.
     #[tokio::test]
     #[cfg(feature = "whatsapp-web")]
-    async fn zero_timeout_denies_immediately() {
-        let (_responder, rx) = tokio::sync::oneshot::channel::<ChannelApprovalResponse>();
-        let started = std::time::Instant::now();
-        let out = tokio::time::timeout(std::time::Duration::from_secs(0), rx).await;
-        assert!(out.is_err(), "a zero timeout must elapse, not wait");
-        assert!(started.elapsed() < std::time::Duration::from_secs(1));
+    async fn timeout_denies_and_removes_its_own_token() {
+        let seen_token = Arc::new(std::sync::Mutex::new(None::<String>));
+        let recorder = Arc::clone(&seen_token);
+
+        let cfg = zeroclaw_config::schema::WhatsAppConfig {
+            approval_timeout_secs: 0,
+            ..Default::default()
+        };
+
+        let channel =
+            WhatsAppWebChannel::new(&cfg, "alias-a", Arc::new(Vec::new), Arc::new(Vec::new))
+                .with_approval_send_hook(Arc::new(move |message: SendMessage| {
+                    let recorder = Arc::clone(&recorder);
+                    Box::pin(async move {
+                        let token = message
+                            .content
+                            .split_once('[')
+                            .and_then(|(_, rest)| rest.split_once(']'))
+                            .map(|(token, _)| token.to_string())
+                            .expect("the prompt must carry its token in brackets");
+                        *recorder.lock().unwrap() = Some(token);
+                        // Delivered. Let the timeout arm run.
+                        Ok(())
+                    })
+                }));
+
+        let request = ChannelApprovalRequest {
+            tool_name: "shell".to_string(),
+            arguments_summary: "ls".to_string(),
+            raw_arguments: None,
+        };
+
+        let decision = channel
+            .request_approval("1@s.whatsapp.net", &request)
+            .await
+            .expect("a timeout must resolve to a decision, not an error");
+        assert_eq!(
+            decision,
+            Some(ChannelApprovalResponse::Deny),
+            "a request nobody answered must deny, never approve"
+        );
+
+        let token = seen_token
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("the hook must have run, or the send never reached the timeout");
+        assert!(
+            !PENDING_APPROVALS.lock().await.contains_key(&token),
+            "the timeout arm must remove its own token, or a late reply can \
+             resolve a request whose receiver is already gone"
+        );
     }
 
-    /// A timed-out request must leave no token behind, so a late reply cannot
-    /// resolve a request nobody is waiting on.
+    /// A late reply to a timed-out request is refused, from the caller's side.
+    ///
+    /// The removal assert above pins the map; this pins what the removal BUYS,
+    /// which is the property an operator actually depends on.
     #[tokio::test]
     #[cfg(feature = "whatsapp-web")]
-    async fn timeout_removes_the_token() {
+    async fn a_reply_after_timeout_is_refused() {
         let _rx = park_token("aaa006", "1@s.whatsapp.net", false).await;
         assert!(PENDING_APPROVALS.lock().await.contains_key("aaa006"));
-        // What the timeout arm of request_approval does.
-        PENDING_APPROVALS.lock().await.remove("aaa006");
+        // Bind the id in its own statement. Reading it inline as an argument
+        // keeps the map guard alive for the whole call expression, and the
+        // helper takes the same lock, so that self-deadlocks - and because the
+        // map is process-global, it hangs every other approval test with it.
+        let registration_id = {
+            let pending = PENDING_APPROVALS.lock().await;
+            pending.get("aaa006").expect("just parked").registration_id
+        };
+        remove_pending_approval_if_matches("aaa006", registration_id).await;
         assert_eq!(
             resolve_approval_reply(
                 "aaa006",
