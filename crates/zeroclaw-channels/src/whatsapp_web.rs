@@ -4862,25 +4862,32 @@ mod tests {
         assert_eq!(ch.approval_timeout_secs, 300);
     }
 
-    /// ...but `Default::default()` gives 0, NOT 300, because `WhatsAppConfig`
-    /// derives `Default` and the 300 lives only in the serde attribute.
+    /// ...and a config built in Rust now agrees with one parsed from a file.
     ///
-    /// Worth a test rather than a comment, because combined with zero-means-
-    /// deny-immediately it means a PROGRAMMATICALLY built config denies every
-    /// approval instantly. Operators are unaffected (their config is parsed),
-    /// and the other channels' tests set the field explicitly rather than
-    /// leaning on `Default`, which suggests their authors met this too. Pinning
-    /// it here so a future reader does not have to rediscover which of the two
-    /// defaults applies on their path.
+    /// This test used to assert the opposite. It pinned `Default::default()` at
+    /// 0 and reasoned that operators were unaffected because their config is
+    /// parsed. That reasoning was wrong: the supported alias-creation surfaces
+    /// build the struct in Rust and persist the result, so the zero reached a
+    /// file and survived reload, and zero is an already-elapsed deadline rather
+    /// than "wait forever". Every approval on such an alias denied at once.
+    ///
+    /// The split is fixed in `zeroclaw-config`, so this asserts the channel end
+    /// of it: whichever way an operator's alias came into being, the channel
+    /// waits the documented timeout. The `zeroclaw-config` side additionally
+    /// pins every field against the serde defaults so a new field cannot
+    /// reintroduce the divergence quietly.
     #[test]
     #[cfg(feature = "whatsapp-web")]
-    fn derived_default_is_zero_not_the_serde_default() {
+    fn a_config_built_in_rust_waits_the_documented_timeout() {
         let cfg = zeroclaw_config::schema::WhatsAppConfig::default();
-        assert_eq!(cfg.approval_timeout_secs, 0);
+        assert_eq!(
+            cfg.approval_timeout_secs, 300,
+            "the Rust default must match the documented serde default"
+        );
         let ch = WhatsAppWebChannel::new(&cfg, "alias", Arc::new(Vec::new), Arc::new(Vec::new));
         assert_eq!(
-            ch.approval_timeout_secs, 0,
-            "a derived-Default config denies immediately; parse from TOML for 300"
+            ch.approval_timeout_secs, 300,
+            "the channel must inherit that timeout rather than denying at once"
         );
     }
 
