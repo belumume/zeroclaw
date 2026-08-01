@@ -284,6 +284,26 @@ async fn resolve_approval_reply_with_group_admission(
     .await
 }
 
+/// Test-only interception point for the approval prompt's send.
+///
+/// The send is the only moment at which this request's token is registered
+/// and its cleanup has not yet run, so it is the only place a test can stand
+/// between the two. Without it the generation check in `request_approval`'s
+/// send-error branch is unobservable from outside: `request_approval` mints
+/// its own random token, so a separately parked sentinel is never the key
+/// that branch removes, and an unconditional `remove` there behaves exactly
+/// like a generation-checked one.
+///
+/// It returns the send's own `Result` rather than being a bare fail flag,
+/// because a hook that can return `Ok` also reaches the wait without a vendor
+/// client, which is what driving the timeout arm for real would need.
+#[cfg(all(test, feature = "whatsapp-web"))]
+type ApprovalSendHook = Arc<
+    dyn Fn(SendMessage) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+        + Send
+        + Sync,
+>;
+
 #[cfg(feature = "whatsapp-web")]
 pub struct WhatsAppWebChannel {
     /// Session database path
@@ -368,6 +388,10 @@ pub struct WhatsAppWebChannel {
     /// connect, the linked account is persisted into `peer_groups` through
     /// `crate::identity_persist` (no channel-local allowlist cache).
     persist: Option<Arc<parking_lot::RwLock<zeroclaw_config::schema::Config>>>,
+    /// See [`ApprovalSendHook`]. `None` outside the tests that need to act
+    /// between a token's registration and the cleanup that follows it.
+    #[cfg(test)]
+    approval_send_hook: Option<ApprovalSendHook>,
 }
 
 impl WhatsAppWebChannel {
@@ -436,6 +460,8 @@ impl WhatsAppWebChannel {
             group_mention_patterns: Arc::new(Vec::new()),
             workspace_dir: None,
             persist: None,
+            #[cfg(test)]
+            approval_send_hook: None,
         }
     }
 
@@ -463,6 +489,27 @@ impl WhatsAppWebChannel {
     pub fn with_workspace_dir(mut self, dir: PathBuf) -> Self {
         self.workspace_dir = Some(dir);
         self
+    }
+
+    /// Substitute the approval prompt's send. See [`ApprovalSendHook`].
+    #[cfg(all(test, feature = "whatsapp-web"))]
+    fn with_approval_send_hook(mut self, hook: ApprovalSendHook) -> Self {
+        self.approval_send_hook = Some(hook);
+        self
+    }
+
+    /// Deliver an approval prompt.
+    ///
+    /// A pass-through to [`Channel::send`] in production. The indirection
+    /// exists so a test can substitute the send, which is the only window in
+    /// which this request's map entry is live and its cleanup has not run.
+    #[cfg(feature = "whatsapp-web")]
+    async fn send_approval_prompt(&self, message: &SendMessage) -> Result<()> {
+        #[cfg(test)]
+        if let Some(hook) = self.approval_send_hook.clone() {
+            return hook(message.clone()).await;
+        }
+        self.send(message).await
     }
 
     /// Configure voice transcription (STT) for incoming voice notes.
@@ -2979,7 +3026,10 @@ impl Channel for WhatsAppWebChannel {
             );
         }
 
-        if let Err(e) = self.send(&SendMessage::new(text, recipient)).await {
+        if let Err(e) = self
+            .send_approval_prompt(&SendMessage::new(text, recipient))
+            .await
+        {
             // Never leave a token pending for a prompt that was never
             // delivered; it would sit until the timeout and deny anyway, but
             // with no operator ever having seen it.
@@ -4464,14 +4514,16 @@ mod tests {
     ///
     /// WHAT IT DOES NOT COVER, stated first because the obvious reading is
     /// wrong. This does NOT demonstrate the generation-scoped cleanup that the
-    /// same branch was just changed to use. It was written to, and it cannot:
-    /// `request_approval` mints its own random token, which never collides
-    /// with the sentinel parked below, so an unconditional `remove` of the
-    /// generated token leaves the sentinel alone too. Checked rather than
-    /// assumed, by reverting the branch to the unconditional removal and
-    /// re-running this test, which still passed. Proving that scoping from
-    /// outside needs the entry replaced while the branch is in flight, and
-    /// that needs the injectable send seam the timeout regressions also want.
+    /// same branch uses. It cannot: `request_approval` mints its own random
+    /// token, which never collides with the sentinel parked below, so an
+    /// unconditional `remove` of the generated token leaves the sentinel alone
+    /// too. Checked rather than assumed, by reverting the branch to the
+    /// unconditional removal and re-running this test, which still passed.
+    /// Proving that scoping needs the entry replaced while the branch is in
+    /// flight, which is what
+    /// [`send_error_cleanup_leaves_a_reused_token_alone`] does through the
+    /// send hook. The two are kept separate because they pin different things
+    /// and fail for different reasons.
     ///
     /// What it DOES pin is narrower and real: the send-error path is reachable
     /// and terminates. A channel with no vendor client fails `send`
@@ -4529,6 +4581,99 @@ mod tests {
         );
         drop(pending);
         PENDING_APPROVALS.lock().await.remove(sentinel);
+    }
+
+    /// The send-error branch's generation check, proven from outside.
+    ///
+    /// Scoping is only observable when the entry under THIS request's token is
+    /// replaced while the branch is in flight, which is the race the check
+    /// exists for: a resolver takes this registration out, a later request
+    /// reserves the same six-character code, and an unconditional `remove`
+    /// here would delete that unrelated request instead of ours.
+    ///
+    /// The send hook is what makes the replacement reachable. It runs after
+    /// the token is registered and before any cleanup, which is the only
+    /// window in which the map holds this request's entry untouched. Reverting
+    /// the branch to `PENDING_APPROVALS.lock().await.remove(&token)` fails
+    /// this test at the `expect` below, which is the check it is here to pin.
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn send_error_cleanup_leaves_a_reused_token_alone() {
+        // The registration a later request would hold after reusing the code.
+        let reuser_id = uuid::Uuid::new_v4();
+        let seen_token = Arc::new(std::sync::Mutex::new(None::<String>));
+        // Hold the replacement's receiver open for the length of the test, so
+        // the entry the cleanup must spare is a live one rather than a husk.
+        let reuser_receiver = Arc::new(std::sync::Mutex::new(None));
+
+        let recorder = Arc::clone(&seen_token);
+        let receiver_slot = Arc::clone(&reuser_receiver);
+        let channel = WhatsAppWebChannel::new(
+            &zeroclaw_config::schema::WhatsAppConfig::default(),
+            "alias-a",
+            Arc::new(Vec::new),
+            Arc::new(Vec::new),
+        )
+        .with_approval_send_hook(Arc::new(move |message: SendMessage| {
+            let recorder = Arc::clone(&recorder);
+            let receiver_slot = Arc::clone(&receiver_slot);
+            Box::pin(async move {
+                let token = message
+                    .content
+                    .split_once('[')
+                    .and_then(|(_, rest)| rest.split_once(']'))
+                    .map(|(token, _)| token.to_string())
+                    .expect("the prompt must carry its token in brackets");
+
+                let (responder, receiver) = tokio::sync::oneshot::channel();
+                PENDING_APPROVALS.lock().await.insert(
+                    token.clone(),
+                    PendingApproval {
+                        registration_id: reuser_id,
+                        responder,
+                        binding: ApprovalBinding {
+                            alias: "alias-b".to_string(),
+                            chat: "2@s.whatsapp.net".to_string(),
+                            is_group: false,
+                        },
+                    },
+                );
+                *receiver_slot.lock().unwrap() = Some(receiver);
+                *recorder.lock().unwrap() = Some(token);
+
+                Err(anyhow::Error::msg("send refused by the test hook"))
+            })
+        }));
+
+        let request = ChannelApprovalRequest {
+            tool_name: "shell".to_string(),
+            arguments_summary: "ls".to_string(),
+            raw_arguments: None,
+        };
+        let err = channel
+            .request_approval("1@s.whatsapp.net", &request)
+            .await
+            .expect_err("the hook must fail the send");
+        assert!(
+            err.to_string().contains("send refused by the test hook"),
+            "the caller must get the send's own error, not a later one: {err}"
+        );
+
+        let token = seen_token
+            .lock()
+            .unwrap()
+            .clone()
+            .expect("the hook must have run");
+        let pending = PENDING_APPROVALS.lock().await;
+        let entry = pending.get(&token).expect(
+            "the send-error cleanup removed a token that a later request had already reserved",
+        );
+        assert_eq!(
+            entry.registration_id, reuser_id,
+            "the surviving entry must be the reusing registration, not ours"
+        );
+        drop(pending);
+        PENDING_APPROVALS.lock().await.remove(&token);
     }
 
     #[tokio::test]
