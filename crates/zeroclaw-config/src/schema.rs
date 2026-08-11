@@ -14816,8 +14816,10 @@ pub enum WhatsAppWebMode {
     #[default]
     Business,
     /// As business mode, and additionally applies the self-chat semantics
-    /// (`self_chat_mode` and the fromMe handling) that only a personal account
-    /// has.
+    /// (`self_chat_mode` and the fromMe handling). Both modes run the same
+    /// linked-device session, and WhatsApp can mirror an operator's own
+    /// messages as `fromMe` under either, so that scoping is a property of
+    /// this branch rather than of the account.
     Personal,
 }
 
