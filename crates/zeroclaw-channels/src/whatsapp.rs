@@ -87,6 +87,71 @@ async fn remove_pending_and_disarm(token: &str, guard: &mut PendingApprovalGuard
     guard.disarm();
 }
 
+/// Registers an approval token, waits for the operator, and cleans up after
+/// itself however it leaves.
+///
+/// The send is a parameter so this whole lifecycle can be driven without a live
+/// Meta endpoint. `request_approval_attributed` is a thin wrapper that supplies
+/// the real one, so every ownership transition here happens in the code
+/// production runs rather than in a copy of it: a regression that moved the
+/// guard after the send, dropped it, or changed a cleanup arm would fail.
+///
+/// Registration happens first, then the guard is armed, and only then is
+/// anything sent. That order matters because the send is the first thing that
+/// can leave the function, and it leaves through `?` with the entry already in
+/// the map.
+async fn run_approval_lifecycle<F, Fut>(
+    token: String,
+    approval_timeout_secs: u64,
+    send: F,
+) -> anyhow::Result<zeroclaw_api::channel::AttributedApprovalResponse>
+where
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = anyhow::Result<()>>,
+{
+    let (tx_approval, rx_approval) = oneshot::channel();
+    {
+        let mut map = PENDING_APPROVALS.lock().await;
+        map.insert(token.clone(), tx_approval);
+    }
+    // Armed immediately after registration rather than later, because the send
+    // below is the first thing that can leave the function.
+    let mut guard = PendingApprovalGuard::new(token.clone());
+
+    // The `?` here is what orphans a live token: it returns with the entry
+    // already registered, and no cleanup below it runs. The guard covers it.
+    send().await?;
+
+    let timeout = std::time::Duration::from_secs(approval_timeout_secs);
+    // Only a real token-echo reply is an operator decision; the dropped-sender
+    // and timeout arms are the runtime denying on its own.
+    let attributed = match tokio::time::timeout(timeout, rx_approval).await {
+        Ok(Ok(response)) => {
+            // The reply arrived, which means the gateway's reply handler has
+            // already removed the entry to take the sender out of the map.
+            // Nothing awaits between here and the disarm, so there is no
+            // cancellation window to cover.
+            guard.disarm();
+            zeroclaw_api::channel::AttributedApprovalResponse::operator(response)
+        }
+        Ok(Err(_)) => {
+            remove_pending_and_disarm(&token, &mut guard).await;
+            zeroclaw_api::channel::AttributedApprovalResponse::from_runtime(
+                ChannelApprovalResponse::Deny,
+                zeroclaw_api::channel::ApprovalSource::Unreachable,
+            )
+        }
+        Err(_) => {
+            remove_pending_and_disarm(&token, &mut guard).await;
+            zeroclaw_api::channel::AttributedApprovalResponse::from_runtime(
+                ChannelApprovalResponse::Deny,
+                zeroclaw_api::channel::ApprovalSource::TimedOut,
+            )
+        }
+    };
+    Ok(attributed)
+}
+
 fn ensure_https(url: &str) -> anyhow::Result<()> {
     if !url.starts_with("https://") {
         anyhow::bail!(
@@ -887,52 +952,15 @@ impl Channel for WhatsAppChannel {
         request: &ChannelApprovalRequest,
     ) -> anyhow::Result<Option<zeroclaw_api::channel::AttributedApprovalResponse>> {
         let token = crate::util::new_approval_token();
-        let (tx_approval, rx_approval) = oneshot::channel();
-        {
-            let mut map = PENDING_APPROVALS.lock().await;
-            map.insert(token.clone(), tx_approval);
-        }
-        // Armed immediately after registration rather than later, because the
-        // send below is the first thing that can leave the function.
-        let mut guard = PendingApprovalGuard::new(token.clone());
-
         let text = crate::util::build_yesno_approval_prompt(
             &token,
             &request.tool_name,
             &request.arguments_summary,
         );
-        // The `?` here is what orphans a live token: it returns with the entry
-        // already registered, and no cleanup below it runs. The guard covers
-        // that path.
-        self.send(&SendMessage::new(text, recipient)).await?;
-
-        let timeout = std::time::Duration::from_secs(self.approval_timeout_secs);
-        // Only a real token-echo reply is an operator decision; the
-        // dropped-sender and timeout arms are the runtime denying on its own.
-        let attributed = match tokio::time::timeout(timeout, rx_approval).await {
-            Ok(Ok(response)) => {
-                // The reply arrived, which means the gateway's reply handler
-                // already removed the entry to take the sender out of the map.
-                // Nothing awaits between here and the disarm, so there is no
-                // cancellation window to cover.
-                guard.disarm();
-                zeroclaw_api::channel::AttributedApprovalResponse::operator(response)
-            }
-            Ok(Err(_)) => {
-                remove_pending_and_disarm(&token, &mut guard).await;
-                zeroclaw_api::channel::AttributedApprovalResponse::from_runtime(
-                    ChannelApprovalResponse::Deny,
-                    zeroclaw_api::channel::ApprovalSource::Unreachable,
-                )
-            }
-            Err(_) => {
-                remove_pending_and_disarm(&token, &mut guard).await;
-                zeroclaw_api::channel::AttributedApprovalResponse::from_runtime(
-                    ChannelApprovalResponse::Deny,
-                    zeroclaw_api::channel::ApprovalSource::TimedOut,
-                )
-            }
-        };
+        let attributed = run_approval_lifecycle(token, self.approval_timeout_secs, || async {
+            self.send(&SendMessage::new(text, recipient)).await
+        })
+        .await?;
         Ok(Some(attributed))
     }
 
@@ -2843,38 +2871,54 @@ mod tests {
         });
     }
 
+    /// Block until the lifecycle under test has registered its token, so a
+    /// later assertion cannot pass vacuously against an entry that was never
+    /// there.
+    async fn wait_until_registered(token: &str) {
+        tokio::time::timeout(APPROVAL_CLEANUP_HANG_GUARD, async {
+            while !PENDING_APPROVALS.lock().await.contains_key(token) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("token {token} was never registered"));
+    }
+
     /// The send is the first thing after registration, so a transient send
     /// failure returns with the entry already in the map. That path needs no
     /// cancellation to reach, which is what makes it the cheapest to exploit.
+    ///
+    /// Drives the production lifecycle with a failing send rather than dropping
+    /// a hand-built guard, so moving the guard after the send or removing it
+    /// from the lifecycle would fail this test.
     #[tokio::test]
     async fn send_failure_leaves_no_live_token() {
         let token = "sendfl";
-        let (guard, _rx) = park_guarded_token(token).await;
-        assert!(
-            PENDING_APPROVALS.lock().await.contains_key(token),
-            "fixture failed to register the token, so the assertion below would pass vacuously"
-        );
 
-        // What `self.send(...).await?` does on the error path: the function
-        // returns and everything it owns, including the guard, is dropped.
-        drop(guard);
+        let result = run_approval_lifecycle(token.to_string(), 300, || async {
+            anyhow::bail!("simulated transport failure")
+        })
+        .await;
 
+        assert!(result.is_err(), "a failing send must propagate");
         assert_token_cleared(token).await;
     }
 
     /// Cancellation is the exit no in-body cleanup can cover, because none of
-    /// that code runs once the future is dropped. A caller-side timeout and a
-    /// shutdown both do exactly this.
+    /// that code runs once the future is dropped. The runtime wraps
+    /// `request_approval` in its own timeout, so a caller-side drop of this
+    /// future is an ordinary production event rather than a test-only one.
     #[tokio::test]
     async fn cancelled_request_leaves_no_live_token() {
         let token = "cancel";
-        let (guard, _rx) = park_guarded_token(token).await;
-        assert!(PENDING_APPROVALS.lock().await.contains_key(token));
 
         let task = zeroclaw_spawn::spawn!(async move {
-            let _guard = guard;
-            std::future::pending::<()>().await;
+            // A send that succeeds, then a wait long enough that the abort
+            // below lands while the lifecycle is parked on the receiver.
+            run_approval_lifecycle("cancel".to_string(), 300, || async { Ok(()) }).await
         });
+
+        wait_until_registered(token).await;
         task.abort();
         let _ = task.await;
 
@@ -2885,9 +2929,16 @@ mod tests {
     /// that lands while the cleanup is *waiting for the map lock*.
     ///
     /// Disarming before acquiring that lock made the window real, because the
-    /// guard would then drop already-unarmed and the removal never ran. This
-    /// drives the production helper with the lock held, cancels it mid-await,
-    /// and requires the entry to be gone regardless.
+    /// guard would then drop already-unarmed and the removal never ran.
+    ///
+    /// This drives `remove_pending_and_disarm`, which is the function the two
+    /// runtime-deny arms call, and cancels it while it is provably parked on
+    /// the contended lock. Driving the whole lifecycle here instead was tried
+    /// and rejected: there is no way to observe from outside that the spawned
+    /// task has reached the lock rather than an earlier await, so the
+    /// cancellation landed early, the guard dropped still-armed, and the test
+    /// passed against the defect it exists to catch. A racy test that cannot
+    /// fail is worse than a focused one that can.
     #[tokio::test]
     async fn cancellation_while_awaiting_the_map_lock_leaves_no_live_token() {
         let token = "lockct";
