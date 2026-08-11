@@ -11076,7 +11076,14 @@ pub fn validate_whatsapp_semantics(
     wa: &WhatsAppConfig,
 ) -> Vec<crate::validation_warnings::ValidationWarning> {
     let mut out = Vec::new();
-    if !wa.enabled || !wa.is_web_config() {
+    // Gate on the backend the runtime will actually select, not on whether a
+    // Web selector is merely present. `is_web_config` is true whenever any Web
+    // selector is set, including alongside `phone_number_id`, and that
+    // combination runs as Cloud. The Cloud transport consults none of the keys
+    // below, so diagnosing them against a Cloud channel reports a Web gate that
+    // never runs. The ambiguity itself is already surfaced separately at
+    // startup, so it is not restated here.
+    if !wa.enabled || wa.backend_type() != "web" {
         return out;
     }
 
@@ -37568,6 +37575,68 @@ allowed_users = []
 
     const WA_INERT_WARNING: &str = "whatsapp_chat_policy_inert";
     const WA_OPEN_GROUPS_WARNING: &str = "whatsapp_empty_group_allowlist_permits_all";
+
+    /// A config carrying both `phone_number_id` and a Web selector runs as
+    /// Cloud, and the Cloud transport consults none of the Web chat-policy
+    /// keys. Diagnosing them here would describe a gate that never runs, and
+    /// the open-groups warning in particular would report unintended group
+    /// access on a channel whose Web group gate is not in the path.
+    ///
+    /// The second half is the control: strip `phone_number_id` so the same
+    /// keys select the Web backend, and both warnings must return. Without it
+    /// this test would also pass against a validator that had been switched
+    /// off entirely.
+    #[test]
+    async fn whatsapp_mixed_selectors_run_as_cloud_and_report_no_web_policy_warnings() {
+        let mixed = r#"
+[channels.whatsapp.shop]
+enabled = true
+phone_number_id = "1234567890"
+access_token = "token"
+verify_token = "verify"
+session_path = "/tmp/wa-session"
+mode = "business"
+self_chat_mode = true
+group_policy = "allowlist"
+allowed_groups = []
+"#;
+        let cfg: Config = toml::from_str(mixed).unwrap();
+        assert_eq!(
+            cfg.channels.whatsapp["shop"].backend_type(),
+            "cloud",
+            "a Cloud selector must win over a Web selector, or this test is not \
+             exercising the mixed case"
+        );
+        assert!(
+            warnings_with_code(&cfg, WA_INERT_WARNING).is_empty(),
+            "a Cloud-backed channel must not be diagnosed against the Web chat-policy gate"
+        );
+        assert!(
+            warnings_with_code(&cfg, WA_OPEN_GROUPS_WARNING).is_empty(),
+            "the Web group gate is not in a Cloud channel's path, so an empty \
+             allowed_groups grants no group access here"
+        );
+
+        let web_only = r#"
+[channels.whatsapp.shop]
+enabled = true
+session_path = "/tmp/wa-session"
+mode = "business"
+self_chat_mode = true
+group_policy = "allowlist"
+allowed_groups = []
+"#;
+        let cfg: Config = toml::from_str(web_only).unwrap();
+        assert_eq!(cfg.channels.whatsapp["shop"].backend_type(), "web");
+        assert!(
+            !warnings_with_code(&cfg, WA_INERT_WARNING).is_empty(),
+            "removing the Cloud selector must restore the inert-key diagnostic"
+        );
+        assert!(
+            !warnings_with_code(&cfg, WA_OPEN_GROUPS_WARNING).is_empty(),
+            "removing the Cloud selector must restore the open-groups diagnostic"
+        );
+    }
 
     /// A Web channel in business mode: `dm_policy` and `group_policy` are
     /// consulted under both modes, so calling them inert would now be false.
