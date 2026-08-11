@@ -28,7 +28,7 @@ struct ApprovalBinding {
     /// The configured alias that ISSUED this request.
     ///
     /// The map below is process-wide, so without this the binding is only
-    /// (token, chat) and the reply path evaluates `allowed_numbers` using
+    /// (token, chat) and the reply path resolves the authorized peers using
     /// whichever instance happened to receive the reply. Two aliases sharing a
     /// contact or group then leak authority across the boundary an operator
     /// drew between them: a responder alias A denies can approve alias A's tool
@@ -180,7 +180,7 @@ enum ApprovalRefusal {
     /// The token exists but the reply came from a different chat.
     ForeignChat,
     /// The reply came from the right chat, but the responder is not on
-    /// `allowed_numbers`. This is the gate the other transports omit.
+    /// an authorized peer for this alias. This is the gate the other transports omit.
     UnauthorizedResponder,
     /// The reply cleared every authorization gate, but the requesting future
     /// was already cancelled or dropped, so the oneshot receiver is gone and
@@ -191,7 +191,7 @@ enum ApprovalRefusal {
     /// one that issued it. Distinct from `ForeignChat` because two aliases can
     /// legitimately share a chat, so the chat can match while the issuer does
     /// not, and answering under the wrong alias means the wrong
-    /// `allowed_numbers` decides.
+    /// alias's authorized peers decide.
     ForeignAlias,
     /// The token belongs to a group that the live channel policy no longer
     /// admits.
@@ -784,7 +784,7 @@ impl WhatsAppWebChannel {
             .and_then(crate::util::parse_approval_reply)
         {
             // `normalized` is Some only when a sender candidate matched
-            // allowed_numbers, so it IS the authorization signal, already
+            // an authorized peer, so it IS the authorization signal, already
             // computed above for the message path.
             match resolve_approval_reply_with_group_admission(
                 &token,
@@ -5393,7 +5393,7 @@ mod tests {
 
     /// `PENDING_APPROVALS` is process-wide, so before the alias was part of the
     /// binding this was a real authorization bypass rather than a tidiness
-    /// issue: the reply path evaluates `allowed_numbers` using whichever
+    /// issue: the reply path resolves the authorized peers using whichever
     /// instance received the reply. A responder alias A refuses could therefore
     /// approve alias A's tool call by answering through alias B, because B's
     /// allowlist decided. Two aliases sharing a group is a supported
@@ -5501,7 +5501,7 @@ mod tests {
     }
 
     /// A reply carrying a VALID token, from the right chat, but from a number
-    /// that is not on `allowed_numbers`, must not decide anything. This is the
+    /// that is not an authorized peer, must not decide anything. This is the
     /// case slack, telegram and matrix currently allow.
     #[tokio::test]
     #[cfg(feature = "whatsapp-web")]
