@@ -58,8 +58,11 @@ impl Drop for PendingApprovalGuard {
             return;
         };
         // `Drop` is not async, and blocking here would stall whichever runtime
-        // thread is unwinding. Spawn the removal instead: the entry is gone well
-        // before any realistic reply, and a reply that beats it still finds a
+        // thread is unwinding. Spawn the removal instead. That makes cleanup
+        // asynchronous rather than immediate, and the delay is scheduler
+        // dependent rather than bounded, so the honest guarantee is eventual
+        // removal and not prompt removal. What is not weakened by the delay is
+        // the decision itself: a reply arriving inside that window still finds a
         // receiver whose sender was dropped with this future, so it cannot be
         // reported as an accepted decision.
         zeroclaw_spawn::spawn!(async move {
@@ -2987,6 +2990,146 @@ mod tests {
             "a disarmed guard must not remove an entry the normal path owns"
         );
         PENDING_APPROVALS.lock().await.remove(token);
+    }
+
+    /// A real operator reply must come back attributed to the operator.
+    ///
+    /// No earlier test reached this arm, and none asserted a return value at
+    /// all, so the whole attribution was uncovered on both sides of the
+    /// refactor. It resolves the token exactly as the gateway does, taking the
+    /// sender out of the map before sending, and asserts the decision AND its
+    /// source: the decision alone would pass against a runtime deny that
+    /// happened to carry the same value.
+    #[tokio::test]
+    async fn an_operator_reply_is_attributed_to_the_operator() {
+        let token = "opappr";
+
+        let task = zeroclaw_spawn::spawn!(async move {
+            run_approval_lifecycle("opappr".to_string(), 300, || async { Ok(()) }).await
+        });
+
+        wait_until_registered(token).await;
+
+        let sender = PENDING_APPROVALS
+            .lock()
+            .await
+            .remove(token)
+            .expect("the lifecycle must register before a reply can resolve it");
+        let _ = sender.send(ChannelApprovalResponse::Approve);
+
+        let attributed = task
+            .await
+            .expect("task should not panic")
+            .expect("a resolved approval is not an error");
+
+        assert_eq!(attributed.response, ChannelApprovalResponse::Approve);
+        assert_eq!(
+            attributed.source,
+            zeroclaw_api::channel::ApprovalSource::Operator,
+            "a human answered, so this must not be reported as a runtime fail-closed"
+        );
+        assert!(
+            !PENDING_APPROVALS.lock().await.contains_key(token),
+            "the reply handler removed the entry; the guard must not re-add one"
+        );
+    }
+
+    /// The success arm must DISARM, not merely finish.
+    ///
+    /// A guard still armed after a resolved approval spawns a removal for a
+    /// token the reply handler has already taken. In isolation that is a no-op,
+    /// which is why asserting the entry is absent cannot see the difference. It
+    /// stops being a no-op the moment the token has been reused: the stale
+    /// removal then deletes the NEWER request. That is the same window the
+    /// documented token-reuse residual names, so this reproduces it directly.
+    ///
+    /// The map lock is held across the whole handover deliberately. A stale
+    /// removal is a spawned task that must take that lock, so a version of this
+    /// test that releases it between the resolution and the re-registration
+    /// lets the removal run first, delete nothing, and report success. That
+    /// version was written, and its mutation control caught it passing against
+    /// a deliberately undisarmed guard. Holding the lock orders the removal
+    /// after the re-registration, which is the sequence the residual describes.
+    #[tokio::test]
+    async fn a_resolved_approval_does_not_delete_a_later_registration() {
+        let token = "reuse1";
+
+        let task = zeroclaw_spawn::spawn!(async move {
+            run_approval_lifecycle("reuse1".to_string(), 300, || async { Ok(()) }).await
+        });
+        wait_until_registered(token).await;
+
+        let mut map = PENDING_APPROVALS.lock().await;
+
+        // The reply handler takes the sender out and resolves the request. The
+        // success arm touches no lock, so the lifecycle still completes here.
+        let sender = map.remove(token).expect("registered");
+        let _ = sender.send(ChannelApprovalResponse::Approve);
+        let _ = task.await.expect("task").expect("lifecycle");
+
+        // A later request reuses the same six-character token.
+        let (tx_next, _rx_next) = oneshot::channel();
+        map.insert(token.to_string(), tx_next);
+        drop(map);
+
+        // Give any spawned removal every chance to run before concluding none did.
+        for _ in 0..50 {
+            tokio::task::yield_now().await;
+        }
+
+        assert!(
+            PENDING_APPROVALS.lock().await.contains_key(token),
+            "a resolved approval must not delete a later request that reused its token"
+        );
+        PENDING_APPROVALS.lock().await.remove(token);
+    }
+
+    /// A sender dropped without a decision is the runtime failing closed, and
+    /// must be attributed `Unreachable` rather than presented as an operator
+    /// denial.
+    #[tokio::test]
+    async fn a_dropped_sender_is_attributed_unreachable() {
+        let token = "unrch";
+
+        let task = zeroclaw_spawn::spawn!(async move {
+            run_approval_lifecycle("unrch".to_string(), 300, || async { Ok(()) }).await
+        });
+
+        wait_until_registered(token).await;
+        drop(
+            PENDING_APPROVALS
+                .lock()
+                .await
+                .remove(token)
+                .expect("registered"),
+        );
+
+        let attributed = task.await.expect("task").expect("lifecycle");
+
+        assert_eq!(attributed.response, ChannelApprovalResponse::Deny);
+        assert_eq!(
+            attributed.source,
+            zeroclaw_api::channel::ApprovalSource::Unreachable
+        );
+        assert_token_cleared(token).await;
+    }
+
+    /// An unanswered prompt must be attributed `TimedOut`, which is a different
+    /// fact about the world from `Unreachable` and from an operator denial.
+    #[tokio::test]
+    async fn an_unanswered_prompt_is_attributed_timed_out() {
+        let token = "tmout";
+
+        let attributed = run_approval_lifecycle(token.to_string(), 0, || async { Ok(()) })
+            .await
+            .expect("a timeout is a decision, not an error");
+
+        assert_eq!(attributed.response, ChannelApprovalResponse::Deny);
+        assert_eq!(
+            attributed.source,
+            zeroclaw_api::channel::ApprovalSource::TimedOut
+        );
+        assert_token_cleared(token).await;
     }
 
     #[tokio::test]
