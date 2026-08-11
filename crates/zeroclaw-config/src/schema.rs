@@ -11049,8 +11049,9 @@ pub fn validate_memory_semantics(
 ///
 /// `self_chat_mode` is read only by the Web transport inside its
 /// `mode == Personal` block, so under `mode = "business"` it validates cleanly
-/// and has no effect. It describes a personal account talking to itself, and a
-/// business account has no equivalent.
+/// and has no effect. `mode` selects ZeroClaw's policy posture, not a WhatsApp
+/// account type: both modes drive the same linked-device session, and the
+/// self-chat affordance is scoped to the personal branch by design.
 ///
 /// `dm_policy` and `group_policy` are consulted under BOTH modes, so they are
 /// not reported here.
@@ -14914,8 +14915,9 @@ pub struct WhatsAppConfig {
     pub interrupt_on_new_message: bool,
     /// Usage mode for WhatsApp Web: "business" (default) or "personal".
     /// `dm_policy` and `group_policy` apply under BOTH modes. Personal mode
-    /// additionally applies `self_chat_mode` and the fromMe handling, which
-    /// describe a personal account talking to itself.
+    /// additionally applies `self_chat_mode` and the fromMe handling; both are
+    /// scoped to the personal branch by design, not by any protocol difference
+    /// between the two modes.
     #[tab(Advanced)]
     #[serde(default)]
     pub mode: WhatsAppWebMode,
@@ -37569,8 +37571,8 @@ allowed_users = []
 
     /// A Web channel in business mode: `dm_policy` and `group_policy` are
     /// consulted under both modes, so calling them inert would now be false.
-    /// `self_chat_mode` describes a personal account talking to itself and has
-    /// no business-mode equivalent, so it is the one key that stays inert.
+    /// `self_chat_mode` is read only inside the personal branch, so it is the
+    /// one key that stays inert here.
     #[test]
     async fn whatsapp_business_mode_flags_only_self_chat_mode() {
         let toml = r#"

@@ -49,7 +49,7 @@ For Web mode, `dm_policy` and `group_policy` apply under **both** modes. `self_c
 | `mention_only` | `true`, `false` | both modes | Requires group messages to mention the bot |
 | `passive_group_context` | `true`, `false` | both modes | Records allowed unaddressed group messages as context only |
 
-`self_chat_mode` stays personal-only because it describes a personal account talking to itself.
+`self_chat_mode` stays personal-only because the self-chat affordance is scoped to the personal branch by design. `mode` selects ZeroClaw's policy posture, not a WhatsApp account type: both modes drive the same linked-device session.
 
 The fromMe guard also stays inside the personal branch, but not because business mode lacks an equivalent. Business mode is still a WhatsApp Web linked-device session, and WhatsApp mirrors the operator's own outbound messages to linked devices as `fromMe` in either mode. The linked account is persisted as an authorized peer, so under business mode that mirror can satisfy the allowlist and reach dispatch, which is the shape #6353 closed for personal mode. That behaviour predates this change and is not introduced here; it is called out rather than asserted away, and repairing it is tracked separately.
 
