@@ -5058,6 +5058,33 @@ mod tests {
                 assert_eq!(response, expected);
             }
         }
+
+        // The group warning has to name BOTH things a group member can read.
+        // The token is the obvious one, and the one the warning used to stop
+        // at. The arguments are the other: `arguments_summary` is rendered
+        // verbatim into the prompt, so posting an approval into a group
+        // publishes the command line to every member. An operator deciding
+        // whether to approve in a group needs that stated rather than
+        // inferred from the fact that the args happen to be printed above.
+        //
+        // Read in English deliberately. This binary never initialises the
+        // i18n locale, so the in-crate English catalogue is what resolves,
+        // and the neighbouring-key assert names a locale change as the cause
+        // rather than letting it read as a deleted disclosure.
+        assert_eq!(
+            i18n::get_required_cli_string("channel-approval-args-label"),
+            "Args",
+            "this assertion reads the English catalogue, and a different one resolved"
+        );
+        assert!(
+            group_warning.to_lowercase().contains("arguments"),
+            "the group warning must disclose that the tool arguments are visible to every \
+             member, not only the reply code: {group_warning:?}"
+        );
+        assert!(
+            group.contains("ls -la"),
+            "the group prompt must carry the arguments the warning discloses: {group:?}"
+        );
     }
 
     /// The approval-reply interception, driven through the real inbound
@@ -5177,6 +5204,187 @@ mod tests {
         // The interception already removed the entry, so the guard has nothing
         // left to clean up.
         guard.disarm();
+    }
+
+    /// Every ordinary decision, driven from `request_approval` all the way
+    /// through the production inbound boundary and back to the waiting caller.
+    ///
+    /// The test above starts at a hand-registered token, which leaves the first
+    /// half of the round trip unexercised: nothing checks that the prompt
+    /// `request_approval` actually sends carries a token the listener can read,
+    /// nor that the decision the listener delivers is the one the waiting trait
+    /// call returns. Every other approval test in this file either parks a
+    /// token itself or calls the resolver itself, so the two halves are only
+    /// ever proven separately, and a listener that derived the wrong alias,
+    /// chat or authorization signal would leave all of them green.
+    ///
+    /// The send hook is the join. It runs inside `request_approval`, after the
+    /// token is registered and while the caller is about to wait, so it is the
+    /// only place a test can read this request's real token and then answer it
+    /// the way a person would.
+    ///
+    /// `always` matters as much as `yes` here: the interception decodes the
+    /// keyword, and a parser that collapsed `always` into a plain approve would
+    /// silently downgrade a blanket grant. `no` is the one that needs the outer
+    /// deadline below, because a timed-out request ALSO denies. Without a guard
+    /// shorter than `approval_timeout_secs`, a completely broken interception
+    /// would return `Deny` after 300s and the `no` case would pass for the
+    /// wrong reason.
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn every_decision_round_trips_from_the_send_seam_through_interception() {
+        use wacore::types::events::Event;
+        use wacore::types::message::{MessageInfo, MessageSource};
+        use whatsapp_rust::TokioRuntime;
+        use whatsapp_rust::bot::Bot;
+        use whatsapp_rust_tokio_transport::TokioWebSocketTransportFactory;
+        use whatsapp_rust_ureq_http_client::UreqHttpClient;
+
+        const SENDER_PHONE: &str = "15557654321";
+        let chat = Jid::pn(SENDER_PHONE).to_string();
+        let alias = "approval-round-trip-test";
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let store = Arc::new(crate::whatsapp_storage::RusqliteStore::new(tmp.path()).unwrap());
+        let bot = Bot::builder()
+            .with_backend(store.clone())
+            .with_transport_factory(TokioWebSocketTransportFactory::new())
+            .with_http_client(UreqHttpClient::new())
+            .with_runtime(TokioRuntime)
+            .build()
+            .await
+            .unwrap();
+        let client = bot.client();
+
+        let (tx, mut rx) = tokio::sync::mpsc::channel(4);
+        let context = WhatsAppInboundContext {
+            tx,
+            alias: Arc::new(alias.to_string()),
+            peer_resolver: Arc::new(|| vec![format!("+{SENDER_PHONE}")]),
+            allowed_groups_resolver: Arc::new(Vec::new),
+            mode: zeroclaw_config::schema::WhatsAppWebMode::Personal,
+            dm_policy: zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
+            group_policy: zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
+            self_chat_mode: false,
+            mention_only: false,
+            passive_group_context: false,
+            bot_phone: Arc::new(Mutex::new(None)),
+            bot_lid: Arc::new(Mutex::new(None)),
+            dm_mention_patterns: Arc::new(Vec::new()),
+            group_mention_patterns: Arc::new(Vec::new()),
+            transcription_config: None,
+            transcription_manager: None,
+            voice_chats: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
+        };
+
+        for (word, expected) in [
+            ("yes", ChannelApprovalResponse::Approve),
+            ("no", ChannelApprovalResponse::Deny),
+            ("always", ChannelApprovalResponse::AlwaysApprove),
+        ] {
+            // The hook publishes this request's real token the moment the
+            // prompt "sends", which is what lets the reply below be a genuine
+            // answer to it rather than a token the test chose.
+            let (token_tx, mut token_rx) = tokio::sync::mpsc::channel::<String>(1);
+            let channel = WhatsAppWebChannel::new(
+                &zeroclaw_config::schema::WhatsAppConfig::default(),
+                alias,
+                Arc::new(|| vec![format!("+{SENDER_PHONE}")]),
+                Arc::new(Vec::new),
+            )
+            .with_approval_send_hook(Arc::new(move |message: SendMessage| {
+                let token_tx = token_tx.clone();
+                Box::pin(async move {
+                    let token = message
+                        .content
+                        .split_once('[')
+                        .and_then(|(_, rest)| rest.split_once(']'))
+                        .map(|(token, _)| token.to_string())
+                        .expect("the prompt must carry its token in brackets");
+                    token_tx
+                        .send(token)
+                        .await
+                        .expect("the driver must still be waiting for the token");
+                    // Delivered. Control reaches the wait, which is where the
+                    // inbound reply has to find it.
+                    Ok(())
+                })
+            }));
+
+            let request = ChannelApprovalRequest {
+                tool_name: "shell".to_string(),
+                arguments_summary: format!("echo {word}"),
+                raw_arguments: None,
+            };
+
+            let asking = channel.request_approval(&chat, &request);
+
+            let replying = async {
+                let token = token_rx
+                    .recv()
+                    .await
+                    .expect("the send hook must publish the token before the wait");
+                let reply_event = Event::Message(
+                    Arc::new(waproto::whatsapp::Message {
+                        conversation: Some(format!("{token} {word}")),
+                        ..Default::default()
+                    }),
+                    Arc::new(MessageInfo {
+                        source: MessageSource {
+                            chat: Jid::pn(SENDER_PHONE),
+                            sender: Jid::pn(SENDER_PHONE),
+                            is_from_me: false,
+                            is_group: false,
+                            ..Default::default()
+                        },
+                        id: format!("approval-round-trip-{word}"),
+                        r#type: "text".to_string(),
+                        push_name: "Approval Replier".to_string(),
+                        timestamp: chrono::Utc::now(),
+                        ..Default::default()
+                    }),
+                );
+                WhatsAppWebChannel::handle_inbound_message_event(&reply_event, &client, &context)
+                    .await;
+                token
+            };
+
+            // Shorter than `approval_timeout_secs`, on purpose. See the note
+            // above about `no`: this deadline is what separates "the reply was
+            // delivered" from "nobody answered and the timeout denied".
+            let (decision, token) =
+                tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                    tokio::join!(asking, replying)
+                })
+                .await
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "the {word:?} reply never reached the waiting request; a decision that \
+                     arrives through interception resolves in milliseconds, so this deadline \
+                     means the inbound boundary dropped it"
+                    )
+                });
+
+            assert_eq!(
+                decision.expect("a delivered decision must not surface as an error"),
+                Some(expected.clone()),
+                "a `<token> {word}` reply must resolve the waiting request to {expected:?}"
+            );
+
+            assert!(
+                !PENDING_APPROVALS.lock().await.contains_key(&token),
+                "a resolved request must leave no entry behind for a later reply to hit"
+            );
+
+            // Deterministic rather than timed: `handle_inbound_message_event`
+            // is awaited to completion above, so anything it dispatched is
+            // already queued by now.
+            assert!(
+                rx.try_recv().is_err(),
+                "an approval reply is a control message and must not also dispatch as \
+                 conversation"
+            );
+        }
     }
 
     /// The send-error branch's generation check, proven from outside.
@@ -5710,6 +5918,98 @@ mod tests {
             "the timeout arm must remove its own token, or a late reply can \
              resolve a request whose receiver is already gone"
         );
+    }
+
+    /// A POSITIVE `approval_timeout_secs` is waited out in full, then denies.
+    ///
+    /// The test above configures `0`, which reaches the same arm and cannot
+    /// distinguish waiting from not waiting: an already-elapsed deadline fires
+    /// identically whether the channel read its own configured duration, read
+    /// some other field, or hardcoded a constant. That gap is exactly the shape
+    /// of the defect this branch fixed on the config side, where an unset field
+    /// silently became `0` and every approval denied at once.
+    ///
+    /// So this asserts the DURATION, not just the decision, and does it twice
+    /// with different values. One value would be satisfied by a hardcoded
+    /// constant that happened to match; two are not.
+    ///
+    /// Paused time is what makes that affordable. Under
+    /// `#[tokio::test(start_paused = true)]` the runtime advances its clock to
+    /// the next deadline whenever nothing is runnable, so the 300-second wait
+    /// is measured exactly and costs no wall-clock. The send hook returns `Ok`
+    /// so control reaches the wait rather than returning early at the send.
+    #[tokio::test(start_paused = true)]
+    #[cfg(feature = "whatsapp-web")]
+    async fn a_positive_timeout_is_waited_out_in_full_before_denying() {
+        for configured_secs in [300_u64, 45_u64] {
+            let seen_token = Arc::new(std::sync::Mutex::new(None::<String>));
+            let recorder = Arc::clone(&seen_token);
+
+            let cfg = zeroclaw_config::schema::WhatsAppConfig {
+                approval_timeout_secs: configured_secs,
+                ..Default::default()
+            };
+            let channel = WhatsAppWebChannel::new(
+                &cfg,
+                "alias-paused",
+                Arc::new(Vec::new),
+                Arc::new(Vec::new),
+            )
+            .with_approval_send_hook(Arc::new(move |message: SendMessage| {
+                let recorder = Arc::clone(&recorder);
+                Box::pin(async move {
+                    let token = message
+                        .content
+                        .split_once('[')
+                        .and_then(|(_, rest)| rest.split_once(']'))
+                        .map(|(token, _)| token.to_string())
+                        .expect("the prompt must carry its token in brackets");
+                    *recorder.lock().unwrap() = Some(token);
+                    Ok(())
+                })
+            }));
+
+            let request = ChannelApprovalRequest {
+                tool_name: "shell".to_string(),
+                arguments_summary: "ls".to_string(),
+                raw_arguments: None,
+            };
+
+            let started = tokio::time::Instant::now();
+            let decision = channel
+                .request_approval("1@s.whatsapp.net", &request)
+                .await
+                .expect("a timeout must resolve to a decision, not an error");
+            let waited = started.elapsed();
+
+            assert_eq!(
+                decision,
+                Some(ChannelApprovalResponse::Deny),
+                "a request nobody answered must deny, never approve"
+            );
+
+            let configured = std::time::Duration::from_secs(configured_secs);
+            assert!(
+                waited >= configured,
+                "the channel returned after {waited:?}, short of the configured \
+                 {configured:?}; an operator who set that value is not getting it"
+            );
+            assert!(
+                waited < configured + std::time::Duration::from_secs(1),
+                "the channel waited {waited:?} against a configured {configured:?}; the \
+                 deadline must come from approval_timeout_secs, not from elsewhere"
+            );
+
+            let token = seen_token
+                .lock()
+                .unwrap()
+                .clone()
+                .expect("the hook must have run, or the send never reached the timeout");
+            assert!(
+                !PENDING_APPROVALS.lock().await.contains_key(&token),
+                "the timeout arm must remove its own token whatever the duration"
+            );
+        }
     }
 
     /// A late reply to a timed-out request is refused, from the caller's side.
