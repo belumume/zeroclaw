@@ -14803,11 +14803,10 @@ impl ChannelConfig for SignalConfig {
 /// is consulted only there.
 /// `Business` (default) is the same admission path without that exception.
 ///
-/// This block previously said business mode "responds to all incoming messages,
-/// subject only to the `allowed_numbers` allowlist". Both halves were wrong once
-/// the policies became mode-independent, and `allowed_numbers` is in any case a
-/// V2 field that migrates into `peer_groups` on load, so it named a knob the
-/// current model does not expose.
+/// Neither mode consults `allowed_numbers`. That is a V2 field which migrates
+/// into `peer_groups` on load, so it names no knob the current model exposes;
+/// senders resolve from `[peer_groups.<name>].external_peers` scoped to the
+/// alias.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, zeroclaw_macros::ConfigEnum)]
 #[cfg_attr(feature = "schema-export", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
