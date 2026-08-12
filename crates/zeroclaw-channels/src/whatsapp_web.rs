@@ -5087,6 +5087,39 @@ mod tests {
         );
     }
 
+    /// No runtime assertion can catch a prompt that reverts to a hardcoded
+    /// English string, so this one reads the source instead.
+    ///
+    /// Under the `en` locale a correct literal renders byte-identically to what
+    /// the catalogue produces, so every assertion above passes against it. The
+    /// key-scanning guard in `util.rs` does not close that gap either: it finds
+    /// a key that is still referenced but misspelled, while a reverted prompt
+    /// stops referencing the key at all.
+    ///
+    /// Splitting on the test module is what makes this checkable, since the
+    /// needles below have to appear here in order to be searched for.
+    #[test]
+    fn production_carries_no_approval_prose_literal() {
+        const SRC: &str = include_str!("whatsapp_web.rs");
+        const TEST_MODULE: &str = "\n#[cfg(test)]\nmod tests {";
+
+        let (production, tests) = SRC
+            .split_once(TEST_MODULE)
+            .expect("the test module marker moved, so this guard searched the wrong text");
+        assert!(
+            !tests.is_empty(),
+            "the split produced an empty test half, so the marker matched something unintended"
+        );
+
+        for prose in ["APPROVAL REQUIRED", "Tool: {}", "so everyone here can see"] {
+            assert!(
+                !production.contains(prose),
+                "approval prose {prose:?} is hardcoded in production code; it belongs in the \
+                 Fluent catalogue so that every locale moves with it"
+            );
+        }
+    }
+
     /// The approval-reply interception, driven through the real inbound
     /// handler rather than by calling the resolver directly.
     ///
