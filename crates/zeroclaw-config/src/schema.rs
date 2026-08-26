@@ -11776,20 +11776,7 @@ pub fn validate_whatsapp_semantics(
     if wa.allowed_groups.is_empty()
         && whatsapp_empty_group_list_is_newly_closed(&wa.mode, &wa.group_policy)
     {
-        let remedy = match wa.group_policy {
-            // A list cannot reopen `ignore`: a non-empty list passes the
-            // identity gate, and the chat-type gate still drops every group.
-            WhatsAppChatPolicy::Ignore => {
-                "group_policy = \"ignore\" serves no group by design; set \
-                 group_policy = \"all\" to admit every group, or \
-                 group_policy = \"allowlist\" together with the group JIDs you \
-                 intend to serve"
-            }
-            _ => {
-                "list the group JIDs you intend to serve in allowed_groups, or \
-                 set group_policy = \"all\" to admit every group"
-            }
-        };
+        let remedy = whatsapp_empty_group_list_remedy(&wa.group_policy);
         out.push(crate::validation_warnings::ValidationWarning::new(
             "whatsapp_empty_group_list_serves_no_group",
             format!(
@@ -15805,6 +15792,31 @@ pub fn whatsapp_empty_group_list_is_newly_closed(
         (mode, group_policy),
         (_, WhatsAppChatPolicy::All) | (WhatsAppWebMode::Personal, WhatsAppChatPolicy::Ignore)
     )
+}
+
+/// How to restore group access, phrased for the policy actually in force.
+///
+/// Shared rather than duplicated for the same reason as the predicate above:
+/// the Web transport's startup notice and the `config validate` warning must
+/// not offer different remedies for the same configuration.
+///
+/// The `ignore` arm exists because naming `allowed_groups` there would be an
+/// INEFFECTIVE remedy. A listed group passes the group-identity gate and is
+/// then dropped by the chat-type gate, so populating the list changes nothing
+/// and the operator has to choose a different policy instead.
+pub fn whatsapp_empty_group_list_remedy(group_policy: &WhatsAppChatPolicy) -> &'static str {
+    match group_policy {
+        WhatsAppChatPolicy::Ignore => {
+            "group_policy = \"ignore\" serves no group by design; set \
+             group_policy = \"all\" to admit every group, or \
+             group_policy = \"allowlist\" together with the group JIDs you \
+             intend to serve"
+        }
+        _ => {
+            "list the group JIDs you intend to serve in allowed_groups, or \
+             set group_policy = \"all\" to admit every group"
+        }
+    }
 }
 
 /// WhatsApp channel configuration (Cloud API or Web mode).
@@ -41354,6 +41366,55 @@ group_policy = "ignore"
              offering allowed_groups, which cannot reopen it: {}",
             warnings[0].message
         );
+    }
+
+    /// The six-cell predicate that BOTH the startup notice and `config validate`
+    /// consume. Asserted directly here so the shared contract is pinned once,
+    /// rather than only observed through whichever surface happens to call it.
+    #[test]
+    async fn whatsapp_empty_group_list_newly_closed_matrix() {
+        use WhatsAppChatPolicy as P;
+        use WhatsAppWebMode as M;
+        let cases = [
+            (M::Business, P::Allowlist, true),
+            (M::Business, P::Ignore, true),
+            (M::Business, P::All, false),
+            (M::Personal, P::Allowlist, true),
+            // Already closed before this change, so nothing was lost.
+            (M::Personal, P::Ignore, false),
+            (M::Personal, P::All, false),
+        ];
+        for (mode, policy, expected) in cases {
+            assert_eq!(
+                whatsapp_empty_group_list_is_newly_closed(&mode, &policy),
+                expected,
+                "{mode:?} + {policy:?} newly-closed should be {expected}"
+            );
+        }
+    }
+
+    /// The remedy must never tell an `ignore` channel to populate
+    /// `allowed_groups`: a listed group passes the identity gate and the
+    /// chat-type gate drops it anyway, so that advice cannot work.
+    #[test]
+    async fn whatsapp_empty_group_list_remedy_is_policy_aware() {
+        use WhatsAppChatPolicy as P;
+        let ignore = whatsapp_empty_group_list_remedy(&P::Ignore);
+        assert!(
+            ignore.contains("serves no group by design"),
+            "the ignore remedy must explain the policy: {ignore}"
+        );
+        assert!(
+            !ignore.contains("list the group JIDs you intend to serve in allowed_groups"),
+            "the ignore remedy must not offer a list, which cannot reopen it: {ignore}"
+        );
+        for policy in [P::Allowlist, P::All] {
+            let other = whatsapp_empty_group_list_remedy(&policy);
+            assert!(
+                other.contains("allowed_groups"),
+                "{policy:?} is reopened by a list, so the remedy must name it: {other}"
+            );
+        }
     }
 
     /// The `all` opt-in still admits every group under BOTH modes, so nothing
