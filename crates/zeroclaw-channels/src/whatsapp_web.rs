@@ -386,7 +386,8 @@ pub struct WhatsAppWebChannel {
     /// runtime trust boundary for file delivery.
     workspace_dir: Option<PathBuf>,
     /// Resolves allowed group chats from canonical config at message-time.
-    /// Empty = all groups permitted. Direct messages bypass.
+    /// Empty admits no group unless `group_policy` is `all`, which admits
+    /// every group. Direct messages bypass.
     allowed_groups_resolver: Arc<dyn Fn() -> Vec<String> + Send + Sync>,
     /// Optional pairing-persist handle to the canonical shared `Config`.
     /// `None` in tests; `Some` in the long-running daemon, wired via
@@ -473,7 +474,26 @@ impl WhatsAppWebChannel {
                         "group_policy": format!("{group_policy:?}"),
                         "mode": format!("{mode:?}"),
                     })),
-                "allowed_groups is empty and group_policy is not \"all\", so this                  channel will answer no group. Set group_policy = \"all\" to allow                  every group, or list the group JIDs in allowed_groups."
+                format!(
+                    "allowed_groups is empty and group_policy is not \"all\", so \
+                     this channel will answer no group. It previously answered \
+                     every group. To restore group access, {}.",
+                    match group_policy {
+                        // A list cannot reopen `ignore`: a non-empty list passes
+                        // the identity gate, and `composed_chat_policy_decision`
+                        // still returns DropGroupIgnored for every group. Naming
+                        // allowed_groups here would be an ineffective remedy.
+                        zeroclaw_config::schema::WhatsAppChatPolicy::Ignore =>
+                            "group_policy = \"ignore\" serves no group by design; \
+                             set group_policy = \"all\" to admit every group, or \
+                             group_policy = \"allowlist\" together with the group \
+                             JIDs you intend to serve",
+                        _ =>
+                            "list the group JIDs you intend to serve in \
+                              allowed_groups, or set group_policy = \"all\" to \
+                              admit every group",
+                    }
+                )
             );
         }
 
@@ -4453,9 +4473,11 @@ mod tests {
         let client = bot.client();
 
         // Plain phone JIDs, so admission is decided from the JID itself and no
-        // LID mapping is in play. `allowed_groups` stays empty, which
-        // `is_group_chat_allowed` admits, so each group row reaches the
-        // chat-type policy instead of stopping at the group gate above it.
+        // LID mapping is in play. `allowed_groups` lists GROUP_JID explicitly,
+        // so each group row passes the group-identity gate and reaches the
+        // chat-type policy this test is about. An empty list would stop every
+        // group row at the identity gate under any policy but `all`, which is
+        // the empty-list contract exercised by the dedicated tests above.
         let event = |sender: &str, is_group: bool| {
             let sender_jid: Jid = format!("{sender}@s.whatsapp.net")
                 .parse()
@@ -4493,7 +4515,7 @@ mod tests {
                     tx,
                     alias: Arc::new("both-modes-policy".to_string()),
                     peer_resolver: Arc::new(|| vec![format!("+{ALLOWED}")]),
-                    allowed_groups_resolver: Arc::new(Vec::new),
+                    allowed_groups_resolver: Arc::new(|| vec![GROUP_JID.to_string()]),
                     mode: mode.clone(),
                     dm_policy: policy.clone(),
                     group_policy: policy.clone(),
