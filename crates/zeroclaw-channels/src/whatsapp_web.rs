@@ -2092,8 +2092,6 @@ fn fromme_outside_self_chat_is_operator_trigger(
 ///
 /// A non-empty list still filters under every policy, so `"all"` widens the
 /// default rather than overriding an explicit list.
-///
-/// Ratified in #9397.
 fn is_group_chat_allowed(
     chat_jid: &str,
     allowed_groups: &[String],
@@ -3507,8 +3505,8 @@ mod tests {
     #[test]
     #[cfg(feature = "whatsapp-web")]
     fn allowed_groups_empty_admits_only_under_policy_all() {
-        // #9397: an empty list is NOT permission. It admits only when the
-        // operator asked for open groups by name.
+        // An empty list is NOT permission. It admits only when the operator
+        // asked for open groups by name.
         let jid = "123456789012345@g.us";
         assert!(super::is_group_chat_allowed(
             jid,
@@ -6294,9 +6292,8 @@ mod tests {
     }
 
     /// Emptying `allowed_groups` entirely is a revocation too, not a reset to
-    /// open. Before #9397 an operator who cleared the list while an approval was
-    /// outstanding would have had that reply honoured, because an empty list
-    /// admitted everything.
+    /// open. An operator who clears the list while an approval is outstanding
+    /// must not have that reply honoured.
     #[tokio::test]
     #[cfg(feature = "whatsapp-web")]
     async fn clearing_allowed_groups_refuses_an_outstanding_approval() {
