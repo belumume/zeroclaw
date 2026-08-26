@@ -269,8 +269,12 @@ async fn resolve_approval_reply_with_group_admission(
     is_group: bool,
     responder_is_allowlisted: bool,
     allowed_groups_resolver: &(dyn Fn() -> Vec<String> + Send + Sync),
+    group_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
 ) -> std::result::Result<(), ApprovalRefusal> {
-    if is_group && !is_group_chat_allowed(from_chat, &allowed_groups_resolver()) {
+    // The policy is re-read here, not captured when the approval was issued: an
+    // operator who closes group access while a prompt is outstanding must not
+    // have that reply honoured.
+    if is_group && !is_group_chat_allowed(from_chat, &allowed_groups_resolver(), group_policy) {
         return Err(ApprovalRefusal::GroupNoLongerAllowed);
     }
 
@@ -806,6 +810,7 @@ impl WhatsAppWebChannel {
                 is_group,
                 normalized.is_some(),
                 context.allowed_groups_resolver.as_ref(),
+                &context.group_policy,
             )
             .await
             {
@@ -840,7 +845,7 @@ impl WhatsAppWebChannel {
         }
 
         let allowed_groups = (context.allowed_groups_resolver)();
-        if is_group && !is_group_chat_allowed(&chat, &allowed_groups) {
+        if is_group && !is_group_chat_allowed(&chat, &allowed_groups, &context.group_policy) {
             ::zeroclaw_log::record!(
                 DEBUG,
                 ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
@@ -2056,9 +2061,28 @@ fn fromme_outside_self_chat_is_operator_trigger(
 }
 
 #[cfg(feature = "whatsapp-web")]
-fn is_group_chat_allowed(chat_jid: &str, allowed_groups: &[String]) -> bool {
+/// Whether a group chat may be processed.
+///
+/// An empty `allowed_groups` is NOT permission. A list that admits everything is
+/// indistinguishable from a list nobody configured, so open group access has to
+/// be asked for by name: `group_policy = "all"`. Under `"allowlist"` an empty
+/// list admits nothing, which is what an allowlist means everywhere else in this
+/// codebase; `"ignore"` also admits nothing.
+///
+/// A non-empty list still filters under every policy, so `"all"` widens the
+/// default rather than overriding an explicit list.
+///
+/// Ratified in #9397.
+fn is_group_chat_allowed(
+    chat_jid: &str,
+    allowed_groups: &[String],
+    group_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
+) -> bool {
     if allowed_groups.is_empty() {
-        return true;
+        return matches!(
+            group_policy,
+            zeroclaw_config::schema::WhatsAppChatPolicy::All
+        );
     }
     let chat_user = chat_jid
         .split_once('@')
@@ -3461,9 +3485,24 @@ mod tests {
 
     #[test]
     #[cfg(feature = "whatsapp-web")]
-    fn allowed_groups_empty_permits_all() {
-        // Empty list is the default: every group passes (no behavior change).
-        assert!(super::is_group_chat_allowed("123456789012345@g.us", &[]));
+    fn allowed_groups_empty_admits_only_under_policy_all() {
+        // #9397: an empty list is NOT permission. It admits only when the
+        // operator asked for open groups by name.
+        let jid = "123456789012345@g.us";
+        assert!(super::is_group_chat_allowed(jid, &[], &zeroclaw_config::schema::WhatsAppChatPolicy::All));
+        assert!(!super::is_group_chat_allowed(jid, &[], &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist));
+        assert!(!super::is_group_chat_allowed(jid, &[], &zeroclaw_config::schema::WhatsAppChatPolicy::Ignore));
+    }
+
+    #[test]
+    #[cfg(feature = "whatsapp-web")]
+    fn allowed_groups_non_empty_still_filters_under_policy_all() {
+        // CONTROL for the test above: `all` widens the empty-list default, it does
+        // not override an explicit list. Without this, a change making `all` bypass
+        // filtering entirely would still pass every other case here.
+        let groups = vec!["123456789012345".to_string()];
+        assert!(super::is_group_chat_allowed("123456789012345@g.us", &groups, &zeroclaw_config::schema::WhatsAppChatPolicy::All));
+        assert!(!super::is_group_chat_allowed("999999999999999@g.us", &groups, &zeroclaw_config::schema::WhatsAppChatPolicy::All));
     }
 
     #[test]
@@ -3617,7 +3656,8 @@ mod tests {
         let groups = vec!["123456789012345@g.us".to_string()];
         assert!(super::is_group_chat_allowed(
             "123456789012345@g.us",
-            &groups
+            &groups,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
     }
 
@@ -3642,7 +3682,8 @@ mod tests {
         let groups = vec!["123456789012345".to_string()];
         assert!(super::is_group_chat_allowed(
             "123456789012345@g.us",
-            &groups
+            &groups,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
     }
 
@@ -3661,22 +3702,26 @@ mod tests {
         let groups = vec!["123456789012345".to_string()];
         assert!(!super::is_group_chat_allowed(
             "999999999999999@g.us",
-            &groups
+            &groups,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
         // Blank / whitespace-only entries never match.
         assert!(!super::is_group_chat_allowed(
             "123@g.us",
-            &["   ".to_string()]
+            &["   ".to_string()],
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
         // Prefix entries match the user part EXACTLY, not as a string prefix:
         // "123" must admit "123@g.us" but never "123999@g.us".
         assert!(super::is_group_chat_allowed(
             "123@g.us",
-            &["123".to_string()]
+            &["123".to_string()],
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
         assert!(!super::is_group_chat_allowed(
             "123999@g.us",
-            &["123".to_string()]
+            &["123".to_string()],
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
         ));
     }
 
@@ -3734,7 +3779,7 @@ mod tests {
         let groups = vec!["123456789012345".to_string()];
         let is_group = false;
         let dm_jid = "987654321098765@s.whatsapp.net";
-        let admitted = !is_group || super::is_group_chat_allowed(dm_jid, &groups);
+        let admitted = !is_group || super::is_group_chat_allowed(dm_jid, &groups, &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist);
         assert!(admitted);
     }
 
@@ -6179,6 +6224,7 @@ mod tests {
             true,
             true,
             &resolver,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
         )
         .await;
         assert_eq!(refused, Err(ApprovalRefusal::GroupNoLongerAllowed));
@@ -6194,6 +6240,52 @@ mod tests {
             true,
             true,
             &resolver,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
+        )
+        .await;
+        assert_eq!(accepted, Ok(()));
+        assert_eq!(receiver.await.unwrap(), ChannelApprovalResponse::Approve);
+    }
+
+    /// Emptying `allowed_groups` entirely is a revocation too, not a reset to
+    /// open. Before #9397 an operator who cleared the list while an approval was
+    /// outstanding would have had that reply honoured, because an empty list
+    /// admitted everything.
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn clearing_allowed_groups_refuses_an_outstanding_approval() {
+        const GROUP: &str = "124@g.us";
+        let mut receiver = park_token("aaa014", GROUP, true).await;
+        let allowed_groups = Arc::new(parking_lot::RwLock::new(vec![GROUP.to_string()]));
+        let live_groups = Arc::clone(&allowed_groups);
+        let resolver = move || live_groups.read().clone();
+
+        allowed_groups.write().clear();
+        let refused = resolve_approval_reply_with_group_admission(
+            "aaa014",
+            ChannelApprovalResponse::Approve,
+            "default",
+            GROUP,
+            true,
+            true,
+            &resolver,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
+        )
+        .await;
+        assert_eq!(refused, Err(ApprovalRefusal::GroupNoLongerAllowed));
+        assert!(receiver.try_recv().is_err());
+
+        // CONTROL: the same cleared list under `all` still admits, so the refusal
+        // above is the policy deciding rather than the clear() alone.
+        let accepted = resolve_approval_reply_with_group_admission(
+            "aaa014",
+            ChannelApprovalResponse::Approve,
+            "default",
+            GROUP,
+            true,
+            true,
+            &resolver,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::All,
         )
         .await;
         assert_eq!(accepted, Ok(()));

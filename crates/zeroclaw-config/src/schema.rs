@@ -15778,6 +15778,23 @@ pub enum WhatsAppChatPolicy {
     All,
 }
 
+/// Whether an empty `allowed_groups` is a capability the operator is LOSING.
+///
+/// Shared rather than duplicated: the Web transport emits a startup notice from
+/// this same predicate, so the runtime behavior and the `config validate` warning
+/// cannot drift into disagreeing about which configurations changed.
+///
+/// Ratified in #9397.
+pub fn whatsapp_empty_group_list_is_newly_closed(
+    mode: &WhatsAppWebMode,
+    group_policy: &WhatsAppChatPolicy,
+) -> bool {
+    !matches!(
+        (mode, group_policy),
+        (_, WhatsAppChatPolicy::All) | (WhatsAppWebMode::Personal, WhatsAppChatPolicy::Ignore)
+    )
+}
+
 /// WhatsApp channel configuration (Cloud API or Web mode).
 ///
 /// Set `phone_number_id` for Cloud API mode, or `session_path` for Web mode.
