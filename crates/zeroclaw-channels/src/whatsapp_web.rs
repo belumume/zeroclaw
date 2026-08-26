@@ -3510,9 +3510,21 @@ mod tests {
         // #9397: an empty list is NOT permission. It admits only when the
         // operator asked for open groups by name.
         let jid = "123456789012345@g.us";
-        assert!(super::is_group_chat_allowed(jid, &[], &zeroclaw_config::schema::WhatsAppChatPolicy::All));
-        assert!(!super::is_group_chat_allowed(jid, &[], &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist));
-        assert!(!super::is_group_chat_allowed(jid, &[], &zeroclaw_config::schema::WhatsAppChatPolicy::Ignore));
+        assert!(super::is_group_chat_allowed(
+            jid,
+            &[],
+            &zeroclaw_config::schema::WhatsAppChatPolicy::All
+        ));
+        assert!(!super::is_group_chat_allowed(
+            jid,
+            &[],
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist
+        ));
+        assert!(!super::is_group_chat_allowed(
+            jid,
+            &[],
+            &zeroclaw_config::schema::WhatsAppChatPolicy::Ignore
+        ));
     }
 
     #[test]
@@ -3522,8 +3534,16 @@ mod tests {
         // not override an explicit list. Without this, a change making `all` bypass
         // filtering entirely would still pass every other case here.
         let groups = vec!["123456789012345".to_string()];
-        assert!(super::is_group_chat_allowed("123456789012345@g.us", &groups, &zeroclaw_config::schema::WhatsAppChatPolicy::All));
-        assert!(!super::is_group_chat_allowed("999999999999999@g.us", &groups, &zeroclaw_config::schema::WhatsAppChatPolicy::All));
+        assert!(super::is_group_chat_allowed(
+            "123456789012345@g.us",
+            &groups,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::All
+        ));
+        assert!(!super::is_group_chat_allowed(
+            "999999999999999@g.us",
+            &groups,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::All
+        ));
     }
 
     #[test]
@@ -3800,7 +3820,12 @@ mod tests {
         let groups = vec!["123456789012345".to_string()];
         let is_group = false;
         let dm_jid = "987654321098765@s.whatsapp.net";
-        let admitted = !is_group || super::is_group_chat_allowed(dm_jid, &groups, &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist);
+        let admitted = !is_group
+            || super::is_group_chat_allowed(
+                dm_jid,
+                &groups,
+                &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
+            );
         assert!(admitted);
     }
 
