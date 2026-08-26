@@ -478,21 +478,9 @@ impl WhatsAppWebChannel {
                     "allowed_groups is empty and group_policy is not \"all\", so \
                      this channel will answer no group. It previously answered \
                      every group. To restore group access, {}.",
-                    match group_policy {
-                        // A list cannot reopen `ignore`: a non-empty list passes
-                        // the identity gate, and `composed_chat_policy_decision`
-                        // still returns DropGroupIgnored for every group. Naming
-                        // allowed_groups here would be an ineffective remedy.
-                        zeroclaw_config::schema::WhatsAppChatPolicy::Ignore =>
-                            "group_policy = \"ignore\" serves no group by design; \
-                             set group_policy = \"all\" to admit every group, or \
-                             group_policy = \"allowlist\" together with the group \
-                             JIDs you intend to serve",
-                        _ =>
-                            "list the group JIDs you intend to serve in \
-                              allowed_groups, or set group_policy = \"all\" to \
-                              admit every group",
-                    }
+                    // Shared with the `config validate` warning, so the two
+                    // surfaces cannot offer different remedies for one config.
+                    zeroclaw_config::schema::whatsapp_empty_group_list_remedy(&group_policy)
                 )
             );
         }
