@@ -456,6 +456,27 @@ impl WhatsAppWebChannel {
             .map(|p| p.chars().filter(|c| c.is_ascii_digit()).collect::<String>())
             .filter(|digits| !digits.is_empty());
 
+        // Only the NEWLY-closed case warns. Personal mode with `group_policy =
+        // "ignore"` was already closed, and `group_policy = "all"` explicitly
+        // preserves open access, so neither is reported: an operator whose
+        // behaviour did not change should not be told that it did. The predicate
+        // is shared with `config validate` so the two cannot disagree about which
+        // configurations changed.
+        if zeroclaw_config::schema::whatsapp_empty_group_list_is_newly_closed(&mode, &group_policy)
+            && allowed_groups_resolver().is_empty()
+        {
+            ::zeroclaw_log::record!(
+                WARN,
+                ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note)
+                    .with_outcome(::zeroclaw_log::EventOutcome::Unknown)
+                    .with_attrs(::serde_json::json!({
+                        "group_policy": format!("{group_policy:?}"),
+                        "mode": format!("{mode:?}"),
+                    })),
+                "allowed_groups is empty and group_policy is not \"all\", so this                  channel will answer no group. Set group_policy = \"all\" to allow                  every group, or list the group JIDs in allowed_groups."
+            );
+        }
+
         if mention_only && bot_phone.is_none() {
             ::zeroclaw_log::record!(
                 WARN,
