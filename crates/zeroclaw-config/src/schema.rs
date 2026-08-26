@@ -15783,8 +15783,6 @@ pub enum WhatsAppChatPolicy {
 /// Shared rather than duplicated: the Web transport emits a startup notice from
 /// this same predicate, so the runtime behavior and the `config validate` warning
 /// cannot drift into disagreeing about which configurations changed.
-///
-/// Ratified in #9397.
 pub fn whatsapp_empty_group_list_is_newly_closed(
     mode: &WhatsAppWebMode,
     group_policy: &WhatsAppChatPolicy,
