@@ -475,9 +475,10 @@ impl WhatsAppWebChannel {
                         "mode": format!("{mode:?}"),
                     })),
                 format!(
-                    "allowed_groups is empty and group_policy is not \"all\", so \
-                     this channel will answer no group. It previously answered \
-                     every group. To restore group access, {}.",
+                    "allowed_groups is empty and group_policy is \"allowlist\", \
+                     so this channel will answer no group. An empty list used \
+                     to admit every group at the identity gate; that gate is \
+                     now decided by group_policy. To restore group access, {}.",
                     // Shared with the `config validate` warning, so the two
                     // surfaces cannot offer different remedies for one config.
                     zeroclaw_config::schema::whatsapp_empty_group_list_remedy(&group_policy)
