@@ -33,12 +33,11 @@ pub const VERIFIABLE_INTENT_TOOL_WITHHELD: &str = "verifiable_intent_tool_withhe
 ///   `self_chat_mode` is set but the transport only consults them under
 ///   `mode = "personal"`, so it currently has no effect.
 /// - `whatsapp_empty_group_list_serves_no_group`: `allowed_groups` is empty and
-///   `group_policy` is not `"all"`, so the channel now answers no group where it
-///   previously answered every group. A migration notice about lost capability,
-///   not a fail-open alarm. Raised for every mode with `group_policy =
-///   "allowlist"` or `"ignore"`, except `mode = "personal"` with
-///   `group_policy = "ignore"`, which already dropped every group message.
-///   `group_policy = "all"` still admits every group, so it is not reported.
+///   `group_policy` is `"allowlist"`, so the channel answers no group where an
+///   empty list used to admit every group at the identity gate. A migration
+///   notice about lost capability, not a fail-open alarm. `"all"` admits every
+///   group before and after, and `"ignore"` rejects every group before and
+///   after under BOTH modes, so neither is reported.
 /// - `memory_config_knob_inert`: a `[memory]` knob is set to a non-default
 ///   value but has no runtime consumer yet, so it currently has no effect
 ///   (see `validate_memory_semantics` in `schema.rs` for the current list).
