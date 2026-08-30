@@ -6431,7 +6431,11 @@ mod tests {
                 &Policy::All,
             )
             .await;
-            assert_eq!(accepted, Ok(()), "{policy:?} answers groups and must resolve");
+            assert_eq!(
+                accepted,
+                Ok(()),
+                "{policy:?} answers groups and must resolve"
+            );
             assert_eq!(receiver.await.unwrap(), ChannelApprovalResponse::Approve);
             receiver = park_token("aaa015", GROUP, true).await;
         }
