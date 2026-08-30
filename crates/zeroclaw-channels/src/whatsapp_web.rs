@@ -196,6 +196,11 @@ enum ApprovalRefusal {
     /// The token belongs to a group that the live channel policy no longer
     /// admits.
     GroupNoLongerAllowed,
+    /// The token belongs to a direct message that the live channel policy no
+    /// longer admits. Separate from the group variant because this name is
+    /// what the refusal log prints, and an operator reading `Group` on a DM
+    /// refusal would be told something untrue about their own configuration.
+    DmNoLongerAllowed,
 }
 
 /// Decide whether an approval reply may resolve `token`, and resolve it if so.
@@ -270,10 +275,32 @@ async fn resolve_approval_reply_with_group_admission(
     responder_is_allowlisted: bool,
     allowed_groups_resolver: &(dyn Fn() -> Vec<String> + Send + Sync),
     group_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
+    dm_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
 ) -> std::result::Result<(), ApprovalRefusal> {
-    // The policy is re-read here, not captured when the approval was issued: an
-    // operator who closes group access while a prompt is outstanding must not
-    // have that reply honoured.
+    // The policies are re-read here, not captured when the approval was issued:
+    // an operator who closes access while a prompt is outstanding must not have
+    // that reply honoured.
+    //
+    // A reply executes the pending tool, so it clears the same two gates an
+    // ordinary message clears. The chat-type gate decides whether this KIND of
+    // chat is answered at all; the identity gate decides whether THIS group is
+    // listed. `is_group_chat_allowed` is only the second, and a non-empty list
+    // matching this chat satisfies it under every policy, `ignore` included, so
+    // the identity gate alone would honour a reply in a chat the operator told
+    // this channel to ignore.
+    //
+    // Only the two ignore verdicts are consulted. Responder authorization stays
+    // with `resolve_approval_reply`, which reports it as `UnauthorizedResponder`
+    // rather than collapsing it into a chat refusal.
+    match chat_type_policy_decision(is_group, group_policy, dm_policy, responder_is_allowlisted) {
+        ChatPolicyDecision::DropGroupIgnored => {
+            return Err(ApprovalRefusal::GroupNoLongerAllowed);
+        }
+        ChatPolicyDecision::DropDmIgnored => {
+            return Err(ApprovalRefusal::DmNoLongerAllowed);
+        }
+        ChatPolicyDecision::Admit | ChatPolicyDecision::DropUnrecognizedSender => {}
+    }
     if is_group && !is_group_chat_allowed(from_chat, &allowed_groups_resolver(), group_policy) {
         return Err(ApprovalRefusal::GroupNoLongerAllowed);
     }
@@ -841,6 +868,7 @@ impl WhatsAppWebChannel {
                 normalized.is_some(),
                 context.allowed_groups_resolver.as_ref(),
                 &context.group_policy,
+                &context.dm_policy,
             )
             .await
             {
@@ -6280,6 +6308,7 @@ mod tests {
             true,
             &resolver,
             &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::All,
         )
         .await;
         assert_eq!(refused, Err(ApprovalRefusal::GroupNoLongerAllowed));
@@ -6296,6 +6325,7 @@ mod tests {
             true,
             &resolver,
             &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::All,
         )
         .await;
         assert_eq!(accepted, Ok(()));
@@ -6324,6 +6354,7 @@ mod tests {
             true,
             &resolver,
             &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::All,
         )
         .await;
         assert_eq!(refused, Err(ApprovalRefusal::GroupNoLongerAllowed));
@@ -6340,10 +6371,125 @@ mod tests {
             true,
             &resolver,
             &zeroclaw_config::schema::WhatsAppChatPolicy::All,
+            &zeroclaw_config::schema::WhatsAppChatPolicy::All,
         )
         .await;
         assert_eq!(accepted, Ok(()));
         assert_eq!(receiver.await.unwrap(), ChannelApprovalResponse::Approve);
+    }
+
+    /// An approval reply executes a pending tool, so it has to clear the same
+    /// gates an ordinary message clears. A matching non-empty `allowed_groups`
+    /// satisfies the identity gate under every policy, `ignore` included, so
+    /// the identity gate alone would let a control reply act in a chat the
+    /// operator told ZeroClaw to ignore.
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn an_ignored_group_refuses_an_approval_its_own_messages_cannot_reach() {
+        use zeroclaw_config::schema::WhatsAppChatPolicy as Policy;
+        const GROUP: &str = "125@g.us";
+        let mut receiver = park_token("aaa015", GROUP, true).await;
+        let allowed_groups = Arc::new(parking_lot::RwLock::new(vec![GROUP.to_string()]));
+        let live_groups = Arc::clone(&allowed_groups);
+        let resolver = move || live_groups.read().clone();
+
+        // The list MATCHES this group, so the identity gate admits and only the
+        // chat-type policy can refuse.
+        let refused = resolve_approval_reply_with_group_admission(
+            "aaa015",
+            ChannelApprovalResponse::Approve,
+            "default",
+            GROUP,
+            true,
+            true,
+            &resolver,
+            &Policy::Ignore,
+            &Policy::All,
+        )
+        .await;
+        assert_eq!(
+            refused,
+            Err(ApprovalRefusal::GroupNoLongerAllowed),
+            "an approval reply must not resolve in a group the policy ignores"
+        );
+        assert!(receiver.try_recv().is_err());
+        assert!(PENDING_APPROVALS.lock().await.contains_key("aaa015"));
+
+        // CONTROLS: the identical call under the two policies that DO answer
+        // groups must still resolve, so the refusal above is policy selection
+        // rather than a gate that now rejects every group approval.
+        for policy in [Policy::Allowlist, Policy::All] {
+            let accepted = resolve_approval_reply_with_group_admission(
+                "aaa015",
+                ChannelApprovalResponse::Approve,
+                "default",
+                GROUP,
+                true,
+                true,
+                &resolver,
+                &policy,
+                &Policy::All,
+            )
+            .await;
+            assert_eq!(accepted, Ok(()), "{policy:?} answers groups and must resolve");
+            assert_eq!(receiver.await.unwrap(), ChannelApprovalResponse::Approve);
+            receiver = park_token("aaa015", GROUP, true).await;
+        }
+        PENDING_APPROVALS.lock().await.remove("aaa015");
+    }
+
+    /// The DM half of the same gap. `dm_policy` was not a parameter at all, so
+    /// an approval reply in a direct message skipped the chat-type gate outright
+    /// while an ordinary message in that same chat was dropped.
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn an_ignored_dm_refuses_an_approval_its_own_messages_cannot_reach() {
+        use zeroclaw_config::schema::WhatsAppChatPolicy as Policy;
+        const DM: &str = "15550001@s.whatsapp.net";
+        let mut receiver = park_token("aaa016", DM, false).await;
+        let resolver = || Vec::new();
+
+        let refused = resolve_approval_reply_with_group_admission(
+            "aaa016",
+            ChannelApprovalResponse::Approve,
+            "default",
+            DM,
+            false,
+            true,
+            &resolver,
+            &Policy::All,
+            &Policy::Ignore,
+        )
+        .await;
+        assert_eq!(
+            refused,
+            Err(ApprovalRefusal::DmNoLongerAllowed),
+            "an approval reply must not resolve in a DM the policy ignores"
+        );
+        assert!(receiver.try_recv().is_err());
+        assert!(PENDING_APPROVALS.lock().await.contains_key("aaa016"));
+
+        // CONTROL: the identical call under the two policies that DO answer DMs
+        // must still resolve, so the refusal above is policy selection rather
+        // than a gate that now rejects every DM approval.
+        for policy in [Policy::Allowlist, Policy::All] {
+            let accepted = resolve_approval_reply_with_group_admission(
+                "aaa016",
+                ChannelApprovalResponse::Approve,
+                "default",
+                DM,
+                false,
+                true,
+                &resolver,
+                &Policy::All,
+                &policy,
+            )
+            .await;
+            assert_eq!(accepted, Ok(()), "{policy:?} answers DMs and must resolve");
+            assert_eq!(receiver.await.unwrap(), ChannelApprovalResponse::Approve);
+            receiver = park_token("aaa016", DM, false).await;
+        }
+        PENDING_APPROVALS.lock().await.remove("aaa016");
     }
 
     /// `PENDING_APPROVALS` is process-wide, so before the alias was part of the
