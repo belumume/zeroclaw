@@ -11840,9 +11840,11 @@ pub fn validate_memory_semantics(
 /// `dm_policy` and `group_policy` are consulted under BOTH modes, so they are
 /// not reported here.
 ///
-/// `allowed_groups` is separate. `is_group_chat_allowed` returns true when the
-/// list is empty, so under `group_policy = "allowlist"` an empty list is an
-/// allowlist that admits every group. That holds under both modes.
+/// `allowed_groups` is separate. It is the group-identity gate and is consulted
+/// under both modes, so it is never inert. `is_group_chat_allowed` returns true
+/// for an empty list only under `group_policy = "all"`; under every other policy
+/// an empty list admits no group. That closure is reported below by its own
+/// warning rather than as an inert key.
 ///
 /// Warnings only, no behaviour change to the validator itself. But be precise
 /// about WHICH reliance is reported, because this sentence used to promise more
@@ -41558,9 +41560,9 @@ group_policy = "all"
         );
     }
 
-    /// The default group_policy is `allowlist`, so an empty list really does
-    /// admit every group. This is the positive case that must survive narrowing
-    /// the warning.
+    /// The default group_policy is `allowlist`, under which an empty list admits
+    /// no group, so business mode with no policy set is the newly-closed case.
+    /// This is the positive case that must survive narrowing the warning.
     #[test]
     async fn whatsapp_business_empty_allowed_groups_is_flagged() {
         let toml = r#"
