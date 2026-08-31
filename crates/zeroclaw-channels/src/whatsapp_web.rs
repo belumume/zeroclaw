@@ -6694,6 +6694,131 @@ mod tests {
         );
     }
 
+    /// The same exception, driven through `handle_inbound_message_event`
+    /// rather than through the helper.
+    ///
+    /// The helper-level tests cannot see this: they are handed a verdict, so
+    /// they stay green even if the handler computes the wrong one or passes it
+    /// to the wrong parameter. This exercises the hoisted call site itself.
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn inbound_path_admits_a_personal_self_chat_approval_reply() {
+        use wacore::types::events::Event;
+        use wacore::types::message::{MessageInfo, MessageSource};
+        use whatsapp_rust::TokioRuntime;
+        use whatsapp_rust::bot::Bot;
+        use whatsapp_rust_tokio_transport::TokioWebSocketTransportFactory;
+        use whatsapp_rust_ureq_http_client::UreqHttpClient;
+        use zeroclaw_config::schema::{WhatsAppChatPolicy as Policy, WhatsAppWebMode as Mode};
+
+        const OPERATOR: &str = "15551230001";
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let store = Arc::new(crate::whatsapp_storage::RusqliteStore::new(tmp.path()).unwrap());
+        let bot = Bot::builder()
+            .with_backend(store)
+            .with_transport_factory(TokioWebSocketTransportFactory::new())
+            .with_http_client(UreqHttpClient::new())
+            .with_runtime(TokioRuntime)
+            .build()
+            .await
+            .unwrap();
+        let client = bot.client();
+
+        // A self-chat is the operator's own thread: chat == sender, and the
+        // message is fromMe. That is what `self_chat_verdict` keys on.
+        let self_chat_reply = |token: &str| {
+            let jid: Jid = format!("{OPERATOR}@s.whatsapp.net")
+                .parse()
+                .expect("jid parses");
+            Event::Message(
+                Arc::new(waproto::whatsapp::Message {
+                    conversation: Some(format!("{token} yes")),
+                    ..Default::default()
+                }),
+                Arc::new(MessageInfo {
+                    source: MessageSource {
+                        chat: jid.clone(),
+                        sender: jid,
+                        is_from_me: true,
+                        is_group: false,
+                        ..Default::default()
+                    },
+                    id: format!("selfchat-approval-{token}"),
+                    r#type: "text".to_string(),
+                    push_name: "Operator".to_string(),
+                    timestamp: chrono::Utc::now(),
+                    ..Default::default()
+                }),
+            )
+        };
+
+        // `dm_policy = ignore` in BOTH contexts below. The only difference is
+        // `self_chat_mode`, so what is being exercised is the exception rather
+        // than a permissive policy.
+        let context_for = |self_chat_mode: bool, tx: tokio::sync::mpsc::Sender<ChannelMessage>| {
+            WhatsAppInboundContext {
+                tx,
+                alias: Arc::new("default".to_string()),
+                peer_resolver: Arc::new(|| vec![format!("+{OPERATOR}")]),
+                allowed_groups_resolver: Arc::new(Vec::new),
+                mode: Mode::Personal,
+                dm_policy: Policy::Ignore,
+                group_policy: Policy::Ignore,
+                self_chat_mode,
+                mention_only: false,
+                passive_group_context: false,
+                bot_phone: Arc::new(Mutex::new(None)),
+                bot_lid: Arc::new(Mutex::new(None)),
+                dm_mention_patterns: Arc::new(Vec::new()),
+                group_mention_patterns: Arc::new(Vec::new()),
+                transcription_config: None,
+                transcription_manager: None,
+                voice_chats: Arc::new(std::sync::Mutex::new(std::collections::HashSet::new())),
+            }
+        };
+
+        // self_chat_mode = true: the documented exception. The reply must
+        // resolve the pending tool even though dm_policy ignores DMs.
+        let chat = format!("{OPERATOR}@s.whatsapp.net");
+        let receiver = park_token("aaa018", &chat, false).await;
+        let (tx, _rx) = tokio::sync::mpsc::channel(4);
+        let context = context_for(true, tx);
+        WhatsAppWebChannel::handle_inbound_message_event(
+            &self_chat_reply("aaa018"),
+            &client,
+            &context,
+        )
+        .await;
+        assert_eq!(
+            tokio::time::timeout(std::time::Duration::from_secs(1), receiver)
+                .await
+                .expect("the self-chat approval must resolve, not time out")
+                .expect("the responder must still be open"),
+            ChannelApprovalResponse::Approve,
+            "an enabled personal self-chat must resolve its own approval"
+        );
+
+        // CONTROL: identical event and identical dm_policy, differing only in
+        // self_chat_mode. The channel ignores that thread, so the reply must
+        // NOT resolve. Without this the acceptance above would also pass a
+        // handler that ignored the policy entirely.
+        let mut receiver = park_token("aaa019", &chat, false).await;
+        let (tx, _rx2) = tokio::sync::mpsc::channel(4);
+        let context = context_for(false, tx);
+        WhatsAppWebChannel::handle_inbound_message_event(
+            &self_chat_reply("aaa019"),
+            &client,
+            &context,
+        )
+        .await;
+        assert!(
+            receiver.try_recv().is_err(),
+            "self_chat_mode=false is ignored by the channel, so the reply must not resolve"
+        );
+        PENDING_APPROVALS.lock().await.remove("aaa019");
+    }
+
     /// `PENDING_APPROVALS` is process-wide, so before the alias was part of the
     /// binding this was a real authorization bypass rather than a tidiness
     /// issue: the reply path resolves the authorized peers using whichever
