@@ -276,6 +276,7 @@ async fn resolve_approval_reply_with_group_admission(
     allowed_groups_resolver: &(dyn Fn() -> Vec<String> + Send + Sync),
     group_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
     dm_policy: &zeroclaw_config::schema::WhatsAppChatPolicy,
+    self_chat: SelfChatVerdict,
 ) -> std::result::Result<(), ApprovalRefusal> {
     // The policies are re-read here, not captured when the approval was issued:
     // an operator who closes access while a prompt is outstanding must not have
@@ -292,14 +293,30 @@ async fn resolve_approval_reply_with_group_admission(
     // Only the two ignore verdicts are consulted. Responder authorization stays
     // with `resolve_approval_reply`, which reports it as `UnauthorizedResponder`
     // rather than collapsing it into a chat refusal.
-    match chat_type_policy_decision(is_group, group_policy, dm_policy, responder_is_allowlisted) {
-        ChatPolicyDecision::DropGroupIgnored => {
-            return Err(ApprovalRefusal::GroupNoLongerAllowed);
+    match self_chat {
+        // The channel ignores this thread entirely, so a reply in it cannot
+        // resolve a pending tool either.
+        SelfChatVerdict::Disabled => return Err(ApprovalRefusal::DmNoLongerAllowed),
+        // The documented personal-mode exception: the operator's own thread is
+        // admitted whatever `dm_policy` says, and a reply must be admitted on
+        // the same terms or the prompt it answers can never be answered.
+        SelfChatVerdict::Admitted => {}
+        SelfChatVerdict::NotSelfChat => {
+            match chat_type_policy_decision(
+                is_group,
+                group_policy,
+                dm_policy,
+                responder_is_allowlisted,
+            ) {
+                ChatPolicyDecision::DropGroupIgnored => {
+                    return Err(ApprovalRefusal::GroupNoLongerAllowed);
+                }
+                ChatPolicyDecision::DropDmIgnored => {
+                    return Err(ApprovalRefusal::DmNoLongerAllowed);
+                }
+                ChatPolicyDecision::Admit | ChatPolicyDecision::DropUnrecognizedSender => {}
+            }
         }
-        ChatPolicyDecision::DropDmIgnored => {
-            return Err(ApprovalRefusal::DmNoLongerAllowed);
-        }
-        ChatPolicyDecision::Admit | ChatPolicyDecision::DropUnrecognizedSender => {}
     }
     if is_group && !is_group_chat_allowed(from_chat, &allowed_groups_resolver(), group_policy) {
         return Err(ApprovalRefusal::GroupNoLongerAllowed);
@@ -842,6 +859,18 @@ impl WhatsAppWebChannel {
         let is_group = info.source.is_group;
         let reply_target = Self::compute_reply_target(&chat);
 
+        // Computed HERE rather than further down, because the approval-reply
+        // interception below needs the same verdict the conversation path uses
+        // and sits ahead of where that path derives it.
+        let self_chat = self_chat_verdict(
+            &context.mode,
+            context.self_chat_mode,
+            is_group,
+            sender_jid.user(),
+            &chat,
+            info.source.is_from_me,
+        );
+
         // ── Approval-reply interception ──
         //
         // Must live here rather than in the gateway: the generic resolver at
@@ -869,6 +898,7 @@ impl WhatsAppWebChannel {
                 context.allowed_groups_resolver.as_ref(),
                 &context.group_policy,
                 &context.dm_policy,
+                self_chat,
             )
             .await
             {
@@ -919,25 +949,18 @@ impl WhatsAppWebChannel {
         // operator's own linked device talking to itself, and the self-chat
         // exception is a personal-mode affordance. The chat-type policies
         // further down are NOT personal-only and run under both modes.
-        let mut operator_self_chat = false;
+        let operator_self_chat = self_chat == SelfChatVerdict::Admitted;
         if context.mode == zeroclaw_config::schema::WhatsAppWebMode::Personal {
-            let sender_user = sender_jid.user();
-            let chat_user = chat.split_once('@').map(|(u, _)| u).unwrap_or(&chat);
-            let is_self_chat = !is_group && sender_user == chat_user && info.source.is_from_me;
-
-            if is_self_chat {
-                if !context.self_chat_mode {
-                    ::zeroclaw_log::record!(
-                        DEBUG,
-                        ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note),
-                        "ignoring self-chat message (self_chat_mode=false)"
-                    );
-                    return;
-                }
-                // self_chat_mode=true: the operator is talking to their own
-                // agent, so the chat-type policies below do not apply here.
-                operator_self_chat = true;
-            } else if info.source.is_from_me
+            if self_chat == SelfChatVerdict::Disabled {
+                ::zeroclaw_log::record!(
+                    DEBUG,
+                    ::zeroclaw_log::Event::new(module_path!(), ::zeroclaw_log::Action::Note),
+                    "ignoring self-chat message (self_chat_mode=false)"
+                );
+                return;
+            }
+            if self_chat == SelfChatVerdict::NotSelfChat
+                && info.source.is_from_me
                 && !fromme_outside_self_chat_is_operator_trigger(
                     is_group,
                     &context.dm_mention_patterns,
@@ -2196,6 +2219,52 @@ fn chat_type_policy_decision(
                 ChatPolicyDecision::DropUnrecognizedSender
             }
         }
+    }
+}
+
+/// What Personal-mode self-chat handling decides, before the chat-type
+/// policies run.
+///
+/// Extracted so the conversation path and the approval-reply path reach the
+/// same verdict from one place. An approval reply resolves a pending tool, so
+/// it has to be admitted on the same terms as the message that requested it:
+/// admitting it more narrowly strands a prompt the operator can never answer,
+/// and admitting it more widely honours a reply in a thread the channel drops.
+#[cfg(feature = "whatsapp-web")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SelfChatVerdict {
+    /// Not the operator's own thread, or not personal mode. The chat-type
+    /// policies decide.
+    NotSelfChat,
+    /// The operator's own thread with the affordance on. Admitted whatever
+    /// `dm_policy` says, which is what `self_chat_mode = true` means.
+    Admitted,
+    /// The operator's own thread with `self_chat_mode = false`. The channel
+    /// ignores it, so a reply here must not resolve an approval either.
+    Disabled,
+}
+
+/// Classify one inbound message against the personal-mode self-chat rules.
+#[cfg(feature = "whatsapp-web")]
+fn self_chat_verdict(
+    mode: &zeroclaw_config::schema::WhatsAppWebMode,
+    self_chat_mode: bool,
+    is_group: bool,
+    sender_user: &str,
+    chat: &str,
+    is_from_me: bool,
+) -> SelfChatVerdict {
+    if *mode != zeroclaw_config::schema::WhatsAppWebMode::Personal {
+        return SelfChatVerdict::NotSelfChat;
+    }
+    let chat_user = chat.split_once('@').map(|(u, _)| u).unwrap_or(chat);
+    if is_group || sender_user != chat_user || !is_from_me {
+        return SelfChatVerdict::NotSelfChat;
+    }
+    if self_chat_mode {
+        SelfChatVerdict::Admitted
+    } else {
+        SelfChatVerdict::Disabled
     }
 }
 
@@ -6309,6 +6378,7 @@ mod tests {
             &resolver,
             &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
             &zeroclaw_config::schema::WhatsAppChatPolicy::All,
+            SelfChatVerdict::NotSelfChat,
         )
         .await;
         assert_eq!(refused, Err(ApprovalRefusal::GroupNoLongerAllowed));
@@ -6326,6 +6396,7 @@ mod tests {
             &resolver,
             &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
             &zeroclaw_config::schema::WhatsAppChatPolicy::All,
+            SelfChatVerdict::NotSelfChat,
         )
         .await;
         assert_eq!(accepted, Ok(()));
@@ -6355,6 +6426,7 @@ mod tests {
             &resolver,
             &zeroclaw_config::schema::WhatsAppChatPolicy::Allowlist,
             &zeroclaw_config::schema::WhatsAppChatPolicy::All,
+            SelfChatVerdict::NotSelfChat,
         )
         .await;
         assert_eq!(refused, Err(ApprovalRefusal::GroupNoLongerAllowed));
@@ -6372,6 +6444,7 @@ mod tests {
             &resolver,
             &zeroclaw_config::schema::WhatsAppChatPolicy::All,
             &zeroclaw_config::schema::WhatsAppChatPolicy::All,
+            SelfChatVerdict::NotSelfChat,
         )
         .await;
         assert_eq!(accepted, Ok(()));
@@ -6405,6 +6478,7 @@ mod tests {
             &resolver,
             &Policy::Ignore,
             &Policy::All,
+            SelfChatVerdict::NotSelfChat,
         )
         .await;
         assert_eq!(
@@ -6429,6 +6503,7 @@ mod tests {
                 &resolver,
                 &policy,
                 &Policy::All,
+                SelfChatVerdict::NotSelfChat,
             )
             .await;
             assert_eq!(
@@ -6463,6 +6538,7 @@ mod tests {
             &resolver,
             &Policy::All,
             &Policy::Ignore,
+            SelfChatVerdict::NotSelfChat,
         )
         .await;
         assert_eq!(
@@ -6487,6 +6563,7 @@ mod tests {
                 &resolver,
                 &Policy::All,
                 &policy,
+                SelfChatVerdict::NotSelfChat,
             )
             .await;
             assert_eq!(accepted, Ok(()), "{policy:?} answers DMs and must resolve");
@@ -6494,6 +6571,127 @@ mod tests {
             receiver = park_token("aaa016", DM, false).await;
         }
         PENDING_APPROVALS.lock().await.remove("aaa016");
+    }
+
+    /// The personal-mode self-chat exception reaches the approval path too.
+    /// The conversation path admits the operator's own thread whatever
+    /// `dm_policy` says, so a reply there has to be admitted on the same terms;
+    /// gating it on `dm_policy` alone strands a prompt the operator requested
+    /// and can never answer.
+    #[tokio::test]
+    #[cfg(feature = "whatsapp-web")]
+    async fn a_personal_self_chat_resolves_an_approval_an_ignored_dm_could_not() {
+        use zeroclaw_config::schema::WhatsAppChatPolicy as Policy;
+        const SELF: &str = "15550002@s.whatsapp.net";
+        let receiver = park_token("aaa017", SELF, false).await;
+        let resolver = || Vec::new();
+
+        // `dm_policy = ignore` throughout: the ONLY difference between the two
+        // calls below is the self-chat verdict, so it is the exception being
+        // exercised rather than a permissive policy.
+        let accepted = resolve_approval_reply_with_group_admission(
+            "aaa017",
+            ChannelApprovalResponse::Approve,
+            "default",
+            SELF,
+            false,
+            true,
+            &resolver,
+            &Policy::All,
+            &Policy::Ignore,
+            SelfChatVerdict::Admitted,
+        )
+        .await;
+        assert_eq!(
+            accepted,
+            Ok(()),
+            "an enabled personal self-chat must resolve its own approval"
+        );
+        assert_eq!(receiver.await.unwrap(), ChannelApprovalResponse::Approve);
+
+        // CONTROL: the identical call, same policy, differing only in the
+        // verdict, must still refuse. Without this the acceptance above would
+        // also pass a gate that admitted every DM.
+        let mut receiver = park_token("aaa017", SELF, false).await;
+        let refused = resolve_approval_reply_with_group_admission(
+            "aaa017",
+            ChannelApprovalResponse::Approve,
+            "default",
+            SELF,
+            false,
+            true,
+            &resolver,
+            &Policy::All,
+            &Policy::Ignore,
+            SelfChatVerdict::NotSelfChat,
+        )
+        .await;
+        assert_eq!(refused, Err(ApprovalRefusal::DmNoLongerAllowed));
+        assert!(receiver.try_recv().is_err());
+
+        // And a self-chat the operator has switched OFF is dropped by the
+        // conversation path, so a reply in it must not resolve either.
+        let refused = resolve_approval_reply_with_group_admission(
+            "aaa017",
+            ChannelApprovalResponse::Approve,
+            "default",
+            SELF,
+            false,
+            true,
+            &resolver,
+            &Policy::All,
+            &Policy::All,
+            SelfChatVerdict::Disabled,
+        )
+        .await;
+        assert_eq!(
+            refused,
+            Err(ApprovalRefusal::DmNoLongerAllowed),
+            "self_chat_mode=false is ignored by the channel, so a reply cannot resolve"
+        );
+        assert!(receiver.try_recv().is_err());
+        PENDING_APPROVALS.lock().await.remove("aaa017");
+    }
+
+    /// The predicate itself, so the two call sites cannot disagree about what
+    /// counts as a self-chat.
+    #[test]
+    #[cfg(feature = "whatsapp-web")]
+    fn self_chat_verdict_matrix() {
+        use zeroclaw_config::schema::WhatsAppWebMode as Mode;
+        let v = super::self_chat_verdict;
+        const U: &str = "15550002";
+        const C: &str = "15550002@s.whatsapp.net";
+
+        assert_eq!(
+            v(&Mode::Personal, true, false, U, C, true),
+            SelfChatVerdict::Admitted
+        );
+        assert_eq!(
+            v(&Mode::Personal, false, false, U, C, true),
+            SelfChatVerdict::Disabled
+        );
+        // Business mode has no self-chat affordance at all.
+        assert_eq!(
+            v(&Mode::Business, true, false, U, C, true),
+            SelfChatVerdict::NotSelfChat
+        );
+        // Each remaining leg alone is enough to make it not a self-chat.
+        assert_eq!(
+            v(&Mode::Personal, true, true, U, C, true),
+            SelfChatVerdict::NotSelfChat,
+            "a group is never the operator self-chat"
+        );
+        assert_eq!(
+            v(&Mode::Personal, true, false, "15550003", C, true),
+            SelfChatVerdict::NotSelfChat,
+            "a different sender is not the operator talking to themselves"
+        );
+        assert_eq!(
+            v(&Mode::Personal, true, false, U, C, false),
+            SelfChatVerdict::NotSelfChat,
+            "not fromMe is not the operator talking to themselves"
+        );
     }
 
     /// `PENDING_APPROVALS` is process-wide, so before the alias was part of the
